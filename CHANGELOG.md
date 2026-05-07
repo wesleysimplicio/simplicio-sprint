@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-05-07
+
+### Fixed
+
+- Step numbers corrected across all agents to match 10-step flow (TestRunner→5, SecurityReviewer→6, LintRunner→4, PrCreator→9, PrReviewer→10).
+- Added `git push --force-with-lease` before PR creation — previously commit existed only locally, causing PR creation to fail.
+
+### Added
+
+- PrReviewer expanded: merge conflict markers, `debugger`, `binding.pry`, `import pdb`, `breakpoint()`, `System.out.println`, `dd()`, `dump()` detection.
+- SecurityReviewer: 5 new secret patterns (Slack webhook, JWT, Slack token, MongoDB/Postgres connection strings).
+- SecurityReviewer: `pip-audit` integration for Python dependency vulnerabilities.
+- SecurityReviewer: `cargo-audit` integration for Rust dependency vulnerabilities.
+- 6 new tests (103 total): merge conflict detection, debugger/pdb/logger patterns, Slack webhook, JWT detection.
+
 ## [0.2.1] - 2026-05-07
 
 ### Added

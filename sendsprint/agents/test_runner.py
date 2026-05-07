@@ -67,7 +67,7 @@ class TestRunner:
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
 
     def run_unit(self) -> StepReport:
-        report = StepReport(step=4, name="unit-tests", repo=str(self.repo))
+        report = StepReport(step=5, name="unit-tests", repo=str(self.repo))
         report.status = "running"
         if self.custom_unit_cmd:
             cmd = self.custom_unit_cmd.split()
@@ -82,7 +82,7 @@ class TestRunner:
         return self._exec(cmd, report, kind="unit")
 
     def run_e2e(self) -> StepReport:
-        report = StepReport(step=4, name="e2e-tests", repo=str(self.repo))
+        report = StepReport(step=5, name="e2e-tests", repo=str(self.repo))
         report.status = "running"
         if self.custom_e2e_cmd:
             cmd = self.custom_e2e_cmd.split()

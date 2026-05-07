@@ -13,13 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 class PrReviewer:
-    """Step 8: review PR diff, flag issues, report findings."""
+    """Step 10: review PR diff, flag issues, report findings."""
 
     def __init__(self, repo_path: str | Path) -> None:
         self.repo = Path(repo_path).resolve()
 
     def review(self, source_branch: str, target_branch: str = "main") -> StepReport:
-        report = StepReport(step=8, name="pr-review", repo=str(self.repo))
+        report = StepReport(step=10, name="pr-review", repo=str(self.repo))
         report.started_at = datetime.now(tz=timezone.utc)
         report.status = "running"
 
@@ -79,14 +79,26 @@ class PrReviewer:
                     "rule": "todo-marker",
                     "message": f"line {i + 1}: unresolved TODO/FIXME/HACK",
                 })
-            if "console.log(" in code or ("print(" in code and "logger" not in code):
-                issues.append({
-                    "rule": "debug-statement",
-                    "message": f"line {i + 1}: debug statement in diff",
-                })
+            debug_patterns = [
+                "console.log(", "console.debug(", "debugger",
+                "binding.pry", "byebug", "import pdb", "pdb.set_trace(",
+                "breakpoint()", "System.out.println(",
+                "dd(", "dump(",
+            ]
+            if any(p in code for p in debug_patterns):
+                if not ("logger" in code or "logging" in code):
+                    issues.append({
+                        "rule": "debug-statement",
+                        "message": f"line {i + 1}: debug statement in diff",
+                    })
             if len(code) > 200:
                 issues.append({
                     "rule": "long-line",
                     "message": f"line {i + 1}: line exceeds 200 chars",
+                })
+            if code.startswith("<<<<<<<") or code.startswith(">>>>>>>") or code.startswith("======="):
+                issues.append({
+                    "rule": "merge-conflict",
+                    "message": f"line {i + 1}: unresolved merge conflict marker",
                 })
         return issues

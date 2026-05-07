@@ -22,6 +22,11 @@ SECRET_PATTERNS: list[tuple[str, str]] = [
     (r"(?i)(aws_access_key_id|aws_secret_access_key)\s*=\s*\S+", "aws-credential"),
     (r"ghp_[A-Za-z0-9]{36}", "github-pat"),
     (r"sk-[A-Za-z0-9]{20,}", "openai-key"),
+    (r"https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[A-Za-z0-9]+", "slack-webhook"),
+    (r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}", "jwt-in-source"),
+    (r"xox[bporas]-[A-Za-z0-9\-]{10,}", "slack-token"),
+    (r"(?i)(mongodb(\+srv)?://)[^\s'\"]+", "database-connection-string"),
+    (r"(?i)(postgres(ql)?://)[^\s'\"]+", "database-connection-string"),
 ]
 
 IGNORE_DIRS = {
@@ -46,7 +51,7 @@ class SecurityReviewer:
         self.fp = fingerprint
 
     def scan(self) -> StepReport:
-        report = StepReport(step=5, name="security-review", repo=str(self.repo))
+        report = StepReport(step=6, name="security-review", repo=str(self.repo))
         report.started_at = datetime.now(tz=timezone.utc)
         report.status = "running"
 
@@ -118,6 +123,10 @@ class SecurityReviewer:
         findings: list[SecurityFinding] = []
         if (self.repo / "package-lock.json").exists() or (self.repo / "package.json").exists():
             findings.extend(self._npm_audit())
+        if (self.repo / "requirements.txt").exists() or (self.repo / "pyproject.toml").exists():
+            findings.extend(self._pip_audit())
+        if (self.repo / "Cargo.toml").exists():
+            findings.extend(self._cargo_audit())
         return findings
 
     def _npm_audit(self) -> list[SecurityFinding]:
@@ -149,6 +158,74 @@ class SecurityReviewer:
                     file="package.json",
                     message=f"{pkg}: {info.get('title', sev)} vulnerability",
                     recommendation=f"npm audit fix or upgrade {pkg}",
+                )
+            )
+        return out
+
+    def _pip_audit(self) -> list[SecurityFinding]:
+        try:
+            result = subprocess.run(
+                ["pip-audit", "--format=json", "--desc"],
+                cwd=str(self.repo),
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return []
+        if result.returncode == 0:
+            return []
+        try:
+            data = json.loads(result.stdout)
+        except (json.JSONDecodeError, ValueError):
+            return []
+        out: list[SecurityFinding] = []
+        for vuln in (data if isinstance(data, list) else data.get("dependencies", []))[:20]:
+            name = vuln.get("name", "unknown")
+            for v in vuln.get("vulns", []):
+                vid = v.get("id", "")
+                desc = v.get("description", "")[:200]
+                sev = v.get("fix_versions") and "high" or "medium"
+                out.append(
+                    SecurityFinding(
+                        rule="pip-audit",
+                        severity=sev,
+                        file="requirements.txt",
+                        message=f"{name}: {vid} — {desc}",
+                        recommendation=f"upgrade {name}",
+                    )
+                )
+        return out
+
+    def _cargo_audit(self) -> list[SecurityFinding]:
+        try:
+            result = subprocess.run(
+                ["cargo", "audit", "--json"],
+                cwd=str(self.repo),
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return []
+        if result.returncode == 0:
+            return []
+        try:
+            data = json.loads(result.stdout)
+        except (json.JSONDecodeError, ValueError):
+            return []
+        out: list[SecurityFinding] = []
+        for vuln in data.get("vulnerabilities", {}).get("list", [])[:20]:
+            advisory = vuln.get("advisory", {})
+            pkg = advisory.get("package", "unknown")
+            title = advisory.get("title", "vulnerability")
+            out.append(
+                SecurityFinding(
+                    rule="cargo-audit",
+                    severity="high",
+                    file="Cargo.toml",
+                    message=f"{pkg}: {title}",
+                    recommendation=f"upgrade {pkg}",
                 )
             )
         return out

@@ -4,7 +4,7 @@ Multi-agent skill that automates end-to-end sprint delivery. Reads Jira / Azure 
 
 Works across Claude, Codex, Hermes Agent, Openclaw, and GitHub Copilot.
 
-> **Status:** v0.2.0 — Full 9-step flow implemented. Multi-repo workspaces, `--scope mine` filtering, tech detection for 25+ stacks.
+> **Status:** v0.2.2 — Full 10-step flow. Multi-repo workspaces, `--scope mine` filtering, tech detection for 25+ stacks, 103 tests.
 
 ---
 
@@ -192,7 +192,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-97 tests covering operators, architecture mapper/builder, tech detector, scope filtering, workspace loading, and all agents (including lint runner).
+103 tests covering operators, architecture mapper/builder, tech detector, scope filtering, workspace loading, and all agents (lint, security, PR review).
 
 ---
 

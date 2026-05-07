@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class PrCreator:
-    """Step 7: create a pull request after dev + test + security pass."""
+    """Step 9: create a pull request after dev + test + security pass."""
 
     def __init__(
         self,
@@ -39,7 +39,7 @@ class PrCreator:
         title: str,
         body: str = "",
     ) -> StepReport:
-        report = StepReport(step=7, name="create-pr", repo=str(self.repo))
+        report = StepReport(step=9, name="create-pr", repo=str(self.repo))
         report.started_at = datetime.now(tz=timezone.utc)
         report.status = "running"
         try:

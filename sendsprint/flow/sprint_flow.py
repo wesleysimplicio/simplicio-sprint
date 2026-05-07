@@ -154,6 +154,9 @@ class SprintFlow:
             # --- Step 8: Commit ---
             self._step8_commit(work_dir, sprint, report)
 
+            # --- Step 8b: Push branch ---
+            self._push_branch(work_dir, branch_name)
+
             # --- Step 9: Create PR ---
             target = (repo_cfg.pr_target_branch if repo_cfg else None) or (
                 self.workspace.default_base_branch if self.workspace else "main"
@@ -390,6 +393,19 @@ class SprintFlow:
         report.steps.append(done)
         if pr_report and pr_report.pr:
             report.prs.append(pr_report.pr)
+
+    def _push_branch(self, work_dir: Path, branch: str) -> None:
+        try:
+            subprocess.run(
+                ["git", "push", "-u", "origin", branch, "--force-with-lease"],
+                cwd=str(work_dir),
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=True,
+            )
+        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
+            logger.warning("git push failed for %s: %s", branch, exc)
 
     # ── Helpers ────────────────────────────────────────────────────────
 

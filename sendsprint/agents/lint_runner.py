@@ -50,7 +50,7 @@ class LintRunner:
         self.custom_command = custom_command
 
     def run(self) -> StepReport:
-        report = StepReport(step=3, name="lint", repo=str(self.repo))
+        report = StepReport(step=4, name="lint", repo=str(self.repo))
         report.started_at = datetime.now(tz=timezone.utc)
         report.status = "running"
 

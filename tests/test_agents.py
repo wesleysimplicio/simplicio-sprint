@@ -206,6 +206,25 @@ class TestSecurityReviewer:
         rules = [f.rule for f in report.findings]
         assert "env-not-gitignored" not in rules
 
+    def test_scan_detects_slack_webhook(self, tmp_path: Path) -> None:
+        (tmp_path / "notify.py").write_text(
+            'WEBHOOK = "https://hooks.slack.com/services/T0000/B0000/xxxx1234abcd"'
+        )
+        fp = make_fp(tmp_path)
+        reviewer = SecurityReviewer(tmp_path, fp)
+        report = reviewer.scan()
+        rules = [f.rule for f in report.findings]
+        assert "slack-webhook" in rules
+
+    def test_scan_detects_jwt_token(self, tmp_path: Path) -> None:
+        jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+        (tmp_path / "auth.py").write_text(f'TOKEN = "{jwt}"')
+        fp = make_fp(tmp_path)
+        reviewer = SecurityReviewer(tmp_path, fp)
+        report = reviewer.scan()
+        rules = [f.rule for f in report.findings]
+        assert "jwt-in-source" in rules
+
 
 # ---------------------------------------------------------------------------
 # LintRunner
@@ -273,7 +292,34 @@ class TestPrReviewer:
 
     def test_static_checks_ignores_removed_lines(self, tmp_path: Path) -> None:
         reviewer = self._reviewer(tmp_path)
-        # Removed line with TODO should not be flagged
         diff = "-const x = 1; // TODO: old code\n"
         issues = reviewer._static_checks(diff)
         assert issues == []
+
+    def test_static_checks_merge_conflict_marker(self, tmp_path: Path) -> None:
+        reviewer = self._reviewer(tmp_path)
+        diff = "+<<<<<<< HEAD\n+const x = 1;\n+=======\n+const x = 2;\n+>>>>>>> feature\n"
+        issues = reviewer._static_checks(diff)
+        rules = [i["rule"] for i in issues]
+        assert rules.count("merge-conflict") == 3
+
+    def test_static_checks_debugger_statement(self, tmp_path: Path) -> None:
+        reviewer = self._reviewer(tmp_path)
+        diff = "+debugger\n"
+        issues = reviewer._static_checks(diff)
+        rules = [i["rule"] for i in issues]
+        assert "debug-statement" in rules
+
+    def test_static_checks_python_debug(self, tmp_path: Path) -> None:
+        reviewer = self._reviewer(tmp_path)
+        diff = "+import pdb\n+breakpoint()\n"
+        issues = reviewer._static_checks(diff)
+        rules = [i["rule"] for i in issues]
+        assert rules.count("debug-statement") == 2
+
+    def test_static_checks_logger_not_flagged(self, tmp_path: Path) -> None:
+        reviewer = self._reviewer(tmp_path)
+        diff = "+logger.debug('value', value);\n"
+        issues = reviewer._static_checks(diff)
+        rules = [i["rule"] for i in issues]
+        assert "debug-statement" not in rules
