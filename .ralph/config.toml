@@ -1,0 +1,11 @@
+# Ralph autonomous loop configuration for SendSprint.
+# Drives `ralph run` against tasks under .specs/sprints/sprint-*/*.task.md.
+adapter = "claude"
+plansDir = ".plans"
+debug = false
+tui = true
+
+[hooks]
+ralph_start = ""
+ralph_loop_end = "ruff format sendsprint/ && ruff check sendsprint/ --fix"
+ralph_complete = ""

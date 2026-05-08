@@ -1,0 +1,34 @@
+[
+  {
+    "category": "tech-detector",
+    "title": "TASK-001 — Add Bun runtime marker to tech detector",
+    "description": "Spec: .specs/sprints/sprint-1/01-add-bun-detector.task.md. Implement Bun support in sendsprint/tech/detector.py and update sendsprint/agents/{dev,lint_runner,test_runner}.py to use bun install / bun run build / bun x eslint . / bun test. Bump 0.4.0 -> 0.5.0.",
+    "passes": false,
+    "acceptance": [
+      "AC-1 detect_tech(path) returns ['bun'] with confidence >= 0.9 when bun.lockb exists",
+      "AC-2 bun wins over node when both bun.lockb and package.json present",
+      "AC-3 DevAgent.install_and_build() runs `bun install` then `bun run build` if script exists, else StepReport.status='skipped'",
+      "AC-4 LintRunner runs `bun x eslint .` when eslint config present in bun repo",
+      "AC-5 TestRunner runs `bun test` and parses JSON output",
+      "AC-6 All bun agents return StepReport.status='skipped' with reason='bun not installed' when binary absent",
+      "Coverage of sendsprint/tech/detector.py >= 85%",
+      "ruff check + ruff format --check clean",
+      "Version bumped to 0.5.0 in pyproject.toml, sendsprint/__init__.py, README.md, CHANGELOG.md"
+    ]
+  },
+  {
+    "category": "security-reviewer",
+    "title": "TASK-002 — Add cargo-audit coverage tests to security reviewer",
+    "description": "Spec: .specs/sprints/sprint-1/02-add-cargo-audit-tests.task.md. Add unit tests for the cargo-audit branch of sendsprint/agents/security_reviewer.py. Bump 0.4.0 -> 0.4.1.",
+    "passes": false,
+    "acceptance": [
+      "AC-1 0 vulns -> StepReport(status='ok', details.cargo_findings=0)",
+      "AC-2 3 vulns -> details.cargo_findings=3, findings[*] contain {advisory_id, severity, package}",
+      "AC-3 cargo binary missing -> StepReport.status='skipped', reason='cargo not installed'",
+      "AC-4 invalid JSON stdout -> StepReport.status='failed', error mentions parse",
+      "AC-5 25 vulns input -> findings truncated to 20, details.truncated=True",
+      "Coverage of sendsprint/agents/security_reviewer.py >= 90%",
+      "Version bumped to 0.4.1 across pyproject.toml, sendsprint/__init__.py, README.md, CHANGELOG.md"
+    ]
+  }
+]

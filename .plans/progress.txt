@@ -1,0 +1,3 @@
+# Ralph progress log
+# Append one line per iteration. Imperative, English, terse.
+# Format: <YYYY-MM-DD> <feature-id> <what-learned>
