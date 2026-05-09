@@ -50,3 +50,4 @@ playwright/.cache/
 .sendsprint/
 sprint-*.json
 arch-report-*.json
+evidence/

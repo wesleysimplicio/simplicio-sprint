@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "SendSprint",
+    "slug": "sendsprint-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "sendsprint",
+    "splash": {
+      "backgroundColor": "#070b1a",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ai.sendsprint.mobile"
+    },
+    "android": {
+      "package": "ai.sendsprint.mobile",
+      "adaptiveIcon": { "backgroundColor": "#070b1a" }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "defaultBackend": "http://localhost:8765"
+    }
+  }
+}
