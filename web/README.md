@@ -17,6 +17,8 @@ todos os testes (incluindo regressão) passarem** ou estourar o limite de
 
 <p align="center">
   <a href="../video/preview/runloop.mp4">▶️ MP4 cheio (1920×1080, ~22s)</a>
+  &nbsp;·&nbsp;
+  <a href="../video/preview/runloop-en.mp4">🇺🇸 English</a>
 </p>
 
 Mostra exatamente o que você verá em `RunScreen` ao clicar "Iniciar entrega":

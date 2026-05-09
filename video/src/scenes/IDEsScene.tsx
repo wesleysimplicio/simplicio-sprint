@@ -10,6 +10,7 @@ import { Background } from "../components/Background";
 import { Particles } from "../components/Particles";
 import { AnimatedText } from "../components/AnimatedText";
 import { theme } from "../theme";
+import { useStrings } from "../i18n";
 
 const IDES = [
   { name: "Claude Code", color: "#cd7f32" },
@@ -29,6 +30,7 @@ const IDES = [
 export const IDEsScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  const s = useStrings();
 
   const fadeIn = interpolate(frame, [0, 14], [0, 1], {
     extrapolateRight: "clamp",
@@ -62,10 +64,10 @@ export const IDEsScene: React.FC = () => {
               marginBottom: 14,
             }}
           >
-            ONDE FUNCIONA
+            {s.ides_eyebrow}
           </div>
           <AnimatedText
-            text="13 IDEs / agentes prontos"
+            text={s.ides_title}
             size={72}
             weight={800}
             gradient
@@ -82,7 +84,7 @@ export const IDEsScene: React.FC = () => {
               }),
             }}
           >
-            Mesma skill, mesmo gatilho — copia o manifesto e roda.
+            {s.ides_lede}
           </div>
         </div>
 

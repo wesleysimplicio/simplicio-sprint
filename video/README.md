@@ -11,25 +11,21 @@ spring/fade.
 
 ### Skill explainer (56s)
 
-![SendSprint explainer preview](./preview/sendsprint-preview.gif)
-
-<p align="center">
-  <a href="./preview/sendsprint-explainer.mp4">
-    ▶️ MP4 completo (1920×1080, 56s, 20 MB)
-  </a>
-  &nbsp;·&nbsp;
-  <a href="./preview/poster.png">🖼️ Poster PNG</a>
-</p>
+| 🇺🇸 English | 🇧🇷 Português |
+|---|---|
+| ![EN preview](./preview/sendsprint-en-preview.gif) | ![PT preview](./preview/sendsprint-preview.gif) |
+| [▶️ MP4 (20 MB)](./preview/sendsprint-explainer-en.mp4) | [▶️ MP4 (20 MB)](./preview/sendsprint-explainer.mp4) |
 
 ### Run loop (22s) — usado no `web/README.md`
 
-![SendSprint run loop](./preview/runloop-preview.gif)
-
-<p align="center">
-  <a href="./preview/runloop.mp4">▶️ MP4 completo (1920×1080, 22s, 5.5 MB)</a>
-</p>
+| 🇺🇸 English | 🇧🇷 Português |
+|---|---|
+| ![EN preview](./preview/runloop-en-preview.gif) | ![PT preview](./preview/runloop-preview.gif) |
+| [▶️ MP4 (5.5 MB)](./preview/runloop-en.mp4) | [▶️ MP4 (5.5 MB)](./preview/runloop.mp4) |
 
 > Os GIFs são previews 560p / 12fps. Os MP4s em `preview/` são 1080p @ 30fps.
+> Os strings vêm do `src/i18n.tsx` — adicionar uma terceira língua = mais um
+> entry no objeto `STRINGS` + uma nova `<Composition lang="es">`.
 
 ## Cenas
 
@@ -75,11 +71,13 @@ inspeciona props, edita e vê o reload na hora.
 
 ## Composições disponíveis
 
-| ID | Resolução | Uso |
-|---|---|---|
-| `SendSprintExplainer` | 1920×1080 | YouTube / landing page |
-| `SendSprintExplainer1080Square` | 1080×1080 | Instagram / LinkedIn |
-| `SendSprintRunLoop` | 1920×1080 | Demo do loop p/ web/README.md |
+| ID | Lang | Resolução | Uso |
+|---|---|---|---|
+| `SendSprintExplainer` | pt | 1920×1080 | README pt-BR |
+| `SendSprintExplainerEN` | en | 1920×1080 | README EN / YouTube |
+| `SendSprintExplainer1080Square` | pt | 1080×1080 | Instagram / LinkedIn |
+| `SendSprintRunLoop` | pt | 1920×1080 | README pt-BR — demo do loop |
+| `SendSprintRunLoopEN` | en | 1920×1080 | README EN — demo do loop |
 
 Render manual:
 

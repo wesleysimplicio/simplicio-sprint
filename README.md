@@ -9,27 +9,29 @@ Multi-agent skill that automates end-to-end sprint delivery. Reads Jira / Azure 
 
 ### Skill explainer (56s)
 
-![SendSprint explainer preview](./video/preview/sendsprint-preview.gif)
+![SendSprint explainer preview](./video/preview/sendsprint-en-preview.gif)
 
 <p align="center">
-  <a href="./video/preview/sendsprint-explainer.mp4">▶️ Full MP4 (1920×1080, 56s, 20 MB)</a>
+  <a href="./video/preview/sendsprint-explainer-en.mp4">▶️ Full MP4 (1920×1080, 56s, 20 MB)</a>
   &nbsp;·&nbsp;
   <a href="./video/preview/poster.png">🖼️ Poster</a>
 </p>
 
 ### Run loop demo (22s) — what `web/RunScreen` shows
 
-![SendSprint run loop](./video/preview/runloop-preview.gif)
+![SendSprint run loop](./video/preview/runloop-en-preview.gif)
 
 <p align="center">
-  <a href="./video/preview/runloop.mp4">▶️ Full MP4 (1920×1080, 22s, 5.5 MB)</a>
+  <a href="./video/preview/runloop-en.mp4">▶️ Full MP4 (1920×1080, 22s, 5.5 MB)</a>
   &nbsp;·&nbsp;
   <a href="./video/">🛠️ Source (Remotion)</a>
 </p>
 
+> 🇧🇷 Versão em português dos vídeos: ver [README.pt-BR.md](README.pt-BR.md).
+
 Both videos are generated locally by Remotion (`cd video && npm run build`).
 The run-loop one shows exactly what happens in the browser when you open
-`http://localhost:8081` and click "Iniciar entrega": round 1 fails with a
+`http://localhost:8081` and start a sprint delivery: round 1 fails with a
 visual regression, fix-loop applies patches, round 2 turns green, PR opens.
 
 ## 🌐 Run it in your browser (web)

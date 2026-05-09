@@ -10,24 +10,24 @@ import { Particles } from "../components/Particles";
 import { Terminal, TerminalLine } from "../components/Terminal";
 import { AnimatedText } from "../components/AnimatedText";
 import { theme } from "../theme";
+import { useStrings } from "../i18n";
 
-const triggers = [
-  { lang: "pt-BR", phrase: "rode o sendsprint" },
-  { lang: "en", phrase: "run sendsprint" },
-  { lang: "es", phrase: "ejecutar sprint" },
-  { lang: "slash", phrase: "/sendsprint" },
-];
-
-const lines: TerminalLine[] = [
-  { prompt: "you", text: "rode o sendsprint", color: theme.text, delay: 0, speed: 1.6 },
-  { prompt: "claude", text: "→ ativando skill SendSprint…", color: theme.accent, delay: 36 },
-  { prompt: "claude", text: "→ lendo sprint do Jira #42…", color: theme.accent, delay: 60 },
-  { prompt: "claude", text: "✓ 8 itens carregados, iniciando flow", color: theme.success, delay: 88 },
-];
+const lineStyle = (i: number, total: number): Pick<TerminalLine, "color" | "delay" | "speed"> => {
+  if (i === 0) return { color: theme.text, delay: 0, speed: 1.6 };
+  if (i === total - 1) return { color: theme.success, delay: 36 + (i - 1) * 24 };
+  return { color: theme.accent, delay: 36 + (i - 1) * 24 };
+};
 
 export const TriggerScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
+  const s = useStrings();
+  const triggers = s.trigger_chips;
+  const lines: TerminalLine[] = s.trigger_lines.map((l, i) => ({
+    prompt: l.prompt,
+    text: l.text,
+    ...lineStyle(i, s.trigger_lines.length),
+  }));
   const fadeIn = interpolate(frame, [0, 14], [0, 1], {
     extrapolateRight: "clamp",
   });
@@ -60,10 +60,10 @@ export const TriggerScene: React.FC = () => {
               fontSize: 22,
             }}
           >
-            COMO ATIVAR
+            {s.trigger_eyebrow}
           </div>
           <AnimatedText
-            text="Diga a frase mágica"
+            text={s.trigger_title}
             size={84}
             weight={800}
             gradient
@@ -78,8 +78,7 @@ export const TriggerScene: React.FC = () => {
               maxWidth: 620,
             }}
           >
-            A skill detecta o gatilho em pt-BR, inglês ou espanhol — e
-            também pelo slash command.
+            {s.trigger_lede}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {triggers.map((t, i) => (

@@ -11,17 +11,13 @@ import { Particles } from "../components/Particles";
 import { Card } from "../components/Card";
 import { AnimatedText } from "../components/AnimatedText";
 import { theme } from "../theme";
-
-const features = [
-  { emoji: "🧭", title: "Lê a sprint", desc: "Jira ou Azure DevOps" },
-  { emoji: "🛠️", title: "Codifica e testa", desc: "Worktree + lint + E2E" },
-  { emoji: "🛡️", title: "Revisa segurança", desc: "Secrets + audit (flag-only)" },
-  { emoji: "🚀", title: "Abre o PR", desc: "GitHub ou Azure DevOps" },
-];
+import { useStrings } from "../i18n";
 
 export const WhatIsScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  const s = useStrings();
+  const features = s.what_features;
 
   const fadeIn = interpolate(frame, [0, 14], [0, 1], {
     extrapolateRight: "clamp",
@@ -55,10 +51,10 @@ export const WhatIsScene: React.FC = () => {
               marginBottom: 14,
             }}
           >
-            O QUE É?
+            {s.what_eyebrow}
           </div>
           <AnimatedText
-            text="Um agente que entrega sua sprint"
+            text={s.what_title}
             size={76}
             weight={800}
             delay={6}
@@ -76,7 +72,7 @@ export const WhatIsScene: React.FC = () => {
               }),
             }}
           >
-            Você descreve. Ele lê, codifica, testa e abre o PR.
+            {s.what_lede}
           </div>
         </div>
 

@@ -10,25 +10,15 @@ import { Background } from "../components/Background";
 import { Particles } from "../components/Particles";
 import { AnimatedText } from "../components/AnimatedText";
 import { theme } from "../theme";
+import { useStrings } from "../i18n";
 
 /**
  * Standalone explainer of the run loop: round 1 fails (regression detected),
- * fix-loop kicks in, round 2 passes, PR opens. Designed to be linked from
- * web/README.md as the visual demo of what RunScreen does.
+ * fix-loop kicks in, round 2 passes, PR opens. Strings come from `useStrings`
+ * so the same composition renders in pt or en.
  */
 
-const STEPS = [
-  { num: 1, name: "read sprint" },
-  { num: 2, name: "architecture" },
-  { num: 3, name: "dev: install + build" },
-  { num: 4, name: "lint" },
-  { num: 5, name: "tests + regression" },
-  { num: 6, name: "security" },
-  { num: 7, name: "fix-loop" },
-  { num: 8, name: "commit + push" },
-  { num: 9, name: "create PR" },
-  { num: 10, name: "delivered" },
-];
+const STEP_NUMS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
 // Frame timeline (30fps, total ~660 frames = 22s)
 const T = {
@@ -42,17 +32,15 @@ const T = {
 type StepStatus = "pending" | "running" | "ok" | "failed";
 
 function statusAt(frame: number, num: number, round: 1 | 2): StepStatus {
-  // round 1: steps 1..6 progress, step 5 fails, step 7 fix-loop runs
   if (round === 1) {
     const start = T.round1.from;
-    const per = (T.round1.to - start) / 6; // 6 visible step cells (1-6)
+    const per = (T.round1.to - start) / 6;
     const local = (frame - start) / per;
     if (local < 0) return "pending";
     if (num < Math.floor(local)) return num === 5 ? "failed" : "ok";
     if (num === Math.floor(local) + 1) return "running";
-    return num <= 6 ? "pending" : "pending";
+    return "pending";
   }
-  // round 2: steps 3..6 re-run + 8..10 finalize
   const start = T.round2.from;
   const per = (T.round2.to - start) / 7;
   const local = (frame - start) / per;
@@ -60,13 +48,12 @@ function statusAt(frame: number, num: number, round: 1 | 2): StepStatus {
     if (num < 3) return "ok";
     return "pending";
   }
-  // Sequence: 3, 4, 5, 6, 8, 9, 10 — using local index
   const seq = [3, 4, 5, 6, 8, 9, 10];
   const cur = seq[Math.min(seq.length - 1, Math.floor(local))];
   const idx = seq.indexOf(num);
   if (idx === -1) {
     if (num < 3) return "ok";
-    if (num === 7) return "ok"; // fix-loop already done before this round
+    if (num === 7) return "ok";
     return "pending";
   }
   if (num < cur) return "ok";
@@ -122,11 +109,12 @@ const Header: React.FC<{ round: 1 | 2; inFix: boolean; inOutro: boolean }> = ({
   inFix,
   inOutro,
 }) => {
+  const s = useStrings();
   const tag = inOutro
-    ? "DELIVERED"
+    ? s.rl_delivered_label
     : inFix
-      ? "FIX-LOOP"
-      : `ROUND ${round} / 3`;
+      ? s.rl_fixloop_label
+      : s.rl_round_label(round, 3);
   const color = inOutro
     ? theme.success
     : inFix
@@ -160,78 +148,80 @@ const Header: React.FC<{ round: 1 | 2; inFix: boolean; inOutro: boolean }> = ({
           fontSize: 16,
         }}
       >
-        SendSprint • run loop • localhost
+        {s.rl_subtitle}
       </div>
     </div>
   );
 };
 
-const Hero: React.FC = () => (
-  <div
-    style={{
-      flex: 1,
-      display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 18,
-      textAlign: "center",
-    }}
-  >
+const Hero: React.FC = () => {
+  const s = useStrings();
+  return (
     <div
       style={{
-        color: theme.accent,
-        fontFamily: theme.fontMono,
-        letterSpacing: 6,
-        fontSize: 22,
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 18,
+        textAlign: "center",
       }}
     >
-      O LOOP QUE NÃO PARA
+      <div
+        style={{
+          color: theme.accent,
+          fontFamily: theme.fontMono,
+          letterSpacing: 6,
+          fontSize: 22,
+        }}
+      >
+        {s.rl_hero_eyebrow}
+      </div>
+      <AnimatedText
+        text={s.rl_hero_title}
+        size={120}
+        weight={900}
+        gradient
+        letterStagger={2}
+      />
+      <div
+        style={{
+          color: theme.textMuted,
+          fontFamily: theme.fontSans,
+          fontSize: 28,
+          maxWidth: 900,
+          marginTop: 8,
+        }}
+      >
+        {s.rl_hero_lede}
+      </div>
     </div>
-    <AnimatedText
-      text="rode até passar."
-      size={120}
-      weight={900}
-      gradient
-      letterStagger={2}
-    />
-    <div
-      style={{
-        color: theme.textMuted,
-        fontFamily: theme.fontSans,
-        fontSize: 28,
-        maxWidth: 900,
-        marginTop: 8,
-      }}
-    >
-      Tests + regression + evidência por round, fix-loop automático,
-      PR só quando tudo estiver verde.
-    </div>
-  </div>
-);
+  );
+};
 
 const StepsList: React.FC<{ frame: number; round: 1 | 2; inFix: boolean }> = ({
   frame,
   round,
   inFix,
 }) => {
+  const s = useStrings();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {STEPS.map((s) => {
+      {STEP_NUMS.map((num) => {
         let st: StepStatus = "pending";
         if (round === 2) {
-          const r1 = statusAt(frame, s.num, 1);
-          const r2 = statusAt(frame, s.num, 2);
-          // step 5 was failed in r1, but r2 may be running/ok
+          const r1 = statusAt(frame, num, 1);
+          const r2 = statusAt(frame, num, 2);
           if (r2 !== "pending") st = r2;
           else if (r1 === "ok" || r1 === "failed") st = r1;
           else st = "pending";
-          if (s.num === 5 && r2 === "pending") st = "failed";
+          if (num === 5 && r2 === "pending") st = "failed";
         } else {
-          st = statusAt(frame, s.num, 1);
+          st = statusAt(frame, num, 1);
         }
 
-        if (inFix && s.num === 7) st = "running";
+        if (inFix && num === 7) st = "running";
         const colors: Record<StepStatus, string> = {
           pending: theme.textMuted,
           running: round === 1 ? theme.danger : theme.success,
@@ -239,11 +229,12 @@ const StepsList: React.FC<{ frame: number; round: 1 | 2; inFix: boolean }> = ({
           failed: theme.danger,
         };
         const col = colors[st];
-        const icon = st === "ok" ? "✓" : st === "failed" ? "✗" : st === "running" ? "↻" : String(s.num);
+        const icon =
+          st === "ok" ? "✓" : st === "failed" ? "✗" : st === "running" ? "↻" : String(num);
 
         return (
           <div
-            key={s.num}
+            key={num}
             style={{
               display: "flex",
               alignItems: "center",
@@ -251,13 +242,8 @@ const StepsList: React.FC<{ frame: number; round: 1 | 2; inFix: boolean }> = ({
               padding: "12px 18px",
               borderRadius: 14,
               background:
-                st === "running"
-                  ? `linear-gradient(90deg, ${col}33, transparent)`
-                  : "transparent",
-              border:
-                st === "running"
-                  ? `1px solid ${col}88`
-                  : "1px solid transparent",
+                st === "running" ? `linear-gradient(90deg, ${col}33, transparent)` : "transparent",
+              border: st === "running" ? `1px solid ${col}88` : "1px solid transparent",
             }}
           >
             <div
@@ -265,8 +251,7 @@ const StepsList: React.FC<{ frame: number; round: 1 | 2; inFix: boolean }> = ({
                 width: 44,
                 height: 44,
                 borderRadius: 12,
-                background:
-                  st === "pending" ? "rgba(255,255,255,0.05)" : col,
+                background: st === "pending" ? "rgba(255,255,255,0.05)" : col,
                 color: st === "pending" ? theme.textMuted : "white",
                 display: "flex",
                 alignItems: "center",
@@ -283,12 +268,11 @@ const StepsList: React.FC<{ frame: number; round: 1 | 2; inFix: boolean }> = ({
               style={{
                 fontFamily: theme.fontSans,
                 fontSize: 24,
-                color:
-                  st === "pending" ? "rgba(241,244,255,0.55)" : theme.text,
+                color: st === "pending" ? "rgba(241,244,255,0.55)" : theme.text,
                 fontWeight: st === "running" ? 700 : 500,
               }}
             >
-              {s.name}
+              {s.rl_step_names[num]}
             </div>
           </div>
         );
@@ -316,7 +300,8 @@ const RegressionCard: React.FC<{
   failed: boolean;
   fps: number;
 }> = ({ frame, round, failed, fps }) => {
-  const s = spring({
+  const s = useStrings();
+  const sp = spring({
     frame: frame - (round === 1 ? T.round1.from : T.round2.from),
     fps,
     config: { damping: 18, stiffness: 130 },
@@ -335,8 +320,8 @@ const RegressionCard: React.FC<{
         background: "rgba(15,21,48,0.85)",
         border: `1px solid ${color}88`,
         boxShadow: `0 0 80px ${color}22`,
-        opacity: s,
-        transform: `translateY(${interpolate(s, [0, 1], [20, 0])}px)`,
+        opacity: sp,
+        transform: `translateY(${interpolate(sp, [0, 1], [20, 0])}px)`,
         display: "flex",
         flexDirection: "column",
         gap: 18,
@@ -365,7 +350,7 @@ const RegressionCard: React.FC<{
             fontFamily: theme.fontSans,
           }}
         >
-          {failed ? "✗ regressão detectada" : "✓ regressão verde"}
+          {failed ? s.rl_regression_failed : s.rl_regression_passed}
         </div>
       </div>
       <div
@@ -375,9 +360,7 @@ const RegressionCard: React.FC<{
           fontSize: 16,
         }}
       >
-        {failed
-          ? "playwright + pytest report — 3 falhas:"
-          : "47 passed · 0 failed · coverage 92.4%"}
+        {failed ? s.rl_regression_help_failed : s.rl_regression_help_passed}
       </div>
       {failed ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -446,16 +429,12 @@ const RegressionCard: React.FC<{
 };
 
 const FixLoopCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
-  const s = spring({
+  const s = useStrings();
+  const sp = spring({
     frame: frame - T.fixLoop.from,
     fps,
     config: { damping: 18, stiffness: 130 },
   });
-  const patches = [
-    "› revert primary color #22d3ee → #7c5cff",
-    "› ajustar regex de validação de email",
-    "› patches aplicados no worktree, repetindo dev → tests",
-  ];
   return (
     <div
       style={{
@@ -464,7 +443,7 @@ const FixLoopCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =
         background: "rgba(15,21,48,0.85)",
         border: `1px solid ${theme.warning}88`,
         boxShadow: `0 0 80px ${theme.warning}22`,
-        opacity: s,
+        opacity: sp,
         display: "flex",
         flexDirection: "column",
         gap: 18,
@@ -480,7 +459,7 @@ const FixLoopCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =
             fontFamily: theme.fontSans,
           }}
         >
-          fix-loop
+          {s.rl_fixloop_subtitle}
         </div>
       </div>
       <div
@@ -490,10 +469,10 @@ const FixLoopCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =
           fontSize: 16,
         }}
       >
-        3 testes falharam → iniciando rodada 2 / 3
+        {s.rl_fixloop_intro}
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {patches.map((p, i) => (
+        {s.rl_fixloop_patches.map((p, i) => (
           <div
             key={p}
             style={{
@@ -521,7 +500,8 @@ const FixLoopCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =
 };
 
 const DeliveredCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
-  const s = spring({
+  const s = useStrings();
+  const sp = spring({
     frame: frame - T.outro.from,
     fps,
     config: { damping: 14, stiffness: 130 },
@@ -534,8 +514,8 @@ const DeliveredCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps })
         background: `linear-gradient(135deg, ${theme.success}33, ${theme.accent}22)`,
         border: `1px solid ${theme.success}88`,
         boxShadow: `0 0 100px ${theme.success}44`,
-        opacity: s,
-        transform: `scale(${interpolate(s, [0, 1], [0.85, 1])})`,
+        opacity: sp,
+        transform: `scale(${interpolate(sp, [0, 1], [0.85, 1])})`,
         display: "flex",
         flexDirection: "column",
         gap: 18,
@@ -550,7 +530,7 @@ const DeliveredCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps })
           fontFamily: theme.fontSans,
         }}
       >
-        Sprint entregue
+        {s.rl_delivered_title}
       </div>
       <div
         style={{
@@ -559,7 +539,7 @@ const DeliveredCard: React.FC<{ frame: number; fps: number }> = ({ frame, fps })
           fontFamily: theme.fontSans,
         }}
       >
-        10/10 steps OK · 2 rounds de fix-loop · regressão verde · coverage 92.4%
+        {s.rl_delivered_summary}
       </div>
       <div
         style={{

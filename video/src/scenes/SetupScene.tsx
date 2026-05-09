@@ -11,26 +11,25 @@ import { Terminal, TerminalLine } from "../components/Terminal";
 import { AnimatedText } from "../components/AnimatedText";
 import { Card } from "../components/Card";
 import { theme } from "../theme";
-
-const installLines: TerminalLine[] = [
-  { prompt: "$", text: "pip install -e \".[dev]\"", delay: 0, speed: 1.6 },
-  { prompt: "$", text: "playwright install chromium", delay: 30, speed: 1.6 },
-  { prompt: "$", text: "sendsprint init", color: theme.primarySoft, delay: 60, speed: 1.5 },
-  { prompt: "✓", text: "stack detectado, .specs/ preenchido", color: theme.success, delay: 88 },
-  { prompt: "$", text: "sendsprint login jira", color: theme.primarySoft, delay: 110, speed: 1.5 },
-  { prompt: "✓", text: "credenciais salvas no keyring (chmod 600)", color: theme.success, delay: 140 },
-];
-
-const STEPS_SHORT = [
-  { n: 1, title: "Instale", desc: "pip install -e .[dev]" },
-  { n: 2, title: "Init", desc: "sendsprint init: descobre stack" },
-  { n: 3, title: "Login", desc: "credenciais no OS keyring" },
-  { n: 4, title: "Use", desc: "“rode o sendsprint” no chat" },
-];
+import { useStrings } from "../i18n";
 
 export const SetupScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
+  const t = useStrings();
+  const installLines: TerminalLine[] = [
+    { prompt: "$", text: 'pip install -e ".[dev]"', delay: 0, speed: 1.6 },
+    { prompt: "$", text: "playwright install chromium", delay: 30, speed: 1.6 },
+    { prompt: "$", text: "sendsprint init", color: theme.primarySoft, delay: 60, speed: 1.5 },
+    { prompt: "✓", text: t.setup_msg_stack_detected, color: theme.success, delay: 88 },
+    { prompt: "$", text: "sendsprint login jira", color: theme.primarySoft, delay: 110, speed: 1.5 },
+    { prompt: "✓", text: t.setup_msg_creds_saved, color: theme.success, delay: 140 },
+  ];
+  const STEPS_SHORT = t.setup_steps.map((entry, i) => ({
+    n: i + 1,
+    title: entry.title,
+    desc: entry.desc,
+  }));
   const fadeIn = interpolate(frame, [0, 14], [0, 1], {
     extrapolateRight: "clamp",
   });
@@ -63,10 +62,10 @@ export const SetupScene: React.FC = () => {
               fontSize: 22,
             }}
           >
-            COMEÇANDO
+            {t.setup_eyebrow}
           </div>
           <AnimatedText
-            text="4 passos pra rodar"
+            text={t.setup_title}
             size={84}
             weight={800}
             gradient
@@ -81,8 +80,7 @@ export const SetupScene: React.FC = () => {
               maxWidth: 560,
             }}
           >
-            Credenciais ficam no keyring do SO. Depois é só conversar com a
-            skill.
+            {t.setup_lede}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {STEPS_SHORT.map((s, i) => (
@@ -99,7 +97,7 @@ export const SetupScene: React.FC = () => {
 
         <div style={{ display: "flex", justifyContent: "center" }}>
           <Terminal
-            title="~/sendsprint — setup"
+            title={t.setup_install_title}
             lines={installLines}
             startDelay={20}
             width={820}

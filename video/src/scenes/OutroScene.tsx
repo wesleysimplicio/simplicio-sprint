@@ -11,10 +11,12 @@ import { Particles } from "../components/Particles";
 import { Logo } from "../components/Logo";
 import { AnimatedText } from "../components/AnimatedText";
 import { theme } from "../theme";
+import { useStrings } from "../i18n";
 
 export const OutroScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  const t = useStrings();
 
   const ctaSpring = spring({
     frame: frame - 60,
@@ -45,7 +47,7 @@ export const OutroScene: React.FC = () => {
       >
         <Logo size={170} delay={0} />
         <AnimatedText
-          text="Pronto pra entregar?"
+          text={t.outro_title}
           size={96}
           weight={900}
           gradient
@@ -71,7 +73,7 @@ export const OutroScene: React.FC = () => {
           }}
         >
           <span style={{ fontFamily: theme.fontMono, opacity: 0.85 }}>›</span>
-          rode o sendsprint
+          {t.outro_cta}
         </div>
         <div
           style={{

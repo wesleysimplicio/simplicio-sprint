@@ -26,6 +26,8 @@ Skill multi-agente que automatiza entrega de sprint ponta-a-ponta. Lê sprints d
   <a href="./video/">🛠️ Código-fonte (Remotion)</a>
 </p>
 
+> 🇺🇸 English versions of these videos: see [README.md](README.md).
+
 Os dois vídeos são gerados localmente pelo Remotion (`cd video && npm run build`).
 O do run loop mostra exatamente o que acontece no navegador quando você abre
 `http://localhost:8081` e clica "Iniciar entrega": round 1 falha com regressão
