@@ -11,10 +11,12 @@ import { Particles } from "../components/Particles";
 import { Logo } from "../components/Logo";
 import { AnimatedText } from "../components/AnimatedText";
 import { theme } from "../theme";
+import { useStrings } from "../i18n";
 
 export const IntroScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  const s = useStrings();
 
   const fadeOut = interpolate(
     frame,
@@ -63,7 +65,7 @@ export const IntroScene: React.FC = () => {
             textTransform: "uppercase",
           }}
         >
-          Sua sprint, entregue do início ao fim
+          {s.intro_subtitle}
         </div>
         <div
           style={{
@@ -78,7 +80,7 @@ export const IntroScene: React.FC = () => {
             letterSpacing: 4,
           }}
         >
-          GUIA RÁPIDO • CLAUDE CODE SKILL
+          {s.intro_tag}
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

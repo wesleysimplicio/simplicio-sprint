@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "SendSprint",
+    "slug": "sendsprint-web",
+    "version": "0.1.0",
+    "platforms": ["web"],
+    "userInterfaceStyle": "dark",
+    "scheme": "sendsprint",
+    "splash": {
+      "backgroundColor": "#070b1a",
+      "resizeMode": "contain"
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "defaultBackend": "http://localhost:8765"
+    }
+  }
+}

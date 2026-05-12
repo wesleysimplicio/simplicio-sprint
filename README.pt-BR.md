@@ -4,7 +4,9 @@
 
 Skill multi-agente que automatiza entrega de sprint ponta-a-ponta. Lê sprints do Jira / Azure DevOps, mapeia arquitetura, instala + builda, roda testes, faz scan de segurança, cria PRs, revisa diff e entrega — tudo num fluxo único de 9 passos.
 
-## 🎬 Vídeo explicativo (56s)
+## 🎬 Vídeos
+
+### Explicação da skill (56s)
 
 ![Prévia do vídeo SendSprint](./video/preview/sendsprint-preview.gif)
 
@@ -12,9 +14,38 @@ Skill multi-agente que automatiza entrega de sprint ponta-a-ponta. Lê sprints d
   <a href="./video/preview/sendsprint-explainer.mp4">▶️ MP4 completo (1920×1080, 56s, 20 MB)</a>
   &nbsp;·&nbsp;
   <a href="./video/preview/poster.png">🖼️ Poster</a>
+</p>
+
+### Demo do run loop (22s) — o que o `web/RunScreen` mostra
+
+![Run loop SendSprint](./video/preview/runloop-preview.gif)
+
+<p align="center">
+  <a href="./video/preview/runloop.mp4">▶️ MP4 completo (1920×1080, 22s, 5.5 MB)</a>
   &nbsp;·&nbsp;
   <a href="./video/">🛠️ Código-fonte (Remotion)</a>
 </p>
+
+> 🇺🇸 English versions of these videos: see [README.md](README.md).
+
+Os dois vídeos são gerados localmente pelo Remotion (`cd video && npm run build`).
+O do run loop mostra exatamente o que acontece no navegador quando você abre
+`http://localhost:8081` e clica "Iniciar entrega": round 1 falha com regressão
+visual, fix-loop aplica patches, round 2 fica verde, PR abre.
+
+## 🌐 Rodar no navegador (web)
+
+```bash
+# 1) backend
+pip install -e ".[api]"
+python -m sendsprint.api          # http://localhost:8765
+
+# 2) web UI (outro terminal)
+cd web && npm install && npm run dev   # http://localhost:8081
+```
+
+Veja [`web/README.md`](./web/README.md) pro passo-a-passo e
+[`sendsprint/api/README.md`](./sendsprint/api/README.md) pra API HTTP/SSE.
 
 
 Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.

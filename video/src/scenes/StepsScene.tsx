@@ -11,6 +11,7 @@ import { Particles } from "../components/Particles";
 import { AnimatedText } from "../components/AnimatedText";
 import { StepIcon, IconKey } from "../components/StepIcon";
 import { theme } from "../theme";
+import { useStrings, type Strings } from "../i18n";
 
 type Step = {
   num: number;
@@ -21,88 +22,41 @@ type Step = {
   details: string[];
 };
 
-const STEPS: Step[] = [
-  {
-    num: 1,
-    title: "Lê a sprint",
-    desc: "Jira ou Azure DevOps",
-    icon: "sprint",
-    accent: "#7c5cff",
-    details: ["transport: mcp → api → playwright", "--scope mine filtra só você"],
-  },
-  {
-    num: 2,
-    title: "Mapeia arquitetura",
-    desc: "Score < 0.6? gera baseline",
-    icon: "architecture",
-    accent: "#22d3ee",
-    details: ["ArchitectureMapper.map(repo)", "build_architecture(repo)"],
-  },
-  {
-    num: 3,
-    title: "Dev: install + build",
-    desc: "Worktree isolado, 16 package managers",
-    icon: "build",
-    accent: "#34d399",
-    details: ["WorktreeManager", "DevAgent + detect_tech"],
-  },
-  {
-    num: 4,
-    title: "Lint",
-    desc: "19 stacks suportados",
-    icon: "lint",
-    accent: "#a78bff",
-    details: ["eslint • ruff • clippy • golangci", "phpcs • rubocop • dart analyze"],
-  },
-  {
-    num: 5,
-    title: "Testes",
-    desc: "Unit + Playwright E2E",
-    icon: "test",
-    accent: "#fbbf24",
-    details: ["screenshots em evidence/", "TestRunner roda tudo"],
-  },
-  {
-    num: 6,
-    title: "Segurança (flag-only)",
-    desc: "12 padrões + audit dependências",
-    icon: "security",
-    accent: "#f87171",
-    details: ["secrets, .env gitignore", "ADR-005: nunca auto-fix"],
-  },
-  {
-    num: 7,
-    title: "Fix loop",
-    desc: "Re-roda até 3× se falhar",
-    icon: "loop",
-    accent: "#ff8a3d",
-    details: ["MAX_FIX_LOOPS = 3", "lint + tests + security"],
-  },
-  {
-    num: 8,
-    title: "Commit + push",
-    desc: "Worktree branch → origin",
-    icon: "commit",
-    accent: "#22d3ee",
-    details: ["git push --force-with-lease", "branch isolada por sprint item"],
-  },
-  {
-    num: 9,
-    title: "Cria o PR",
-    desc: "GitHub gh ou Azure DevOps REST",
-    icon: "pr",
-    accent: "#7c5cff",
-    details: ["PrCreator", "URL no RunReport.prs[]"],
-  },
-  {
-    num: 10,
-    title: "Revisa e entrega",
-    desc: "Diff checks + RunReport",
-    icon: "review",
-    accent: "#34d399",
-    details: ["sem TODO/FIXME/debug", "report.json exportado"],
-  },
+const ICONS: IconKey[] = [
+  "sprint",
+  "architecture",
+  "build",
+  "lint",
+  "test",
+  "security",
+  "loop",
+  "commit",
+  "pr",
+  "review",
 ];
+
+const ACCENTS = [
+  "#7c5cff",
+  "#22d3ee",
+  "#34d399",
+  "#a78bff",
+  "#fbbf24",
+  "#f87171",
+  "#ff8a3d",
+  "#22d3ee",
+  "#7c5cff",
+  "#34d399",
+];
+
+const buildSteps = (s: Strings): Step[] =>
+  s.steps.map((entry, i) => ({
+    num: i + 1,
+    title: entry.title,
+    desc: entry.desc,
+    icon: ICONS[i],
+    accent: ACCENTS[i],
+    details: entry.details,
+  }));
 
 const HEADER_FRAMES = 50;
 const STEP_FRAMES = 55;
@@ -110,6 +64,8 @@ const STEP_FRAMES = 55;
 export const StepsScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps, durationInFrames } = useVideoConfig();
+  const strings = useStrings();
+  const STEPS = buildSteps(strings);
 
   const fadeIn = interpolate(frame, [0, 14], [0, 1], {
     extrapolateRight: "clamp",
@@ -147,11 +103,12 @@ export const StepsScene: React.FC = () => {
             marginTop: 30,
           }}
         >
-          <StepsList currentIndex={stepIndex} />
+          <StepsList steps={STEPS} currentIndex={stepIndex} />
           <StepFocus
             step={STEPS[stepIndex]}
             entry={stepEntry}
             localFrame={localStepFrame}
+            progressLabel={strings.steps_progress_label}
           />
         </div>
       </AbsoluteFill>
@@ -159,36 +116,42 @@ export const StepsScene: React.FC = () => {
   );
 };
 
-const Header: React.FC = () => (
-  <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-    <div
-      style={{
-        padding: "10px 18px",
-        borderRadius: 999,
-        background: "rgba(124,92,255,0.18)",
-        color: theme.primarySoft,
-        fontFamily: theme.fontMono,
-        letterSpacing: 4,
-        fontSize: 20,
-      }}
-    >
-      O FLOW
+const Header: React.FC = () => {
+  const s = useStrings();
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+      <div
+        style={{
+          padding: "10px 18px",
+          borderRadius: 999,
+          background: "rgba(124,92,255,0.18)",
+          color: theme.primarySoft,
+          fontFamily: theme.fontMono,
+          letterSpacing: 4,
+          fontSize: 20,
+        }}
+      >
+        {s.steps_eyebrow}
+      </div>
+      <AnimatedText
+        text={s.steps_title}
+        size={64}
+        weight={800}
+        gradient
+        align="left"
+        letterStagger={1}
+      />
     </div>
-    <AnimatedText
-      text="10 passos automatizados"
-      size={64}
-      weight={800}
-      gradient
-      align="left"
-      letterStagger={1}
-    />
-  </div>
-);
+  );
+};
 
-const StepsList: React.FC<{ currentIndex: number }> = ({ currentIndex }) => {
+const StepsList: React.FC<{ steps: Step[]; currentIndex: number }> = ({
+  steps,
+  currentIndex,
+}) => {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {STEPS.map((s, i) => {
+      {steps.map((s, i) => {
         const active = i === currentIndex;
         const done = i < currentIndex;
         return (
@@ -256,7 +219,8 @@ const StepFocus: React.FC<{
   step: Step;
   entry: number;
   localFrame: number;
-}> = ({ step, entry, localFrame }) => {
+  progressLabel: string;
+}> = ({ step, entry, localFrame, progressLabel }) => {
   const opacity = interpolate(entry, [0, 1], [0, 1], {
     extrapolateRight: "clamp",
   });
@@ -356,7 +320,7 @@ const StepFocus: React.FC<{
             <DetailLine key={d} text={d} delay={i * 8} />
           ))}
         </div>
-        <ProgressBar accent={step.accent} num={step.num} />
+        <ProgressBar accent={step.accent} num={step.num} label={progressLabel} />
       </div>
     </div>
   );
@@ -397,9 +361,10 @@ const DetailLine: React.FC<{ text: string; delay: number }> = ({
   );
 };
 
-const ProgressBar: React.FC<{ accent: string; num: number }> = ({
+const ProgressBar: React.FC<{ accent: string; num: number; label: string }> = ({
   accent,
   num,
+  label,
 }) => {
   const pct = (num / 10) * 100;
   return (
@@ -431,7 +396,7 @@ const ProgressBar: React.FC<{ accent: string; num: number }> = ({
           color: theme.textMuted,
         }}
       >
-        <span>progresso</span>
+        <span>{label}</span>
         <span>{num}/10</span>
       </div>
     </div>

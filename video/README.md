@@ -7,22 +7,29 @@ spring/fade.
 
 > Stack: Remotion 4 + React 19 + TypeScript. 1920×1080 @ 30fps. Saída MP4 (h264) ou WebM.
 
-## Preview
+## Previews
 
-![SendSprint explainer preview](./preview/sendsprint-preview.gif)
+### Skill explainer (56s)
 
-<p align="center">
-  <a href="./preview/sendsprint-explainer.mp4">
-    ▶️ Assistir o MP4 completo (1920×1080, 56s, 20 MB)
-  </a>
-  &nbsp;·&nbsp;
-  <a href="./preview/poster.png">🖼️ Poster PNG</a>
-</p>
+| 🇺🇸 English | 🇧🇷 Português |
+|---|---|
+| ![EN preview](./preview/sendsprint-en-preview.gif) | ![PT preview](./preview/sendsprint-preview.gif) |
+| [▶️ MP4 (20 MB)](./preview/sendsprint-explainer-en.mp4) | [▶️ MP4 (20 MB)](./preview/sendsprint-explainer.mp4) |
 
-> O GIF acima é uma prévia de 16s @ 560p / 10fps (≈3 MB) só para o README. O
-> arquivo `preview/sendsprint-explainer.mp4` é o vídeo final em 1080p @ 30fps.
+### Run loop (22s) — usado no `web/README.md`
+
+| 🇺🇸 English | 🇧🇷 Português |
+|---|---|
+| ![EN preview](./preview/runloop-en-preview.gif) | ![PT preview](./preview/runloop-preview.gif) |
+| [▶️ MP4 (5.5 MB)](./preview/runloop-en.mp4) | [▶️ MP4 (5.5 MB)](./preview/runloop.mp4) |
+
+> Os GIFs são previews 560p / 12fps. Os MP4s em `preview/` são 1080p @ 30fps.
+> Os strings vêm do `src/i18n.tsx` — adicionar uma terceira língua = mais um
+> entry no objeto `STRINGS` + uma nova `<Composition lang="es">`.
 
 ## Cenas
+
+**Skill explainer** (`SendSprintExplainer`, 56s):
 
 | # | Cena | Duração | O que mostra |
 |---|---|---|---|
@@ -34,8 +41,18 @@ spring/fade.
 | 6 | `SetupScene` | 7s | Setup em 4 passos + terminal de instalação |
 | 7 | `OutroScene` | 6s | CTA "rode o sendsprint" |
 
-A timeline está centralizada em [`src/theme.ts`](./src/theme.ts) — ajuste
-`SCENES` se quiser remixar a ordem ou duração.
+**Run loop** (`SendSprintRunLoop`, 22s):
+
+| # | Bloco | Duração | O que mostra |
+|---|---|---|---|
+| 1 | Hero | ~2s | Título "rode até passar" + sub |
+| 2 | Round 1 | ~8s | Steps 1–6, regressão FALHA com 3 testes |
+| 3 | Fix-loop | ~3s | Patches sugeridos + retry |
+| 4 | Round 2 | ~6s | Re-roda steps 3–6, regressão VERDE + galeria |
+| 5 | Delivered | ~2s | "Sprint entregue" + URL do PR |
+
+A timeline da skill explainer está em [`src/theme.ts`](./src/theme.ts) (`SCENES`);
+o run loop tem timeline própria em [`src/scenes/RunLoopScene.tsx`](./src/scenes/RunLoopScene.tsx) (`T`).
 
 ## Como rodar
 
@@ -54,10 +71,20 @@ inspeciona props, edita e vê o reload na hora.
 
 ## Composições disponíveis
 
-| ID | Resolução | Uso |
-|---|---|---|
-| `SendSprintExplainer` | 1920×1080 | YouTube / landing page |
-| `SendSprintExplainer1080Square` | 1080×1080 | Instagram / LinkedIn |
+| ID | Lang | Resolução | Uso |
+|---|---|---|---|
+| `SendSprintExplainer` | pt | 1920×1080 | README pt-BR |
+| `SendSprintExplainerEN` | en | 1920×1080 | README EN / YouTube |
+| `SendSprintExplainer1080Square` | pt | 1080×1080 | Instagram / LinkedIn |
+| `SendSprintRunLoop` | pt | 1920×1080 | README pt-BR — demo do loop |
+| `SendSprintRunLoopEN` | en | 1920×1080 | README EN — demo do loop |
+
+Render manual:
+
+```bash
+npx remotion render src/index.ts SendSprintRunLoop preview/runloop.mp4 \
+  --browser-executable=$(which chromium)   # ou chrome-headless-shell
+```
 
 Para renderizar a versão quadrada:
 
