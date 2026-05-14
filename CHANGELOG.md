@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.1] - 2026-05-14
+
+### Changed
+
+- Codex CLI config: switch default model to `gpt-5.4` via top-level `model` key (replaces deprecated `[model]` table).
+
 ## [0.7.0] - 2026-05-14
 
 ### Added
