@@ -40,7 +40,7 @@ class WorktreeManager:
     def list_worktrees(self) -> list[str]:
         result = self._run(["git", "worktree", "list", "--porcelain"])
         return [
-            line.split(" ", 1)[1]
+            str(Path(line.split(" ", 1)[1]).resolve())
             for line in result.stdout.splitlines()
             if line.startswith("worktree ")
         ]

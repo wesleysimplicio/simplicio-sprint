@@ -50,7 +50,7 @@ Veja [`web/README.md`](./web/README.md) pro passo-a-passo e
 
 Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.4.1 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Auto-scaffold `.specs/` na primeira execução. Fluxo completo de 10 passos. Workspaces multi-repo, filtro `--scope mine`, detecção de tech stack pra 25+ stacks, 103 testes.
+> **Status:** v0.7.0 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de 10 passos. PRs miram `develop` por padrão e podem ser configurados por workspace/repo. Publicação PyPI automatizada em tags de release.
 
 ---
 
@@ -109,6 +109,9 @@ sendsprint detect-tech ./repo
 
 # Conferir mapeamento de arquitetura (com auto-build se faltar)
 sendsprint check-architecture ./repo --build
+
+# Sincronizar os arquivos mais recentes do agentic-starter
+sendsprint sync-agentic-starter ./repo --ref latest
 ```
 
 ### Python
@@ -151,12 +154,14 @@ name: my-project
 root_path: /home/dev/repos
 new_projects_dir: Projetos/novos
 pr_provider: github
+default_base_branch: develop
 repos:
   - name: backend-api
     path: backend-api
     role: api
     tech: dotnet
     default_branch: main
+    pr_target_branch: develop
   - name: frontend-web
     path: frontend-web
     role: front

@@ -13,6 +13,12 @@ from rich.table import Table
 
 from sendsprint import __version__, credentials
 from sendsprint import profile as profile_mod
+from sendsprint.agentic_starter import (
+    DEFAULT_AGENTIC_STARTER_REF,
+    DEFAULT_AGENTIC_STARTER_SOURCE,
+    result_to_json,
+    sync_agentic_starter,
+)
 from sendsprint.architecture import ArchitectureMapper, build_architecture
 from sendsprint.flow import SprintFlow
 from sendsprint.models import Sprint
@@ -107,6 +113,33 @@ def detect_tech_cmd(
     console.print_json(data=json.loads(fp.model_dump_json()))
 
 
+@app.command(name="sync-agentic-starter")
+def sync_agentic_starter_cmd(
+    repo_path: Path = typer.Argument(Path("."), exists=True, file_okay=False, help="Repo to sync"),
+    source: str = typer.Option(
+        DEFAULT_AGENTIC_STARTER_SOURCE,
+        "--source",
+        help="Local path, GitHub URL, or owner/repo for agentic-starter",
+    ),
+    ref: str = typer.Option(
+        DEFAULT_AGENTIC_STARTER_REF,
+        "--ref",
+        help="'latest', a tag, branch, or commit SHA",
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing scaffold files"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+) -> None:
+    """Sync agentic-starter scaffold files into a repo."""
+    result = sync_agentic_starter(
+        repo_path,
+        source=source,
+        ref=ref,
+        force=force,
+        dry_run=dry_run,
+    )
+    console.print_json(data=result_to_json(result))
+
+
 @app.command(name="run")
 def run_flow(
     source: str = typer.Argument(..., help="jira | azuredevops"),
@@ -199,6 +232,11 @@ def init(
     offline: bool = typer.Option(
         False, "--offline", help="Skip the LLM and write deterministic templates"
     ),
+    sync_starter: bool = typer.Option(
+        True,
+        "--sync-agentic-starter/--no-sync-agentic-starter",
+        help="Best-effort sync of the latest agentic-starter structure",
+    ),
 ) -> None:
     """Auto-discover repo + LLM-fill .specs/{product,architecture}/*.md baselines.
 
@@ -233,6 +271,17 @@ def init(
             "[yellow]note:[/yellow] templates only. set ANTHROPIC_API_KEY (or LLM_PROVIDER) "
             "and re-run with [bold]--force[/bold] for LLM-drafted specs."
         )
+    if sync_starter:
+        try:
+            sync_result = sync_agentic_starter(repo)
+        except Exception as exc:  # pragma: no cover - defensive CLI UX
+            console.print(f"[yellow]agentic-starter sync skipped:[/yellow] {exc}")
+        else:
+            console.print(
+                "[green]agentic-starter[/green] "
+                f"created={len(sync_result.created)} updated={len(sync_result.updated)} "
+                f"skipped={len(sync_result.skipped)} ref={sync_result.resolved_ref}"
+            )
 
 
 @app.command()

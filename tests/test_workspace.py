@@ -53,6 +53,7 @@ def test_load_workspace_valid_json(tmp_path: Path) -> None:
 
     assert ws.name == "json-ws"
     assert ws.repos == []
+    assert ws.default_base_branch == "develop"
 
 
 def test_load_workspace_missing_file_raises(tmp_path: Path) -> None:

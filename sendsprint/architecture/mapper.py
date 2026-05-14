@@ -10,6 +10,7 @@ from sendsprint.models import ArchitectureReport
 logger = logging.getLogger(__name__)
 
 AGENTIC_STARTER_MARKERS = (
+    ".agentic-starter.json",
     "AGENTS.md",
     ".specs/architecture/DESIGN.md",
     ".specs/product/VISION.md",

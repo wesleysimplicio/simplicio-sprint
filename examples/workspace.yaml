@@ -37,4 +37,4 @@ pr_provider: github            # github | azuredevops
 pr_reviewers:
   - lead-dev
   - tech-reviewer
-default_base_branch: main
+default_base_branch: develop

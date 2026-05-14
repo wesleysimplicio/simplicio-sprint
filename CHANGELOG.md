@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.7.0] - 2026-05-14
+
+### Added
+
+- `sendsprint sync-agentic-starter` command to sync the latest `agentic-starter` scaffold from a local path, GitHub URL, or `owner/repo`. Existing files are preserved unless `--force` is used, and `.agentic-starter.json` records the synced source/ref.
+- `sendsprint init` now performs a best-effort `agentic-starter` sync by default after generating `.specs/`; use `--no-sync-agentic-starter` to disable network sync.
+- GitHub Actions workflow to sync `agentic-starter` on a schedule and open a PR with any scaffold changes.
+- GitHub Actions workflow to build and publish the Python package to PyPI from release tags using trusted publishing.
+- Tests for scaffold sync copy, skip, force, dry-run, and missing-path behavior.
+
+### Changed
+
+- Workspace PR target defaults to `develop` while remaining configurable through `default_base_branch` or per-repo `pr_target_branch`.
+- `ArchitectureMapper` treats `.agentic-starter.json` as an `agentic-starter` marker.
+
 ## [0.6.0] - 2026-05-12
 
 ### Added

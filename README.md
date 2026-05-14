@@ -51,7 +51,7 @@ See [`web/README.md`](./web/README.md) for the full walkthrough and
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.4.0 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Auto-scaffold `.specs/` on first run. Full 10-step flow. Multi-repo workspaces, `--scope mine` filtering, tech detection for 25+ stacks, 103 tests.
+> **Status:** v0.7.0 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Auto-scaffold `.specs/` plus latest `agentic-starter` sync. Full 10-step flow. PRs target `develop` by default and can be configured per workspace/repo. PyPI publishing is automated on release tags.
 
 ---
 
@@ -110,6 +110,9 @@ sendsprint detect-tech ./repo
 
 # Check architecture mapping (with auto-build if missing)
 sendsprint check-architecture ./repo --build
+
+# Sync latest agentic-starter scaffold files into a repo
+sendsprint sync-agentic-starter ./repo --ref latest
 ```
 
 ### Python
@@ -152,12 +155,14 @@ name: my-project
 root_path: /home/dev/repos
 new_projects_dir: Projetos/novos
 pr_provider: github
+default_base_branch: develop
 repos:
   - name: backend-api
     path: backend-api
     role: api
     tech: dotnet
     default_branch: main
+    pr_target_branch: develop
   - name: frontend-web
     path: frontend-web
     role: front

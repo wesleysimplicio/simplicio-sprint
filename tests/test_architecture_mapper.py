@@ -80,6 +80,13 @@ def test_agentic_starter_specs_design_also_detected(tmp_path: Path) -> None:
     assert report.is_mapped is True
 
 
+def test_agentic_starter_lock_also_detected(tmp_path: Path) -> None:
+    (tmp_path / ".agentic-starter.json").write_text("{}")
+    report = ArchitectureMapper().inspect(tmp_path)
+    assert report.has_agentic_starter is True
+    assert report.is_mapped is True
+
+
 def test_no_starter_marker_does_not_set_flag(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("# Readme")
     report = ArchitectureMapper().inspect(tmp_path)

@@ -35,7 +35,7 @@ class WorkspaceConfig(BaseModel):
     new_projects_dir: str = "Projetos/novos"
     pr_provider: Literal["github", "azuredevops"] = "github"
     pr_reviewers: list[str] = Field(default_factory=list)
-    default_base_branch: str = "main"
+    default_base_branch: str = "develop"
 
 
 DEFAULT_DEVELOPABLE_STATUSES = (
