@@ -4,7 +4,27 @@
 
 Skill multi-agente que automatiza entrega de sprint ponta-a-ponta. Lê sprints do Jira / Azure DevOps, mapeia arquitetura, instala + builda, roda testes, faz scan de segurança, cria PRs, revisa diff e entrega — tudo num fluxo único de 9 passos.
 
+## Visuais de produtividade
+
+### Time sem vs. com SendSprint
+
+![Time sem vs. com SendSprint](./docs/assets/sendsprint-productivity-before-after.png)
+
+### SendSprint como motor de entrega
+
+![Motor de produtividade SendSprint](./docs/assets/sendsprint-productivity-engine.png)
+
 ## 🎬 Vídeos
+
+### Produtividade antes/depois (47s)
+
+![Poster SendSprint antes e depois](./video/preview/sendsprint-before-after-poster-pt.png)
+
+<p align="center">
+  <a href="./video/preview/sendsprint-before-after-pt.mp4">▶️ MP4 em português (1920×1080, 47s, 8.9 MB)</a>
+  &nbsp;·&nbsp;
+  <a href="./video/preview/sendsprint-before-after-en.mp4">🇺🇸 MP4 em inglês (1920×1080, 47s, 8.9 MB)</a>
+</p>
 
 ### Explicação da skill (56s)
 
@@ -50,7 +70,7 @@ Veja [`web/README.md`](./web/README.md) pro passo-a-passo e
 
 Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.9.0 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Instalador MCP do Azure DevOps. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de 10 passos. Preflight, dry-run, estado resumível, roteamento com confiança e validação pós-PR inclusos. Branches usam `feature/{number}-{title}` e PRs miram `develop` por padrão; ambos podem ser configurados por workspace/repo. Checagens de hierarquia do backlog Azure evitam links pai Issue -> Task inválidos. Guia core de Jira/Azure DevOps incluso para regras estáveis do agente. Publicação PyPI automatizada em tags de release.
+> **Status:** v0.10.0 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Instalador MCP do Azure DevOps. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de 10 passos. Preflight, dry-run, estado resumível, roteamento com confiança e validação pós-PR inclusos. Visuais de produtividade e vídeos Remotion antes/depois estão inclusos. Branches usam `feature/{number}-{title}` e PRs miram `develop` por padrão; ambos podem ser configurados por workspace/repo. Checagens de hierarquia do backlog Azure evitam links pai Issue -> Task inválidos. Guia core de Jira/Azure DevOps incluso para regras estáveis do agente. Publicação PyPI automatizada em tags de release.
 
 ---
 

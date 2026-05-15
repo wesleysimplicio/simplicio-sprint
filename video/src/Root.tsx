@@ -2,6 +2,7 @@ import React from "react";
 import { Composition } from "remotion";
 import { SendSprintExplainer } from "./Video";
 import { RunLoopVideo, RUN_LOOP_DURATION } from "./RunLoopVideo";
+import { SendSprintBeforeAfter, BEFORE_AFTER_DURATION } from "./BeforeAfterVideo";
 import { FPS, TOTAL_FRAMES } from "./theme";
 
 export const Root: React.FC = () => {
@@ -48,6 +49,24 @@ export const Root: React.FC = () => {
         component={RunLoopVideo}
         defaultProps={{ lang: "en" as const }}
         durationInFrames={RUN_LOOP_DURATION}
+        fps={FPS}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="SendSprintBeforeAfter"
+        component={SendSprintBeforeAfter}
+        defaultProps={{ lang: "pt" as const }}
+        durationInFrames={BEFORE_AFTER_DURATION}
+        fps={FPS}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="SendSprintBeforeAfterEN"
+        component={SendSprintBeforeAfter}
+        defaultProps={{ lang: "en" as const }}
+        durationInFrames={BEFORE_AFTER_DURATION}
         fps={FPS}
         width={1920}
         height={1080}

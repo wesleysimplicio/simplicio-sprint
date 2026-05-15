@@ -9,7 +9,27 @@
 
 Multi-agent skill that automates end-to-end sprint delivery. Reads Jira / Azure DevOps sprints, maps architecture, installs + builds, runs tests, scans for security issues, creates PRs, reviews diffs, and delivers — all in a single 9-step flow.
 
+## Productivity Visuals
+
+### Team without vs. with SendSprint
+
+![Team without vs. with SendSprint](./docs/assets/sendsprint-productivity-before-after.png)
+
+### SendSprint as the delivery engine
+
+![SendSprint productivity engine](./docs/assets/sendsprint-productivity-engine.png)
+
 ## 🎬 Videos
+
+### Productivity before/after (47s)
+
+![SendSprint before and after poster](./video/preview/sendsprint-before-after-poster-en.png)
+
+<p align="center">
+  <a href="./video/preview/sendsprint-before-after-en.mp4">▶️ English MP4 (1920×1080, 47s, 8.9 MB)</a>
+  &nbsp;·&nbsp;
+  <a href="./video/preview/sendsprint-before-after-pt.mp4">🇧🇷 Portuguese MP4 (1920×1080, 47s, 8.9 MB)</a>
+</p>
 
 ### Skill explainer (56s)
 
@@ -55,7 +75,7 @@ See [`web/README.md`](./web/README.md) for the full walkthrough and
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.9.0 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Azure DevOps MCP installer. Auto-scaffold `.specs` plus latest `agentic-starter` sync. Full 10-step flow. Preflight, dry-run delivery plans, resumable run state, confidence routing, and post-PR validation are built in. Branches default to `feature/{number}-{title}` and PRs target `develop`; both can be configured. Azure backlog hierarchy checks prevent invalid Issue -> Task parent links. Jira/Azure DevOps core guide is bundled for stable agent rules. PyPI publishing is automated on release tags.
+> **Status:** v0.10.0 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Azure DevOps MCP installer. Auto-scaffold `.specs` plus latest `agentic-starter` sync. Full 10-step flow. Preflight, dry-run delivery plans, resumable run state, confidence routing, and post-PR validation are built in. Productivity visuals and before/after Remotion explainers are bundled. Branches default to `feature/{number}-{title}` and PRs target `develop`; both can be configured. Azure backlog hierarchy checks prevent invalid Issue -> Task parent links. Jira/Azure DevOps core guide is bundled for stable agent rules. PyPI publishing is automated on release tags.
 
 ---
 

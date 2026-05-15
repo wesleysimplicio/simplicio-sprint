@@ -6,6 +6,8 @@
   "scripts": {
     "start": "remotion studio src/index.ts",
     "build": "remotion render src/index.ts SendSprintExplainer out/sendsprint-explainer.mp4",
+    "build:before-after": "remotion render src/index.ts SendSprintBeforeAfter out/sendsprint-before-after-pt.mp4 && remotion render src/index.ts SendSprintBeforeAfterEN out/sendsprint-before-after-en.mp4",
+    "still:before-after": "remotion still src/index.ts SendSprintBeforeAfter out/sendsprint-before-after-poster-pt.png --frame=90 && remotion still src/index.ts SendSprintBeforeAfterEN out/sendsprint-before-after-poster-en.png --frame=90",
     "build:webm": "remotion render src/index.ts SendSprintExplainer out/sendsprint-explainer.webm --codec=vp9",
     "still": "remotion still src/index.ts SendSprintExplainer out/poster.png --frame=60",
     "typecheck": "tsc --noEmit",

@@ -9,6 +9,13 @@ spring/fade.
 
 ## Previews
 
+### Productivity before/after (47s)
+
+| 🇺🇸 English | 🇧🇷 Português |
+|---|---|
+| ![EN poster](./preview/sendsprint-before-after-poster-en.png) | ![PT poster](./preview/sendsprint-before-after-poster-pt.png) |
+| [▶️ MP4 (8.9 MB)](./preview/sendsprint-before-after-en.mp4) | [▶️ MP4 (8.9 MB)](./preview/sendsprint-before-after-pt.mp4) |
+
 ### Skill explainer (56s)
 
 | 🇺🇸 English | 🇧🇷 Português |
@@ -61,8 +68,10 @@ cd video
 npm install
 npm start                 # abre o Remotion Studio (preview interativo)
 npm run build             # renderiza out/sendsprint-explainer.mp4
+npm run build:before-after # renderiza before/after pt + en
 npm run build:webm        # renderiza out/sendsprint-explainer.webm (vp9)
 npm run still             # exporta um frame estático em out/poster.png
+npm run still:before-after # exporta posters before/after pt + en
 npm run typecheck         # valida tipos
 ```
 
@@ -78,6 +87,8 @@ inspeciona props, edita e vê o reload na hora.
 | `SendSprintExplainer1080Square` | pt | 1080×1080 | Instagram / LinkedIn |
 | `SendSprintRunLoop` | pt | 1920×1080 | README pt-BR — demo do loop |
 | `SendSprintRunLoopEN` | en | 1920×1080 | README EN — demo do loop |
+| `SendSprintBeforeAfter` | pt | 1920×1080 | Antes/depois para empresas |
+| `SendSprintBeforeAfterEN` | en | 1920×1080 | Company before/after explainer |
 
 Render manual:
 

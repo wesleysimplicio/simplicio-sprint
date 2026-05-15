@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.0] - 2026-05-15
+
+### Added
+
+- GPT-image-generated productivity visuals comparing teams before and after adopting SendSprint.
+- Remotion before/after explainer video in English and Portuguese, with pain, empathy, solution, outcome, and CTA scenes.
+- Render scripts for before/after MP4s and posters.
+
 ## [0.9.0] - 2026-05-15
 
 ### Added
