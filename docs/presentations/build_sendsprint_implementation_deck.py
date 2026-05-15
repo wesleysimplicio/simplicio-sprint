@@ -154,7 +154,7 @@ COPY: dict[str, dict[str, object]] = {
                     "Python: ruff, mypy, and 175 pytest tests passing.",
                     "Remotion: TypeScript typecheck and rendered MP4 outputs.",
                     "README: images, posters, and video links included.",
-                    "Version bumped to 0.10.0 with changelog entry.",
+                    "Version bumped to 0.10.3 with changelog entry.",
                 ),
                 VIDEO / "sendsprint-before-after-poster-en.png",
                 "Rendered video poster",
@@ -165,9 +165,9 @@ COPY: dict[str, dict[str, object]] = {
                 "OPERATING MODEL",
                 "Adoption becomes a simple, repeatable command sequence.",
                 (
-                    "sendsprint preflight azuredevops \"Team\\\\Sprint 12\" --workspace workspace.yaml",
-                    "sendsprint run azuredevops \"Team\\\\Sprint 12\" --dry-run",
-                    "sendsprint run azuredevops \"Team\\\\Sprint 12\" --run-id sprint-12",
+                    'sendsprint preflight azuredevops "Team\\\\Sprint 12" --workspace workspace.yaml',
+                    'sendsprint run azuredevops "Team\\\\Sprint 12" --dry-run',
+                    'sendsprint run azuredevops "Team\\\\Sprint 12" --run-id sprint-12',
                     "Open PRs with evidence and review metadata.",
                 ),
                 None,
@@ -293,7 +293,7 @@ COPY: dict[str, dict[str, object]] = {
                     "Python: ruff, mypy e 175 testes pytest passando.",
                     "Remotion: typecheck TypeScript e MP4s renderizados.",
                     "README: imagens, posters e links de video incluidos.",
-                    "Versao 0.10.0 com entrada no changelog.",
+                    "Versao 0.10.3 com entrada no changelog.",
                 ),
                 VIDEO / "sendsprint-before-after-poster-pt.png",
                 "Poster renderizado",
@@ -304,9 +304,9 @@ COPY: dict[str, dict[str, object]] = {
                 "MODELO OPERACIONAL",
                 "A adocao vira uma sequencia simples e repetivel de comandos.",
                 (
-                    "sendsprint preflight azuredevops \"Team\\\\Sprint 12\" --workspace workspace.yaml",
-                    "sendsprint run azuredevops \"Team\\\\Sprint 12\" --dry-run",
-                    "sendsprint run azuredevops \"Team\\\\Sprint 12\" --run-id sprint-12",
+                    'sendsprint preflight azuredevops "Team\\\\Sprint 12" --workspace workspace.yaml',
+                    'sendsprint run azuredevops "Team\\\\Sprint 12" --dry-run',
+                    'sendsprint run azuredevops "Team\\\\Sprint 12" --run-id sprint-12',
                     "PRs abertos com evidencia e metadados de revisao.",
                 ),
                 None,
@@ -395,12 +395,16 @@ def build_pptx(lang: str, cfg: dict[str, object]) -> Path:
         add_textbox(slide, 0.65, 0.46, 4.8, 0.26, item.kicker, 10, item.accent, True, "Aptos")
         title_h = 1.88 if idx == 1 else 1.05
         body_y = 2.78 if idx == 1 else 1.83
-        add_textbox(slide, 0.65, 0.82, 7.0, title_h, item.title, 34 if idx > 1 else 39, "text", True)
+        add_textbox(
+            slide, 0.65, 0.82, 7.0, title_h, item.title, 34 if idx > 1 else 39, "text", True
+        )
         add_textbox(slide, 0.68, body_y, 6.45, 0.78, item.body, 17, "muted")
         add_textbox(slide, 12.15, 0.48, 0.5, 0.2, f"{idx:02d}", 11, "muted", True)
 
         if item.image:
-            slide.shapes.add_shape(1, Inches(7.55), Inches(0.9), Inches(5.1), Inches(4.0)).fill.solid()
+            slide.shapes.add_shape(
+                1, Inches(7.55), Inches(0.9), Inches(5.1), Inches(4.0)
+            ).fill.solid()
             slide.shapes[-1].fill.fore_color.rgb = hex_rgb(COLORS["panel"])
             slide.shapes[-1].line.color.rgb = hex_rgb(COLORS["line"])
             add_picture_contain(slide, item.image, 7.75, 1.05, 4.7, 3.7)
@@ -412,7 +416,9 @@ def build_pptx(lang: str, cfg: dict[str, object]) -> Path:
 
         for b_idx, bullet in enumerate(item.bullets):
             y = bullet_y + b_idx * 0.68
-            dot = slide.shapes.add_shape(9, Inches(bullet_x), Inches(y + 0.08), Inches(0.13), Inches(0.13))
+            dot = slide.shapes.add_shape(
+                9, Inches(bullet_x), Inches(y + 0.08), Inches(0.13), Inches(0.13)
+            )
             dot.fill.solid()
             dot.fill.fore_color.rgb = hex_rgb(accent)
             dot.line.fill.background()
@@ -428,7 +434,9 @@ def build_pptx(lang: str, cfg: dict[str, object]) -> Path:
     return path
 
 
-def draw_wrapped(draw: ImageDraw.ImageDraw, xy, text: str, font, fill, width_chars: int, line_gap: int = 8):
+def draw_wrapped(
+    draw: ImageDraw.ImageDraw, xy, text: str, font, fill, width_chars: int, line_gap: int = 8
+):
     x, y = xy
     for line in wrap(text, width_chars):
         draw.text((x, y), line, font=font, fill=fill)
@@ -452,20 +460,30 @@ def make_preview_image(item: Slide, idx: int, lang: str, out: Path) -> None:
     for line in item.title.splitlines():
         draw.text((92, title_y), line, font=title_font, fill=rgb_tuple(COLORS["text"]))
         title_y += title_font.size + 12
-    draw_wrapped(draw, (98, 455 if idx == 1 else 290), item.body, body_font, rgb_tuple(COLORS["muted"]), 58)
+    draw_wrapped(
+        draw, (98, 455 if idx == 1 else 290), item.body, body_font, rgb_tuple(COLORS["muted"]), 58
+    )
     draw.text((1765, 72), f"{idx:02d}", font=small_font, fill=rgb_tuple(COLORS["muted"]))
 
     bullet_x, bullet_y, bullet_width = 110, 630 if idx == 1 else 460, 58
     if item.image:
         panel = (1088, 150, 1815, 720)
-        draw.rounded_rectangle(panel, radius=44, fill=rgb_tuple(COLORS["panel"]), outline=rgb_tuple(COLORS["line"]), width=2)
+        draw.rounded_rectangle(
+            panel,
+            radius=44,
+            fill=rgb_tuple(COLORS["panel"]),
+            outline=rgb_tuple(COLORS["line"]),
+            width=2,
+        )
         with Image.open(item.image).convert("RGB") as asset:
             asset.thumbnail((680, 500))
             ax = panel[0] + (panel[2] - panel[0] - asset.width) // 2
             ay = panel[1] + (panel[3] - panel[1] - asset.height) // 2
             img.paste(asset, (ax, ay))
         if item.image_label:
-            draw.text((1115, 750), item.image_label, font=small_font, fill=rgb_tuple(COLORS["muted"]))
+            draw.text(
+                (1115, 750), item.image_label, font=small_font, fill=rgb_tuple(COLORS["muted"])
+            )
         bullet_width = 52
 
     for bullet in item.bullets:

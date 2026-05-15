@@ -6,9 +6,7 @@ from sendsprint.run_state import RunStateStore, delivery_key, stable_run_id
 
 
 def test_stable_run_id_is_deterministic() -> None:
-    assert stable_run_id("azuredevops", "Sprint 29") == stable_run_id(
-        "azuredevops", "Sprint 29"
-    )
+    assert stable_run_id("azuredevops", "Sprint 29") == stable_run_id("azuredevops", "Sprint 29")
     assert stable_run_id("azuredevops", "Sprint 29") != stable_run_id("jira", "Sprint 29")
 
 

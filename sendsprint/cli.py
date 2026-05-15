@@ -1,4 +1,4 @@
-"""SendSprint CLI v2 — workspace-aware, scoped, 9-step orchestration."""
+"""SendSprint CLI v2 - workspace-aware, scoped, 10-step orchestration."""
 
 # ruff: noqa: B008, I001 - Typer's documented API uses Option/Argument in defaults.
 
@@ -658,9 +658,7 @@ def _render_delivery_plan(plan) -> None:
     for col in ("Item", "Repo", "Branch", "Target", "Confidence", "Reason"):
         table.add_column(col)
     for delivery in plan.deliveries:
-        style = {"high": "green", "medium": "yellow", "low": "red"}.get(
-            delivery.confidence, ""
-        )
+        style = {"high": "green", "medium": "yellow", "low": "red"}.get(delivery.confidence, "")
         table.add_row(
             delivery.item_key,
             Path(delivery.repo).name,

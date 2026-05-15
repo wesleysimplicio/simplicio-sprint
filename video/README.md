@@ -1,7 +1,7 @@
 # SendSprint — vídeo explicativo (Remotion)
 
-Vídeo animado em React/Remotion que ensina, em ~56 segundos, como usar a skill
-**SendSprint** no Claude Code (e em mais 12 IDEs/agentes). Estilo: gradient
+Vídeo animado em React/Remotion que explica, em ~56 segundos, como o
+**SendSprint** transforma trabalho de sprint em pull requests validados. Estilo: gradient
 escuro com partículas leves, terminais animados, ícones SVG, transições por
 spring/fade.
 
@@ -15,9 +15,9 @@ spring/fade.
 | 🇺🇸 English | 🇧🇷 Português |
 |---|---|
 | ![EN poster](./preview/sendsprint-before-after-poster-en.png) | ![PT poster](./preview/sendsprint-before-after-poster-pt.png) |
-| [▶️ MP4 (8.9 MB)](./preview/sendsprint-before-after-en.mp4) | [▶️ MP4 (8.9 MB)](./preview/sendsprint-before-after-pt.mp4) |
+| [▶️ MP4 (7.1 MB)](./preview/sendsprint-before-after-en.mp4) | [▶️ MP4 (7.1 MB)](./preview/sendsprint-before-after-pt.mp4) |
 
-### Skill explainer (56s)
+### Product explainer (56s)
 
 | 🇺🇸 English | 🇧🇷 Português |
 |---|---|
@@ -37,7 +37,7 @@ spring/fade.
 
 ## Cenas
 
-**Skill explainer** (`SendSprintExplainer`, 56s):
+**Product explainer** (`SendSprintExplainer`, 56s):
 
 | # | Cena | Duração | O que mostra |
 |---|---|---|---|
@@ -59,7 +59,7 @@ spring/fade.
 | 4 | Round 2 | ~6s | Re-roda steps 3–6, regressão VERDE + galeria |
 | 5 | Delivered | ~2s | "Sprint entregue" + URL do PR |
 
-A timeline da skill explainer está em [`src/theme.ts`](./src/theme.ts) (`SCENES`);
+A timeline do product explainer esta em [`src/theme.ts`](./src/theme.ts) (`SCENES`);
 o run loop tem timeline própria em [`src/scenes/RunLoopScene.tsx`](./src/scenes/RunLoopScene.tsx) (`T`).
 
 ## Como rodar

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.10.3] - 2026-05-15
+
+### Changed
+
+- Refreshed README visuals to present SendSprint as a sprint-to-PR delivery platform.
+- Updated README, package metadata, and video documentation to use product/platform language and the current 10-step flow.
+- Regenerated before/after Remotion MP4s, posters, and bilingual presentation exports with the new product visuals.
+
 ## [0.10.2] - 2026-05-15
 
 ### Added

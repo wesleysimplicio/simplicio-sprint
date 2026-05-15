@@ -53,7 +53,7 @@ class PrInfo(BaseModel):
 
 
 class StepReport(BaseModel):
-    """Result of one step of the 9-step flow for one repo (or global)."""
+    """Result of one step of the 10-step flow for one repo (or global)."""
 
     step: int
     name: str

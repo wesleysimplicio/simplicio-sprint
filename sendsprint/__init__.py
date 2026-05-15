@@ -1,4 +1,4 @@
-"""SendSprint - multi-agent skill that automates sprint delivery."""
+"""SendSprint - sprint-to-PR delivery automation platform."""
 
-__version__ = "0.10.2"
+__version__ = "0.10.3"
 __all__ = ["__version__"]

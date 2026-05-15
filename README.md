@@ -1,13 +1,15 @@
 # SendSprint
 
 <p align="center">
-  <img src="./docs/assets/sendsprint-hero.png" alt="SendSprint turns sprint tasks into pull requests with agentic front-end and back-end workflows" />
+  <img src="./docs/assets/sendsprint-hero.png" alt="SendSprint turns sprint work into validated pull requests" />
 </p>
 
 > 🇺🇸 English. Leia em português: [README.pt-BR.md](README.pt-BR.md).
 
 
-Multi-agent skill that automates end-to-end sprint delivery. Reads Jira / Azure DevOps sprints, maps architecture, installs + builds, runs tests, scans for security issues, creates PRs, reviews diffs, and delivers — all in a single 9-step flow.
+SendSprint is a sprint-to-pull-request delivery platform for engineering teams. It reads Jira or Azure DevOps sprint work, maps the target architecture, creates isolated branches/worktrees, builds, tests, checks security, captures evidence, commits, opens pull requests, reviews the diff, and reports delivery state in one controlled 10-step flow.
+
+The proposal is simple: remove the manual coordination tax between backlog, code, tests, evidence, and PRs. SendSprint gives teams a repeatable execution lane from sprint planning to `develop`, with preflight validation, dry-run planning, resumable runs, branch-per-task delivery, and auditable output.
 
 ## Productivity Visuals
 
@@ -26,12 +28,12 @@ Multi-agent skill that automates end-to-end sprint delivery. Reads Jira / Azure 
 ![SendSprint before and after poster](./video/preview/sendsprint-before-after-poster-en.png)
 
 <p align="center">
-  <a href="./video/preview/sendsprint-before-after-en.mp4">▶️ English MP4 (1920×1080, 47s, 8.9 MB)</a>
+  <a href="./video/preview/sendsprint-before-after-en.mp4">▶️ English MP4 (1920×1080, 47s, 7.1 MB)</a>
   &nbsp;·&nbsp;
-  <a href="./video/preview/sendsprint-before-after-pt.mp4">🇧🇷 Portuguese MP4 (1920×1080, 47s, 8.9 MB)</a>
+  <a href="./video/preview/sendsprint-before-after-pt.mp4">🇧🇷 Portuguese MP4 (1920×1080, 47s, 7.1 MB)</a>
 </p>
 
-### Skill explainer (56s)
+### Product explainer (56s)
 
 ![SendSprint explainer preview](./video/preview/sendsprint-en-preview.gif)
 
@@ -83,7 +85,7 @@ See [`web/README.md`](./web/README.md) for the full walkthrough and
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.10.2 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Azure DevOps MCP installer. Auto-scaffold `.specs` plus latest `agentic-starter` sync. Full 10-step flow. Preflight, dry-run delivery plans, resumable run state, confidence routing, and post-PR validation are built in. Productivity visuals, before/after Remotion explainers with music and sound effects, and bilingual implementation decks are bundled. Branches default to `feature/{number}-{title}` and PRs target `develop`; both can be configured. Azure backlog hierarchy checks prevent invalid Issue -> Task parent links. Jira/Azure DevOps core guide is bundled for stable agent rules. PyPI publishing is automated on release tags.
+> **Status:** v0.10.3 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Azure DevOps MCP installer. Auto-scaffold `.specs` plus latest `agentic-starter` sync. Full 10-step flow. Preflight, dry-run delivery plans, resumable run state, confidence routing, and post-PR validation are built in. Product visuals, before/after Remotion explainers with music and sound effects, and bilingual implementation decks are bundled. Branches default to `feature/{number}-{title}` and PRs target `develop`; both can be configured. Azure backlog hierarchy checks prevent invalid Issue -> Task parent links. Jira/Azure DevOps core guide is bundled for stable delivery rules. PyPI publishing is automated on release tags.
 
 ---
 
@@ -131,7 +133,7 @@ cp .env.example .env  # fill in credentials
 ### CLI
 
 ```bash
-# Full 9-step flow against a Jira sprint
+# Full 10-step flow against a Jira sprint
 sendsprint run jira 42 --workspace workspace.yaml --scope mine -o report.json
 
 # Full flow against Azure DevOps
@@ -253,7 +255,7 @@ sendsprint/
 │   └── loader.py      YAML/JSON multi-repo workspace config
 ├── scope.py           --scope mine filtering (account_id, email, name)
 ├── flow/
-│   └── sprint_flow.py 9-step orchestrator
+│   └── sprint_flow.py 10-step orchestrator
 ├── llm/               Provider-agnostic LLM client
 └── cli.py             Typer CLI
 ```
@@ -276,9 +278,9 @@ sendsprint/
 
 ---
 
-## Skills
+## Assistant Integrations
 
-Per-platform entry points under `skills/`:
+Per-platform integration manifests under `skills/`:
 
 | File | Platform |
 |------|---------|
@@ -288,7 +290,7 @@ Per-platform entry points under `skills/`:
 | `skills/openclaw/openclaw.md` | Openclaw |
 | `skills/copilot/copilot-instructions.md` | GitHub Copilot |
 
-Each references the same Python core; the skill file teaches the host agent how to invoke it.
+Each references the same Python core; the manifest teaches the host assistant how to invoke SendSprint consistently.
 
 ---
 

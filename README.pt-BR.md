@@ -2,7 +2,9 @@
 
 > 🇧🇷 Versão em português. Read this in English: [README.md](README.md).
 
-Skill multi-agente que automatiza entrega de sprint ponta-a-ponta. Lê sprints do Jira / Azure DevOps, mapeia arquitetura, instala + builda, roda testes, faz scan de segurança, cria PRs, revisa diff e entrega — tudo num fluxo único de 9 passos.
+SendSprint e uma plataforma de entrega sprint-para-PR para times de engenharia. Ele le itens da sprint no Jira ou Azure DevOps, mapeia a arquitetura alvo, cria branches/worktrees isolados, builda, testa, valida seguranca, captura evidencias, comita, abre pull requests, revisa o diff e reporta o estado da entrega em um fluxo controlado de 10 passos.
+
+A proposta e simples: remover o custo de coordenacao manual entre backlog, codigo, testes, evidencia e PR. O SendSprint cria uma esteira repetivel da sprint ate `develop`, com preflight, dry-run, execucao resumivel, branch por task e saida auditavel.
 
 ## Visuais de produtividade
 
@@ -21,12 +23,12 @@ Skill multi-agente que automatiza entrega de sprint ponta-a-ponta. Lê sprints d
 ![Poster SendSprint antes e depois](./video/preview/sendsprint-before-after-poster-pt.png)
 
 <p align="center">
-  <a href="./video/preview/sendsprint-before-after-pt.mp4">▶️ MP4 em português (1920×1080, 47s, 8.9 MB)</a>
+  <a href="./video/preview/sendsprint-before-after-pt.mp4">▶️ MP4 em português (1920×1080, 47s, 7.1 MB)</a>
   &nbsp;·&nbsp;
-  <a href="./video/preview/sendsprint-before-after-en.mp4">🇺🇸 MP4 em inglês (1920×1080, 47s, 8.9 MB)</a>
+  <a href="./video/preview/sendsprint-before-after-en.mp4">🇺🇸 MP4 em inglês (1920×1080, 47s, 7.1 MB)</a>
 </p>
 
-### Explicação da skill (56s)
+### Explicacao do produto (56s)
 
 ![Prévia do vídeo SendSprint](./video/preview/sendsprint-preview.gif)
 
@@ -78,7 +80,7 @@ Veja [`web/README.md`](./web/README.md) pro passo-a-passo e
 
 Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.10.2 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Instalador MCP do Azure DevOps. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de 10 passos. Preflight, dry-run, estado resumível, roteamento com confiança e validação pós-PR inclusos. Visuais de produtividade, vídeos Remotion antes/depois com trilha e efeitos sonoros, e decks bilíngues da implementação estão inclusos. Branches usam `feature/{number}-{title}` e PRs miram `develop` por padrão; ambos podem ser configurados por workspace/repo. Checagens de hierarquia do backlog Azure evitam links pai Issue -> Task inválidos. Guia core de Jira/Azure DevOps incluso para regras estáveis do agente. Publicação PyPI automatizada em tags de release.
+> **Status:** v0.10.3 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Instalador MCP do Azure DevOps. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de 10 passos. Preflight, dry-run, estado resumível, roteamento com confiança e validação pós-PR inclusos. Visuais de produto, vídeos Remotion antes/depois com trilha e efeitos sonoros, e decks bilíngues da implementação estão inclusos. Branches usam `feature/{number}-{title}` e PRs miram `develop` por padrão; ambos podem ser configurados por workspace/repo. Checagens de hierarquia do backlog Azure evitam links pai Issue -> Task inválidos. Guia core de Jira/Azure DevOps incluso para regras estáveis de entrega. Publicação PyPI automatizada em tags de release.
 
 ---
 
@@ -126,7 +128,7 @@ cp .env.example .env  # preencha credenciais
 ### CLI
 
 ```bash
-# Fluxo completo de 9 passos contra sprint Jira
+# Fluxo completo de 10 passos contra sprint Jira
 sendsprint run jira 42 --workspace workspace.yaml --scope mine -o report.json
 
 # Fluxo completo contra Azure DevOps
@@ -234,7 +236,7 @@ sendsprint/
 │   └── loader.py      Config YAML/JSON multi-repo
 ├── scope.py           Filtro `--scope mine` (account_id, email, name)
 ├── flow/
-│   └── sprint_flow.py Orquestrador de 9 passos
+│   └── sprint_flow.py Orquestrador de 10 passos
 ├── llm/               Cliente LLM provider-agnostic
 └── cli.py             CLI Typer
 ```
@@ -257,9 +259,9 @@ sendsprint/
 
 ---
 
-## Skills
+## Integracoes com assistentes
 
-Pontos de entrada por plataforma sob `skills/`:
+Manifestos de integracao por plataforma sob `skills/`:
 
 | Arquivo | Plataforma |
 |------|---------|
@@ -269,7 +271,7 @@ Pontos de entrada por plataforma sob `skills/`:
 | `skills/openclaw/openclaw.md` | Openclaw |
 | `skills/copilot/copilot-instructions.md` | GitHub Copilot |
 
-Cada um aponta pro mesmo core Python; o SKILL ensina o agente host como invocar.
+Cada um aponta para o mesmo core Python; o manifesto ensina o assistente host a invocar o SendSprint de forma consistente.
 
 ---
 
