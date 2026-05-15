@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/session-start-skills.sh"
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/session-start-skills.ps1"
           }
         ]
       }
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/post-edit.sh \"$CLAUDE_FILE_PATH\""
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/post-edit.ps1"
           }
         ]
       }
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [[ \"$CLAUDE_BASH_COMMAND\" == *\"git commit\"* ]]; then .claude/hooks/pre-commit.sh; fi"
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/pre-commit.ps1"
           }
         ]
       }

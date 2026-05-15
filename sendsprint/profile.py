@@ -34,6 +34,7 @@ class AzureDevopsProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
     organization: str | None = None
     project: str | None = None
+    team: str | None = None
     default_iteration: str | None = None
 
 

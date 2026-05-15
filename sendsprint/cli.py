@@ -21,6 +21,7 @@ from sendsprint.agentic_starter import (
 )
 from sendsprint.architecture import ArchitectureMapper, build_architecture
 from sendsprint.flow import SprintFlow
+from sendsprint.mcp import install_azure_devops_mcp
 from sendsprint.models import Sprint
 from sendsprint.operators import AzureDevopsOperator, JiraOperator
 from sendsprint.scaffolder import Scaffolder
@@ -138,6 +139,39 @@ def sync_agentic_starter_cmd(
         dry_run=dry_run,
     )
     console.print_json(data=result_to_json(result))
+
+
+@app.command(name="install-ado-mcp")
+def install_ado_mcp_cmd(
+    organization: str | None = typer.Option(None, "--organization", "--org"),
+    project: str | None = typer.Option(None, "--project"),
+    team: str | None = typer.Option(None, "--team"),
+    config_path: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--config",
+        help="Codex config path; defaults to ~/.codex/config.toml",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """Install/configure the official Azure DevOps MCP server for Codex."""
+    p = profile_mod.load()
+    organization = organization or p.azuredevops.organization
+    project = project or p.azuredevops.project
+    team = team or p.azuredevops.team
+
+    if not organization:
+        organization = typer.prompt("azure devops organization")
+    if not project:
+        project = typer.prompt("azure devops project")
+
+    result = install_azure_devops_mcp(
+        organization=organization,
+        project=project,
+        team=team,
+        config_path=config_path,
+        dry_run=dry_run,
+    )
+    console.print_json(data=result.model_dump())
 
 
 @app.command(name="run")
@@ -309,6 +343,7 @@ def login(
     elif provider == "azuredevops":
         organization = typer.prompt("azure devops organization")
         project = typer.prompt("azure devops project")
+        team = typer.prompt("azure devops team", default="")
         account, _ = credentials.get_or_prompt(
             "azuredevops",
             "AZURE_DEVOPS_ORG",
@@ -321,7 +356,13 @@ def login(
                 "default_provider": "azuredevops",
                 "azuredevops.organization": organization,
                 "azuredevops.project": project,
+                "azuredevops.team": team or None,
             }
+        )
+        install_azure_devops_mcp(
+            organization=organization,
+            project=project,
+            team=team or None,
         )
         console.print(
             f"[green]logged in to azuredevops org={organization} project={project}[/green]"

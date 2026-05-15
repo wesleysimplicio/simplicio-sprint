@@ -11,6 +11,7 @@ Improvements over v2.0:
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,12 +26,13 @@ from sendsprint.agents.pr_creator import PrCreator
 from sendsprint.agents.pr_reviewer import PrReviewer
 from sendsprint.agents.security_reviewer import SecurityReviewer
 from sendsprint.agents.sprint_importer import SprintImporter, _slugify, _sprint_dir_name
+from sendsprint.agents.story_task_planner import delivery_items, item_matches_repo, plan_story_tasks
 from sendsprint.agents.test_runner import TestRunner
 from sendsprint.agents.worktree import WorktreeError, WorktreeManager
 from sendsprint.architecture import ArchitectureMapper, build_architecture
 from sendsprint.models import ArchitectureReport, Sprint
-from sendsprint.models.sprint import SprintItem
 from sendsprint.models.reports import RunReport, StepReport
+from sendsprint.models.sprint import SprintItem
 from sendsprint.models.workspace import RepoConfig, ScopeConfig, WorkspaceConfig
 from sendsprint.operators.base import BaseOperator
 from sendsprint.scope import apply_scope
@@ -40,6 +42,31 @@ from sendsprint.workspace import resolve_repo_path
 logger = logging.getLogger(__name__)
 
 MAX_FIX_LOOPS = 3
+DEFAULT_BRANCH_NAME_TEMPLATE = "feature/{number}-{title}"
+
+
+def _task_number(item: SprintItem) -> str:
+    """Return the numeric task id used by the default branch convention."""
+    for candidate in (item.key, item.id):
+        if not candidate:
+            continue
+        matches = re.findall(r"\d+", candidate)
+        if matches:
+            return _slugify(matches[-1], 40)
+
+    return _slugify(item.key or item.id or "task", 40)
+
+
+def _clean_branch_template(branch: str) -> str:
+    """Drop empty template fragments without changing intentional path segments."""
+    parts = []
+    for part in branch.split("/"):
+        cleaned = re.sub(r"-{2,}", "-", part).strip("-")
+        if cleaned:
+            parts.append(cleaned)
+    return "/".join(parts) or DEFAULT_BRANCH_NAME_TEMPLATE.replace("{number}", "task").replace(
+        "-{title}", ""
+    )
 
 
 class SprintFlowResult(BaseModel):
@@ -100,6 +127,10 @@ class SprintFlow:
         if self.scope.mode == "mine":
             report.user = self.scope.user_email or self.scope.user_display_name
 
+        # --- Step 1.25: Split User Stories without tasks into front/back tasks ---
+        sprint, planning_report = plan_story_tasks(sprint, self.workspace)
+        report.steps.append(planning_report)
+
         # --- Step 1.5: Import sprint items as agentic-starter task specs ---
         self._step1_5_import_specs(sprint, repo_path, report)
 
@@ -113,15 +144,19 @@ class SprintFlow:
             skip.message = "no repos resolved — steps 2-10 skipped"
             report.steps.append(skip)
 
-        if not sprint.items and repos:
+        items_to_deliver = delivery_items(sprint)
+
+        if not items_to_deliver and repos:
             skip = StepReport(step=2, name="no-tasks", status="skipped")
             skip.message = "sprint has 0 items after scope/status filter — steps 2-10 skipped"
             report.steps.append(skip)
 
-        for item in sprint.items:
+        for item in items_to_deliver:
             for repo_cfg, rpath in repos:
+                if not item_matches_repo(item, repo_cfg.role if repo_cfg else None):
+                    continue
                 fp = detect_tech(rpath)
-                branch_name = self._branch_for_task(item, fp)
+                branch_name = self._branch_for_task(item, fp, repo_cfg)
                 task_sprint = sprint.model_copy(update={"items": [item]})
 
                 # --- Step 2: Architecture (per repo, once per task — cheap, idempotent) ---
@@ -477,11 +512,30 @@ class SprintFlow:
             return [(None, Path(repo_path).resolve())]
         return []
 
-    def _branch_for_task(self, item: SprintItem, fp: TechFingerprint) -> str:
+    def _branch_for_task(
+        self,
+        item: SprintItem,
+        fp: TechFingerprint,
+        repo_cfg: RepoConfig | None = None,
+    ) -> str:
+        template = (
+            repo_cfg.branch_name_template
+            if repo_cfg and repo_cfg.branch_name_template
+            else self.workspace.branch_name_template
+            if self.workspace
+            else DEFAULT_BRANCH_NAME_TEMPLATE
+        )
         key = _slugify(item.key or item.id or "task", 40)
+        number = _task_number(item)
         raw_title = (item.title or "").strip()
-        suffix = f"-{_slugify(raw_title, 30)}" if raw_title else ""
-        return f"sendsprint/{key}{suffix}"
+        values = {
+            "number": number,
+            "key": key,
+            "id": _slugify(item.id or item.key or "task", 40),
+            "title": _slugify(raw_title, 30) if raw_title else "",
+            "repo": _slugify(fp.repo_path or "repo", 30),
+        }
+        return _clean_branch_template(template.format(**values))
 
     def _try_worktree(self, repo: Path, branch: str) -> Path | None:
         try:

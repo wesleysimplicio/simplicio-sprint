@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sendsprint"
-version = "0.7.1"
+version = "0.8.0"
 description = "Multi-agent skill that automates sprint delivery from Jira / Azure DevOps to PR + deploy."
 readme = "README.md"
 requires-python = ">=3.11"

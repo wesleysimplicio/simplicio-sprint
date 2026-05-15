@@ -1,5 +1,9 @@
 # SendSprint
 
+<p align="center">
+  <img src="./docs/assets/sendsprint-hero.png" alt="SendSprint turns sprint tasks into pull requests with agentic front-end and back-end workflows" />
+</p>
+
 > 🇺🇸 English. Leia em português: [README.pt-BR.md](README.pt-BR.md).
 
 
@@ -51,7 +55,7 @@ See [`web/README.md`](./web/README.md) for the full walkthrough and
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.7.0 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Auto-scaffold `.specs/` plus latest `agentic-starter` sync. Full 10-step flow. PRs target `develop` by default and can be configured per workspace/repo. PyPI publishing is automated on release tags.
+> **Status:** v0.8.0 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Azure DevOps MCP installer. Auto-scaffold `.specs` plus latest `agentic-starter` sync. Full 10-step flow. Branches default to `feature/{number}-{title}` and PRs target `develop`; both can be configured. PyPI publishing is automated on release tags.
 
 ---
 
@@ -156,6 +160,7 @@ root_path: /home/dev/repos
 new_projects_dir: Projetos/novos
 pr_provider: github
 default_base_branch: develop
+branch_name_template: feature/{number}-{title}
 repos:
   - name: backend-api
     path: backend-api
@@ -163,6 +168,8 @@ repos:
     tech: dotnet
     default_branch: main
     pr_target_branch: develop
+    # Optional per-repo override:
+    # branch_name_template: hotfix/{number}-{title}
   - name: frontend-web
     path: frontend-web
     role: front
@@ -172,6 +179,17 @@ repos:
     role: mobile
     tech: flutter
 ```
+
+Azure DevOps MCP can be configured for Codex with:
+
+```bash
+sendsprint install-ado-mcp --organization my-org --project "Projetos Ágeis" --team "Squad Yankee"
+```
+
+When a User Story has no child tasks, SendSprint creates in-memory front/back
+tasks before delivery. Generated tasks keep `parent_key` pointing to the story
+and labels `scope:front` / `scope:back`, so each task runs only against matching
+workspace repos.
 
 ---
 

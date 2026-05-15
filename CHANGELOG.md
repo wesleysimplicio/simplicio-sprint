@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.8.0] - 2026-05-15
+
+### Added
+
+- Azure DevOps MCP installer command: `sendsprint install-ado-mcp`. It configures Codex to run the official `@azure-devops/mcp` server through `npx -y`.
+- User Story decomposition: stories without child tasks are expanded into generated front/back tasks with `parent_key` and `scope:front` / `scope:back` labels.
+
+### Changed
+
+- Branch generation now defaults to `feature/{number}-{title}`, producing names like `feature/179500-email-cnpj-filter`.
+- Added configurable `branch_name_template` at workspace and repo level. Supported placeholders: `{number}`, `{key}`, `{id}`, `{title}`, `{repo}`.
+- Sprint delivery skips parent stories that have task children and routes generated tasks only to matching front/back repos.
+
 ## [0.7.1] - 2026-05-14
 
 ### Changed

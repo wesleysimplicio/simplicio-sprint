@@ -1,7 +1,10 @@
-#!/usr/bin/env bash
-# SessionStart hook for POSIX shells.
+# SessionStart hook for Windows shells.
+# Emits concise project context without requiring Bash.
 
-cat <<'EOF'
+[CmdletBinding()]
+param()
+
+@'
 [Agentic-Starter - Skills always-on ativas neste projeto]
 
 Skills padrao:
@@ -14,4 +17,4 @@ Padroes deste repo:
 - Conventional Commits.
 - Nunca commitar segredos.
 - Antes do commit: ruff critical nos Python staged e pytest tests -q.
-EOF
+'@

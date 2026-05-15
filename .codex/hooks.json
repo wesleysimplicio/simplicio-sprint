@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\WesleySimplicio\\source\\repos\\SendSprint\\.codex\\hooks\\pre-commit.ps1\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\WesleySimplicio\\source\\repos\\SendSprint\\.codex\\hooks\\post-edit.ps1\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File \"C:\\Users\\WesleySimplicio\\source\\repos\\SendSprint\\.codex\\hooks\\session-start-skills.ps1\""
+          }
+        ]
+      }
+    ]
+  }
+}
