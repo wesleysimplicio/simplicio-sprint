@@ -75,30 +75,50 @@ class PrReviewer:
                 continue
             code = line[1:]
             if "TODO" in code or "FIXME" in code or "HACK" in code:
-                issues.append({
-                    "rule": "todo-marker",
-                    "message": f"line {i + 1}: unresolved TODO/FIXME/HACK",
-                })
+                issues.append(
+                    {
+                        "rule": "todo-marker",
+                        "message": f"line {i + 1}: unresolved TODO/FIXME/HACK",
+                    }
+                )
             debug_patterns = [
-                "console.log(", "console.debug(", "debugger",
-                "binding.pry", "byebug", "import pdb", "pdb.set_trace(",
-                "breakpoint()", "System.out.println(",
-                "dd(", "dump(",
+                "console.log(",
+                "console.debug(",
+                "debugger",
+                "binding.pry",
+                "byebug",
+                "import pdb",
+                "pdb.set_trace(",
+                "breakpoint()",
+                "System.out.println(",
+                "dd(",
+                "dump(",
             ]
-            if any(p in code for p in debug_patterns):
-                if not ("logger" in code or "logging" in code):
-                    issues.append({
+            if any(p in code for p in debug_patterns) and not (
+                "logger" in code or "logging" in code
+            ):
+                issues.append(
+                    {
                         "rule": "debug-statement",
                         "message": f"line {i + 1}: debug statement in diff",
-                    })
+                    }
+                )
             if len(code) > 200:
-                issues.append({
-                    "rule": "long-line",
-                    "message": f"line {i + 1}: line exceeds 200 chars",
-                })
-            if code.startswith("<<<<<<<") or code.startswith(">>>>>>>") or code.startswith("======="):
-                issues.append({
-                    "rule": "merge-conflict",
-                    "message": f"line {i + 1}: unresolved merge conflict marker",
-                })
+                issues.append(
+                    {
+                        "rule": "long-line",
+                        "message": f"line {i + 1}: line exceeds 200 chars",
+                    }
+                )
+            if (
+                code.startswith("<<<<<<<")
+                or code.startswith(">>>>>>>")
+                or code.startswith("=======")
+            ):
+                issues.append(
+                    {
+                        "rule": "merge-conflict",
+                        "message": f"line {i + 1}: unresolved merge conflict marker",
+                    }
+                )
         return issues

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import httpx
 
@@ -45,7 +45,8 @@ class LlmClient:
         base_url: str | None = None,
         timeout: float = 60.0,
     ) -> None:
-        self.provider: Provider = (provider or os.getenv("LLM_PROVIDER", "anthropic")).lower()  # type: ignore[assignment]
+        provider_value = (provider or os.getenv("LLM_PROVIDER") or "anthropic").lower()
+        self.provider = cast(Provider, provider_value)
         self.model = model or os.getenv("LLM_MODEL") or DEFAULT_MODELS.get(self.provider, "")
         self.api_key = api_key or self._resolve_api_key()
         self.base_url = base_url or self._resolve_base_url()

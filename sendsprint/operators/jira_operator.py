@@ -5,12 +5,13 @@ from __future__ import annotations
 import logging
 import os
 from datetime import datetime
+from importlib import import_module
 from typing import Any
 
 import httpx
 
 from sendsprint.models import Comment, Link, Sprint, SprintItem
-from sendsprint.operators.base import BaseOperator, TransportUnavailable
+from sendsprint.operators.base import BaseOperator, Transport, TransportUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +43,14 @@ class JiraOperator(BaseOperator):
         base_url: str | None = None,
         email: str | None = None,
         api_token: str | None = None,
-        transport: str = "auto",
+        transport: Transport = "auto",
         cdp_url: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(transport=transport, **kwargs)
-        resolved_base = (base_url or os.getenv("JIRA_BASE_URL", "")).rstrip("/")
-        resolved_email = email or os.getenv("JIRA_EMAIL", "")
-        resolved_token = api_token or os.getenv("JIRA_API_TOKEN", "")
+        resolved_base = (base_url or os.getenv("JIRA_BASE_URL") or "").rstrip("/")
+        resolved_email = email or os.getenv("JIRA_EMAIL") or ""
+        resolved_token = api_token or os.getenv("JIRA_API_TOKEN") or ""
         if not resolved_base or not resolved_email:
             try:
                 from sendsprint import profile as _profile_mod
@@ -66,10 +67,10 @@ class JiraOperator(BaseOperator):
                 resolved_token = _credentials.get_secret("jira", resolved_email) or ""
             except Exception:  # pragma: no cover — keyring unavailable
                 pass
-        self.base_url = resolved_base
-        self.email = resolved_email
-        self.api_token = resolved_token
-        self.cdp_url = cdp_url or os.getenv("PLAYWRIGHT_CDP_URL", "http://127.0.0.1:9222")
+        self.base_url: str = resolved_base or ""
+        self.email: str = resolved_email or ""
+        self.api_token: str = resolved_token or ""
+        self.cdp_url: str = cdp_url or os.getenv("PLAYWRIGHT_CDP_URL") or "http://127.0.0.1:9222"
 
     def _api_available(self) -> bool:
         return bool(self.base_url and self.email and self.api_token)
@@ -100,16 +101,24 @@ class JiraOperator(BaseOperator):
             "displayName": data.get("displayName"),
         }
 
-    def _read_via_mcp(self, sprint_id: str | int, **_: Any) -> Sprint:
+    def _read_via_mcp(self, **kwargs: Any) -> Sprint:
+        sprint_id = kwargs.get("sprint_id")
+        if sprint_id is None:
+            raise ValueError("sprint_id is required")
         try:
-            from sendsprint.operators import _mcp_bridge
+            bridge = import_module("sendsprint.operators._mcp_bridge")
         except ImportError as exc:
             raise TransportUnavailable("MCP bridge module missing") from exc
-        return _mcp_bridge.call_jira_mcp(sprint_id=sprint_id)
+        return bridge.call_jira_mcp(sprint_id=sprint_id)
 
-    def _read_via_api(self, sprint_id: str | int, **_: Any) -> Sprint:
+    def _read_via_api(self, **kwargs: Any) -> Sprint:
+        sprint_id = kwargs.get("sprint_id")
+        if sprint_id is None:
+            raise ValueError("sprint_id is required")
         if not self._api_available():
-            raise TransportUnavailable("Jira API credentials missing (JIRA_BASE_URL/EMAIL/API_TOKEN)")
+            raise TransportUnavailable(
+                "Jira API credentials missing (JIRA_BASE_URL/EMAIL/API_TOKEN)"
+            )
         auth = (self.email, self.api_token)
         sprint_url = f"{self.base_url}/rest/agile/1.0/sprint/{sprint_id}"
         with httpx.Client(timeout=30.0, auth=auth) as client:
@@ -137,11 +146,16 @@ class JiraOperator(BaseOperator):
                 start_at += len(batch)
         return self._sprint_from_jira_issues(sprint_data, issues, transport="api")
 
-    def _read_via_playwright(self, sprint_id: str | int, **_: Any) -> Sprint:
+    def _read_via_playwright(self, **kwargs: Any) -> Sprint:
+        sprint_id = kwargs.get("sprint_id")
+        if sprint_id is None:
+            raise ValueError("sprint_id is required")
         try:
             from playwright.sync_api import sync_playwright
         except ImportError as exc:
-            raise TransportUnavailable("playwright not installed: pip install playwright && playwright install chromium") from exc
+            raise TransportUnavailable(
+                "playwright not installed: pip install playwright && playwright install chromium"
+            ) from exc
         if not self.base_url:
             raise TransportUnavailable("JIRA_BASE_URL required for Playwright transport")
         items: list[SprintItem] = []
@@ -155,7 +169,9 @@ class JiraOperator(BaseOperator):
             cards = page.locator("[data-testid='platform-board-kit.ui.card.card']").all()
             for card in cards:
                 key_el = card.locator("[data-testid='platform-card.common.ui.key.key']").first
-                title_el = card.locator("[data-testid='platform-card.ui.card.focus-container']").first
+                title_el = card.locator(
+                    "[data-testid='platform-card.ui.card.focus-container']"
+                ).first
                 key = key_el.text_content() if key_el else ""
                 title = title_el.text_content() if title_el else ""
                 if not key:
@@ -215,7 +231,7 @@ class JiraOperator(BaseOperator):
             comments.append(
                 Comment(
                     author=(c.get("author") or {}).get("displayName", "unknown"),
-                    body=_extract_text(c.get("body")),
+                    body=_extract_text(c.get("body")) or "",
                     created_at=_parse_dt(c.get("created")) or datetime.utcnow(),
                 )
             )

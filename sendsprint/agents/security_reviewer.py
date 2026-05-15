@@ -8,8 +8,9 @@ import re
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
-from ..models.reports import SecurityFinding, StepReport
+from ..models.reports import SecurityFinding, Severity, StepReport
 from ..tech import TechFingerprint
 
 logger = logging.getLogger(__name__)
@@ -30,14 +31,44 @@ SECRET_PATTERNS: list[tuple[str, str]] = [
 ]
 
 IGNORE_DIRS = {
-    ".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
-    "bin", "obj", "target", ".next", ".angular", "coverage",
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    "bin",
+    "obj",
+    "target",
+    ".next",
+    ".angular",
+    "coverage",
 }
 
 SCAN_EXTENSIONS = {
-    ".ts", ".tsx", ".js", ".jsx", ".py", ".cs", ".java", ".go", ".rs",
-    ".rb", ".php", ".yaml", ".yml", ".json", ".toml", ".env", ".cfg",
-    ".sh", ".bash", ".zsh", ".tf", ".hcl",
+    ".ts",
+    ".tsx",
+    ".js",
+    ".jsx",
+    ".py",
+    ".cs",
+    ".java",
+    ".go",
+    ".rs",
+    ".rb",
+    ".php",
+    ".yaml",
+    ".yml",
+    ".json",
+    ".toml",
+    ".env",
+    ".cfg",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".tf",
+    ".hcl",
 }
 
 MAX_FILE_SIZE = 512_000
@@ -185,7 +216,7 @@ class SecurityReviewer:
             for v in vuln.get("vulns", []):
                 vid = v.get("id", "")
                 desc = v.get("description", "")[:200]
-                sev = v.get("fix_versions") and "high" or "medium"
+                sev = cast(Severity, "high" if v.get("fix_versions") else "medium")
                 out.append(
                     SecurityFinding(
                         rule="pip-audit",

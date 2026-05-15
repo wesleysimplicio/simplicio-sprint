@@ -47,14 +47,10 @@ class WorktreeManager:
 
     def current_branch(self, wt_dir: Path | None = None) -> str:
         cwd = str(wt_dir) if wt_dir else str(self.repo)
-        result = self._run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd
-        )
+        result = self._run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd)
         return result.stdout.strip()
 
-    def _run(
-        self, cmd: list[str], *, cwd: str | None = None
-    ) -> subprocess.CompletedProcess[str]:
+    def _run(self, cmd: list[str], *, cwd: str | None = None) -> subprocess.CompletedProcess[str]:
         try:
             return subprocess.run(
                 cmd,

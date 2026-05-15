@@ -6,12 +6,13 @@ import base64
 import logging
 import os
 from datetime import datetime
+from importlib import import_module
 from typing import Any
 
 import httpx
 
 from sendsprint.models import Sprint, SprintItem
-from sendsprint.operators.base import BaseOperator, TransportUnavailable
+from sendsprint.operators.base import BaseOperator, Transport, TransportUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +41,15 @@ class AzureDevopsOperator(BaseOperator):
         project: str | None = None,
         team: str | None = None,
         pat: str | None = None,
-        transport: str = "auto",
+        transport: Transport = "auto",
         cdp_url: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(transport=transport, **kwargs)
-        resolved_org = organization or os.getenv("AZURE_DEVOPS_ORG", "")
-        resolved_project = project or os.getenv("AZURE_DEVOPS_PROJECT", "")
-        resolved_team = team or os.getenv("AZURE_DEVOPS_TEAM", "")
-        resolved_pat = pat or os.getenv("AZURE_DEVOPS_PAT", "")
+        resolved_org = organization or os.getenv("AZURE_DEVOPS_ORG") or ""
+        resolved_project = project or os.getenv("AZURE_DEVOPS_PROJECT") or ""
+        resolved_team = team or os.getenv("AZURE_DEVOPS_TEAM") or ""
+        resolved_pat = pat or os.getenv("AZURE_DEVOPS_PAT") or ""
         if not resolved_org or not resolved_project:
             try:
                 from sendsprint import profile as _profile_mod
@@ -65,11 +66,11 @@ class AzureDevopsOperator(BaseOperator):
                 resolved_pat = _credentials.get_secret("azuredevops", resolved_org) or ""
             except Exception:  # pragma: no cover — keyring unavailable
                 pass
-        self.organization = resolved_org
-        self.project = resolved_project
-        self.team = resolved_team
-        self.pat = resolved_pat
-        self.cdp_url = cdp_url or os.getenv("PLAYWRIGHT_CDP_URL", "http://127.0.0.1:9222")
+        self.organization: str = resolved_org or ""
+        self.project: str = resolved_project or ""
+        self.team: str = resolved_team or ""
+        self.pat: str = resolved_pat or ""
+        self.cdp_url: str = cdp_url or os.getenv("PLAYWRIGHT_CDP_URL") or "http://127.0.0.1:9222"
 
     def _api_available(self) -> bool:
         return bool(self.organization and self.project and self.pat)
@@ -90,9 +91,7 @@ class AzureDevopsOperator(BaseOperator):
         headers = {"Authorization": f"Basic {token}"}
         try:
             with httpx.Client(timeout=15.0, headers=headers) as client:
-                resp = client.get(
-                    f"https://dev.azure.com/{self.organization}/_apis/connectionData"
-                )
+                resp = client.get(f"https://dev.azure.com/{self.organization}/_apis/connectionData")
                 resp.raise_for_status()
                 data = resp.json()
         except (httpx.HTTPError, ValueError):
@@ -104,14 +103,20 @@ class AzureDevopsOperator(BaseOperator):
             "displayName": auth_user.get("providerDisplayName"),
         }
 
-    def _read_via_mcp(self, iteration_path: str, **_: Any) -> Sprint:
+    def _read_via_mcp(self, **kwargs: Any) -> Sprint:
+        iteration_path = kwargs.get("iteration_path")
+        if iteration_path is None:
+            raise ValueError("iteration_path is required")
         try:
-            from sendsprint.operators import _mcp_bridge
+            bridge = import_module("sendsprint.operators._mcp_bridge")
         except ImportError as exc:
             raise TransportUnavailable("MCP bridge module missing") from exc
-        return _mcp_bridge.call_ado_mcp(iteration_path=iteration_path)
+        return bridge.call_ado_mcp(iteration_path=iteration_path)
 
-    def _read_via_api(self, iteration_path: str, **_: Any) -> Sprint:
+    def _read_via_api(self, **kwargs: Any) -> Sprint:
+        iteration_path = kwargs.get("iteration_path")
+        if iteration_path is None:
+            raise ValueError("iteration_path is required")
         if not self._api_available():
             raise TransportUnavailable("Azure DevOps credentials missing (ORG/PROJECT/PAT)")
         token = base64.b64encode(f":{self.pat}".encode()).decode()
@@ -156,7 +161,10 @@ class AzureDevopsOperator(BaseOperator):
             transport="api",
         )
 
-    def _read_via_playwright(self, iteration_path: str, **_: Any) -> Sprint:
+    def _read_via_playwright(self, **kwargs: Any) -> Sprint:
+        iteration_path = kwargs.get("iteration_path")
+        if iteration_path is None:
+            raise ValueError("iteration_path is required")
         try:
             from playwright.sync_api import sync_playwright
         except ImportError as exc:
@@ -226,7 +234,11 @@ class AzureDevopsOperator(BaseOperator):
             assignee_descriptor=assignee_descriptor,
             story_points=fields.get("Microsoft.VSTS.Scheduling.StoryPoints"),
             parent_key=str(fields.get("System.Parent")) if fields.get("System.Parent") else None,
-            labels=(fields.get("System.Tags", "") or "").split("; ") if fields.get("System.Tags") else [],
+            labels=(
+                (fields.get("System.Tags", "") or "").split("; ")
+                if fields.get("System.Tags")
+                else []
+            ),
             acceptance_criteria=_strip_html(fields.get("Microsoft.VSTS.Common.AcceptanceCriteria")),
             created_at=_parse_dt(fields.get("System.CreatedDate")),
             updated_at=_parse_dt(fields.get("System.ChangedDate")),

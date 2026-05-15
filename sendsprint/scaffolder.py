@@ -14,6 +14,7 @@ from __future__ import annotations
 import datetime
 import logging
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -108,7 +109,7 @@ class Scaffolder:
         signals: RepoSignals,
         *,
         offline: bool = False,
-        on_step: callable = None,  # type: ignore[assignment]
+        on_step: Callable[[str], None] | None = None,
     ) -> dict[str, str]:
         """Draft the four spec docs. With ``offline=True`` skips the LLM and emits
         deterministic templates filled with collected facts.
@@ -162,7 +163,7 @@ class Scaffolder:
         *,
         force: bool = False,
         offline: bool = False,
-        on_step: callable = None,  # type: ignore[assignment]
+        on_step: Callable[[str], None] | None = None,
     ) -> ScaffoldResult:
         """Discover + generate + write in one shot."""
         signals = self.discover()

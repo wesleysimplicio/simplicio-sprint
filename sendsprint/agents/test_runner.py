@@ -102,9 +102,7 @@ class TestRunner:
     def run_all(self) -> list[StepReport]:
         return [self.run_unit(), self.run_e2e()]
 
-    def _exec(
-        self, cmd: list[str], report: StepReport, *, kind: str
-    ) -> StepReport:
+    def _exec(self, cmd: list[str], report: StepReport, *, kind: str) -> StepReport:
         report.started_at = datetime.now(tz=UTC)
         try:
             result = subprocess.run(

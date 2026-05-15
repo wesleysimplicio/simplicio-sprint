@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import contextlib
+from typing import cast
 
 import httpx
 from fastapi import APIRouter, HTTPException
 
 from sendsprint import credentials
 from sendsprint.api.schemas import AuthResponse, AzureAuthRequest, JiraAuthRequest
+from sendsprint.credentials import Provider as CredentialProvider
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -80,7 +82,9 @@ def status() -> dict:
 
 
 def _has_any(provider: str) -> bool:
+    if provider not in ("jira", "azuredevops"):
+        return False
     try:
-        return bool(credentials.get_secret(provider, "default"))
+        return bool(credentials.get_secret(cast(CredentialProvider, provider), "default"))
     except credentials.CredentialError:
         return False

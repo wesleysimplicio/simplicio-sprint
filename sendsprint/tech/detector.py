@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 from pathlib import Path
@@ -39,8 +40,21 @@ KNOWN_TECHS = {
 
 FRONT_TECHS = {"angular", "react", "vue", "nextjs"}
 BACK_TECHS = {
-    "dotnet", "node", "express", "nestjs", "python", "django", "fastapi", "flask",
-    "java", "spring", "go", "rust", "ruby", "php", "laravel",
+    "dotnet",
+    "node",
+    "express",
+    "nestjs",
+    "python",
+    "django",
+    "fastapi",
+    "flask",
+    "java",
+    "spring",
+    "go",
+    "rust",
+    "ruby",
+    "php",
+    "laravel",
 }
 MOBILE_TECHS = {"flutter", "ios", "android"}
 INFRA_TECHS = {"terraform", "docker", "k8s", "ansible"}
@@ -117,10 +131,8 @@ def _scan_python(repo: Path, techs: list[str], signals: dict[str, str], pms: lis
     if (repo / "uv.lock").exists() and "uv" not in pms:
         pms.append("uv")
     text = ""
-    try:
+    with contextlib.suppress(OSError):
         text = (repo / found).read_text(encoding="utf-8", errors="ignore")
-    except OSError:
-        pass
     text_l = text.lower()
     if "django" in text_l:
         _add(techs, signals, "django", f"{found}:django")
@@ -185,7 +197,7 @@ def _scan_misc(repo: Path, techs: list[str], signals: dict[str, str], pms: list[
             pms.append("composer")
         try:
             comp = json.loads((repo / "composer.json").read_text(encoding="utf-8"))
-            req = (comp.get("require") or {})
+            req = comp.get("require") or {}
             if "laravel/framework" in req:
                 _add(techs, signals, "laravel", "composer.json:laravel/framework")
         except (json.JSONDecodeError, OSError):

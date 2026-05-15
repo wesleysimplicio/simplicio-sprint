@@ -1,11 +1,14 @@
 """SendSprint CLI v2 — workspace-aware, scoped, 9-step orchestration."""
 
+# ruff: noqa: B008, I001 - Typer's documented API uses Option/Argument in defaults.
+
 from __future__ import annotations
 
 import json
 import logging
 import sys
 from pathlib import Path
+from typing import cast
 
 import typer
 from rich.console import Console
@@ -24,10 +27,12 @@ from sendsprint.flow import SprintFlow
 from sendsprint.mcp import install_azure_devops_mcp
 from sendsprint.models import Sprint
 from sendsprint.operators import AzureDevopsOperator, JiraOperator
+from sendsprint.operators.base import Transport
 from sendsprint.scaffolder import Scaffolder
 from sendsprint.scope import build_scope
 from sendsprint.tech import detect_tech
 from sendsprint.workspace import load_workspace
+from sendsprint.credentials import Provider as CredentialProvider
 
 app = typer.Typer(
     add_completion=False,
@@ -54,7 +59,10 @@ def read_jira(
 ) -> None:
     """Step 1 — read a Jira sprint and print its items."""
     operator = JiraOperator(
-        base_url=base_url, email=email, api_token=api_token, transport=transport
+        base_url=base_url,
+        email=email,
+        api_token=api_token,
+        transport=cast(Transport, transport),
     )
     sprint = operator.read_sprint(sprint_id=sprint_id)
     _render_sprint(sprint)
@@ -74,7 +82,10 @@ def read_ado(
 ) -> None:
     """Step 1 — read an Azure DevOps iteration."""
     operator = AzureDevopsOperator(
-        organization=organization, project=project, pat=pat, transport=transport
+        organization=organization,
+        project=project,
+        pat=pat,
+        transport=cast(Transport, transport),
     )
     sprint = operator.read_sprint(iteration_path=iteration_path)
     _render_sprint(sprint)
@@ -202,7 +213,7 @@ def run_flow(
     allowed = _parse_csv(status)
 
     if source == "jira":
-        operator = JiraOperator(transport=transport)
+        operator: JiraOperator | AzureDevopsOperator = JiraOperator(transport=transport)  # type: ignore[arg-type]
         user_info = operator.current_user()
         scope = build_scope(
             mode=scope_mode,
@@ -212,7 +223,7 @@ def run_flow(
             task_keys=task_keys,
         )
     elif source == "azuredevops":
-        operator = AzureDevopsOperator(transport=transport)
+        operator = AzureDevopsOperator(transport=transport)  # type: ignore[arg-type]
         user_info = operator.current_user()
         scope = build_scope(
             mode=scope_mode,
@@ -387,7 +398,7 @@ def logout(
             account = p.azuredevops.organization
     if not account:
         raise typer.BadParameter("no account known; pass it explicitly")
-    credentials.delete_secret(provider, account)
+    credentials.delete_secret(cast(CredentialProvider, provider), account)
     console.print(f"[green]forgot {provider} credentials for {account}[/green]")
 
 
@@ -436,7 +447,7 @@ def sprint(
             account_label="email",
             secret_label="API token",
         )
-        operator = JiraOperator(
+        operator: JiraOperator | AzureDevopsOperator = JiraOperator(
             base_url=p.jira.base_url, email=email, api_token=token, transport="auto"
         )
         if not identifier:

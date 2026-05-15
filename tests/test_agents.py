@@ -20,7 +20,12 @@ from sendsprint.tech import TechFingerprint
 # ---------------------------------------------------------------------------
 
 
-def make_fp(tmp_path: Path, *, techs: list[str] | None = None, pms: list[str] | None = None) -> TechFingerprint:
+def make_fp(
+    tmp_path: Path,
+    *,
+    techs: list[str] | None = None,
+    pms: list[str] | None = None,
+) -> TechFingerprint:
     return TechFingerprint(
         repo_path=str(tmp_path),
         techs=techs or [],
@@ -216,7 +221,11 @@ class TestSecurityReviewer:
         assert "slack-webhook" in rules
 
     def test_scan_detects_jwt_token(self, tmp_path: Path) -> None:
-        jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+        jwt = (
+            "eyJhbGciOiJIUzI1NiJ9."
+            "eyJzdWIiOiIxMjM0NTY3ODkwIn0."
+            "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+        )
         (tmp_path / "auth.py").write_text(f'TOKEN = "{jwt}"')
         fp = make_fp(tmp_path)
         reviewer = SecurityReviewer(tmp_path, fp)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import contextlib
 import logging
 import os
 import subprocess
@@ -62,11 +63,17 @@ class PrCreator:
 
     def _create_github(self, source: str, title: str, body: str) -> PrInfo:
         cmd = [
-            "gh", "pr", "create",
-            "--title", title,
-            "--body", body,
-            "--base", self.target_branch,
-            "--head", source,
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            title,
+            "--body",
+            body,
+            "--base",
+            self.target_branch,
+            "--head",
+            source,
         ]
         for r in self.reviewers:
             cmd.extend(["--reviewer", r])
@@ -82,10 +89,8 @@ class PrCreator:
         url = result.stdout.strip()
         number = None
         if "/" in url:
-            try:
+            with contextlib.suppress(ValueError):
                 number = int(url.rstrip("/").rsplit("/", 1)[-1])
-            except ValueError:
-                pass
         repo_slug = self._gh_repo_slug()
         return PrInfo(
             provider="github",
@@ -131,9 +136,7 @@ class PrCreator:
             resp.raise_for_status()
             data = resp.json()
         pr_id = data.get("pullRequestId")
-        pr_url = (
-            f"https://dev.azure.com/{org}/{project}/_git/{repo_name}/pullrequest/{pr_id}"
-        )
+        pr_url = f"https://dev.azure.com/{org}/{project}/_git/{repo_name}/pullrequest/{pr_id}"
         return PrInfo(
             provider="azuredevops",
             repo=f"{org}/{project}/{repo_name}",

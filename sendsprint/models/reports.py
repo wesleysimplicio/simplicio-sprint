@@ -67,6 +67,11 @@ class StepReport(BaseModel):
     findings: list[SecurityFinding] = Field(default_factory=list)
     pr: PrInfo | None = None
 
+    @property
+    def details(self) -> dict[str, str | None]:
+        """Compatibility shape used by the API bridge."""
+        return {"message": self.message}
+
 
 class RunReport(BaseModel):
     """End-to-end run output across the workspace."""

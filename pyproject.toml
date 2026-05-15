@@ -82,3 +82,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[[tool.mypy.overrides]]
+module = "yaml"
+ignore_missing_imports = true

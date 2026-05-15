@@ -142,9 +142,21 @@ def test_sprint_from_jira_issues_aggregates_by_type() -> None:
         "endDate": "2026-05-15T00:00:00.000+0000",
     }
     issues = [
-        {"id": "1", "key": "P-1", "fields": {"summary": "S1", "issuetype": {"name": "Story"}, "status": {"name": "Done"}}},
-        {"id": "2", "key": "P-2", "fields": {"summary": "T1", "issuetype": {"name": "Task"}, "status": {"name": "Doing"}}},
-        {"id": "3", "key": "P-3", "fields": {"summary": "B1", "issuetype": {"name": "Bug"}, "status": {"name": "Open"}}},
+        {
+            "id": "1",
+            "key": "P-1",
+            "fields": {"summary": "S1", "issuetype": {"name": "Story"}, "status": {"name": "Done"}},
+        },
+        {
+            "id": "2",
+            "key": "P-2",
+            "fields": {"summary": "T1", "issuetype": {"name": "Task"}, "status": {"name": "Doing"}},
+        },
+        {
+            "id": "3",
+            "key": "P-3",
+            "fields": {"summary": "B1", "issuetype": {"name": "Bug"}, "status": {"name": "Open"}},
+        },
     ]
     sprint = op._sprint_from_jira_issues(sprint_data, issues, transport="api")
     assert sprint.id == "42"

@@ -82,9 +82,7 @@ def build_architecture(
     )
 
 
-def _write_if_missing(
-    path: Path, content: str, created: list[str], skipped: list[str]
-) -> None:
+def _write_if_missing(path: Path, content: str, created: list[str], skipped: list[str]) -> None:
     if path.exists():
         skipped.append(str(path))
         return
@@ -133,7 +131,8 @@ Replace this section with project-specific run / build / test instructions.
 
 ## Architecture
 
-See [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`docs/architecture/overview.md`](docs/architecture/overview.md).
+See [`ARCHITECTURE.md`](ARCHITECTURE.md) and
+[`docs/architecture/overview.md`](docs/architecture/overview.md).
 
 ## ADRs
 

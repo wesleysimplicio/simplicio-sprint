@@ -18,13 +18,11 @@ def _matches_user(item: SprintItem, scope: ScopeConfig) -> bool:
         and (item.assignee_email.lower() == scope.user_email.lower())
     ):
         return True
-    if (
+    return bool(
         scope.user_display_name
         and item.assignee
         and (item.assignee.strip().lower() == scope.user_display_name.strip().lower())
-    ):
-        return True
-    return False
+    )
 
 
 def _norm(s: str | None) -> str:

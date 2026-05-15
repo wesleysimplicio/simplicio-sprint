@@ -64,3 +64,22 @@ class ScopeConfig(BaseModel):
     user_display_name: str | None = None
     allowed_statuses: list[str] = Field(default_factory=lambda: list(DEFAULT_DEVELOPABLE_STATUSES))
     task_keys: list[str] | None = None
+
+    def matches(self, item: object) -> bool:
+        """Compatibility helper for older API routes."""
+        if self.mode != "mine":
+            return True
+        email = getattr(item, "assignee_email", None)
+        account_id = getattr(item, "assignee_account_id", None)
+        descriptor = getattr(item, "assignee_descriptor", None)
+        display_name = getattr(item, "assignee", None)
+        return bool(
+            (self.user_email and email and str(email).lower() == self.user_email.lower())
+            or (self.user_account_id and account_id == self.user_account_id)
+            or (self.user_descriptor and descriptor == self.user_descriptor)
+            or (
+                self.user_display_name
+                and display_name
+                and str(display_name).strip().lower() == self.user_display_name.strip().lower()
+            )
+        )

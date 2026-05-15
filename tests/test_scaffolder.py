@@ -22,6 +22,7 @@ from sendsprint.scaffolder import (
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _seed_repo(repo: Path) -> None:
     """Init a git repo with a package.json + README so detect_tech finds 'react'."""
     repo.mkdir(parents=True, exist_ok=True)
@@ -58,6 +59,7 @@ class _FakeLlm:
 # discover()
 # ---------------------------------------------------------------------------
 
+
 def test_discover_collects_signals(tmp_path: Path) -> None:
     _seed_repo(tmp_path)
     signals = Scaffolder(tmp_path).discover()
@@ -93,6 +95,7 @@ def test_discover_handles_missing_docs_and_manifests(tmp_path: Path) -> None:
 # generate(offline=True)
 # ---------------------------------------------------------------------------
 
+
 def test_generate_offline_builds_all_four_specs(tmp_path: Path) -> None:
     _seed_repo(tmp_path)
     scaf = Scaffolder(tmp_path)
@@ -122,6 +125,7 @@ def test_generate_offline_invokes_on_step_callback(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # generate(LLM path)
 # ---------------------------------------------------------------------------
+
 
 def test_generate_llm_calls_client_per_spec(tmp_path: Path) -> None:
     _seed_repo(tmp_path)
@@ -154,6 +158,7 @@ def test_generate_llm_invokes_on_step_callback(tmp_path: Path) -> None:
 # write()
 # ---------------------------------------------------------------------------
 
+
 def test_write_creates_spec_files_and_skips_existing(tmp_path: Path) -> None:
     _seed_repo(tmp_path)
     scaf = Scaffolder(tmp_path)
@@ -167,7 +172,12 @@ def test_write_creates_spec_files_and_skips_existing(tmp_path: Path) -> None:
 
     second = scaf.write(outputs)
     assert second.created == []
-    assert {p.name for p in second.skipped} == {"VISION.md", "DOMAIN.md", "DESIGN.md", "PATTERNS.md"}
+    assert {p.name for p in second.skipped} == {
+        "VISION.md",
+        "DOMAIN.md",
+        "DESIGN.md",
+        "PATTERNS.md",
+    }
 
 
 def test_write_force_overwrites(tmp_path: Path) -> None:
@@ -177,7 +187,12 @@ def test_write_force_overwrites(tmp_path: Path) -> None:
     scaf.write(outputs)
 
     overwritten = scaf.write(outputs, force=True)
-    assert {p.name for p in overwritten.created} == {"VISION.md", "DOMAIN.md", "DESIGN.md", "PATTERNS.md"}
+    assert {p.name for p in overwritten.created} == {
+        "VISION.md",
+        "DOMAIN.md",
+        "DESIGN.md",
+        "PATTERNS.md",
+    }
     assert overwritten.skipped == []
 
 
@@ -194,6 +209,7 @@ def test_write_targets_match_spec_files_map(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # run() end-to-end
 # ---------------------------------------------------------------------------
+
 
 def test_run_offline_end_to_end(tmp_path: Path) -> None:
     _seed_repo(tmp_path)
@@ -212,6 +228,7 @@ def test_run_offline_end_to_end(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
+
 
 class _FakeSignals:
     """Minimal RepoSignals shape for helper tests."""
