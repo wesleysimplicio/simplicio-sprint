@@ -109,6 +109,18 @@ When reading a sprint:
 - Preserve source URL for traceability.
 - If the UI shows `New` work items, treat them as unclaimed unless an assignee exists.
 
+### Pull Requests
+
+Before creating an Azure DevOps PR:
+
+- Push the source branch first; never create a PR from a branch that only exists locally.
+- Link the originating work item by ID whenever possible.
+- Preserve reviewer rules from `workspace.yaml`.
+- Use `required_pr_reviewers` for project policies such as mandatory lead review.
+- For Azure DevOps REST PR creation, send required reviewers with `isRequired: true`.
+- If REST/MCP cannot create the PR but the authenticated browser can, capture the final PR
+  URL, reviewers, linked work items, conflict status, and any evidence limitation.
+
 ## Jira Rules
 
 ### Identity
@@ -171,6 +183,35 @@ When the source item is not a delivery parent type:
 - Link it as `Related`.
 - Make the description say the item is related, not parented.
 
+## Delivery Routing Rules
+
+For multi-repo delivery:
+
+- Start from a clean `develop` or configured base branch in isolated worktrees.
+- If the user's original checkout is dirty, do not switch branches there; create a
+  separate worktree from the remote base branch.
+- Route changes only to repos that need code changes. If API contracts already satisfy
+  the task and targeted API tests pass, report the API as validated and do not open an
+  empty API PR.
+- Still run targeted validation on unaffected repos when the work item asked for
+  front/back investigation.
+- Keep branch-per-task naming; the default remains `feature/{number}-{title}` unless
+  the workspace or user config overrides it.
+
+## Evidence and Regression Rules
+
+For every delivery:
+
+- Record build, unit, and E2E evidence separately per repo.
+- Capture screenshot and video evidence when the authenticated UI is reachable.
+- If auth, tenant membership, SSO, or browser policy blocks visual validation, save an
+  explicit blocker artifact and mention exactly which validation was blocked.
+- Distinguish unrelated regression failures from affected-area failures. Full-suite
+  failures outside the changed area must be reported, while targeted tests for the
+  affected service/page still decide whether the fix is technically sound.
+- Do not hide warnings from private package feeds, vulnerability feeds, or analyzers;
+  classify them as existing/environmental only when supported by the run output.
+
 ## Error Handling Checklist
 
 Before finishing any Jira/Azure sprint task:
@@ -180,6 +221,10 @@ Before finishing any Jira/Azure sprint task:
 - Check that no generated description mentions internal tooling unless explicitly
   requested.
 - Check that no task was assigned to a user unless explicitly requested or inherited.
+- Check that required PR reviewers were applied when configured.
+- Check that every PR links the originating work item when the provider supports it.
+- Check that visual evidence exists or that an auth/environment blocker artifact was
+  captured.
 - Re-read changed work items through MCP/API when possible.
 
 ## Official References

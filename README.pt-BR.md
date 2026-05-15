@@ -80,7 +80,7 @@ Veja [`web/README.md`](./web/README.md) pro passo-a-passo e
 
 Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.10.3 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Instalador MCP do Azure DevOps. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de 10 passos. Preflight, dry-run, estado resumível, roteamento com confiança e validação pós-PR inclusos. Visuais de produto, vídeos Remotion antes/depois com trilha e efeitos sonoros, e decks bilíngues da implementação estão inclusos. Branches usam `feature/{number}-{title}` e PRs miram `develop` por padrão; ambos podem ser configurados por workspace/repo. Checagens de hierarquia do backlog Azure evitam links pai Issue -> Task inválidos. Guia core de Jira/Azure DevOps incluso para regras estáveis de entrega. Publicação PyPI automatizada em tags de release.
+> **Status:** v0.11.0 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Instalador MCP do Azure DevOps. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de 10 passos. Preflight, dry-run, estado resumível, roteamento com confiança, reviewers obrigatórios e validação pós-PR inclusos. Visuais de produto, vídeos Remotion antes/depois com trilha e efeitos sonoros, e decks bilíngues da implementação estão inclusos. Branches usam `feature/{number}-{title}` e PRs miram `develop` por padrão; ambos podem ser configurados por workspace/repo. Checagens de hierarquia do backlog Azure evitam links pai Issue -> Task inválidos. Guia core de Jira/Azure DevOps incluso para regras estáveis de entrega. Publicação PyPI automatizada em tags de release.
 
 ---
 
@@ -194,6 +194,11 @@ root_path: /home/dev/repos
 new_projects_dir: Projetos/novos
 pr_provider: github
 default_base_branch: develop
+branch_name_template: feature/{number}-{title}
+pr_reviewers:
+  - reviewer@example.com
+required_pr_reviewers:
+  - lead@example.com
 repos:
   - name: backend-api
     path: backend-api
@@ -201,6 +206,9 @@ repos:
     tech: dotnet
     default_branch: main
     pr_target_branch: develop
+    # Regra opcional por repo:
+    # required_pr_reviewers:
+    #   - daniel.ribeiro_ext@interplayers.com.br
   - name: frontend-web
     path: frontend-web
     role: front

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.11.0] - 2026-05-15
+
+### Added
+
+- Added `required_pr_reviewers` at workspace and repo level so Azure DevOps PRs can enforce mandatory reviewers with `isRequired: true`.
+- Documented delivery rules for dirty checkout isolation, validated-only repos, required reviewers, linked work items, auth-blocked visual evidence, and unrelated regression failures.
+
 ## [0.10.3] - 2026-05-15
 
 ### Changed

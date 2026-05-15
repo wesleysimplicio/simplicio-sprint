@@ -281,13 +281,20 @@ class SprintFlow:
                     self.workspace.default_base_branch if self.workspace else "main"
                 )
                 provider = self.workspace.pr_provider if self.workspace else "github"
-                reviewers = self.workspace.pr_reviewers if self.workspace else []
+                reviewers = list(self.workspace.pr_reviewers) if self.workspace else []
+                required_reviewers = (
+                    list(self.workspace.required_pr_reviewers) if self.workspace else []
+                )
+                if repo_cfg:
+                    reviewers.extend(repo_cfg.pr_reviewers)
+                    required_reviewers.extend(repo_cfg.required_pr_reviewers)
                 pr_report = self._step9_create_pr(
                     work_dir,
                     branch_name,
                     target,
                     provider,
                     reviewers,
+                    required_reviewers,
                     task_sprint,
                     report,
                     item=item,
@@ -519,6 +526,7 @@ class SprintFlow:
         target: str,
         provider: str,
         reviewers: list[str],
+        required_reviewers: list[str],
         sprint: Sprint,
         report: RunReport,
         item: SprintItem | None = None,
@@ -528,6 +536,7 @@ class SprintFlow:
             provider=provider,
             target_branch=target,
             reviewers=reviewers,
+            required_reviewers=required_reviewers,
         )
         if item:
             title = f"[{item.key}] {item.title} — {work_dir.name}"

@@ -28,11 +28,13 @@ class PrCreator:
         provider: str = "github",
         target_branch: str = "main",
         reviewers: list[str] | None = None,
+        required_reviewers: list[str] | None = None,
     ) -> None:
         self.repo = Path(repo_path).resolve()
         self.provider = provider
         self.target_branch = target_branch
         self.reviewers = reviewers or []
+        self.required_reviewers = required_reviewers or []
 
     def create(
         self,
@@ -75,7 +77,7 @@ class PrCreator:
             "--head",
             source,
         ]
-        for r in self.reviewers:
+        for r in [*self.reviewers, *self.required_reviewers]:
             cmd.extend(["--reviewer", r])
         result = subprocess.run(
             cmd,
@@ -122,8 +124,12 @@ class PrCreator:
             "title": title,
             "description": body,
         }
-        if self.reviewers:
-            payload["reviewers"] = [{"uniqueName": r} for r in self.reviewers]
+        reviewers_payload: list[dict[str, Any]] = [{"uniqueName": r} for r in self.reviewers]
+        reviewers_payload.extend(
+            {"uniqueName": r, "isRequired": True} for r in self.required_reviewers
+        )
+        if reviewers_payload:
+            payload["reviewers"] = reviewers_payload
         with httpx.Client(timeout=30.0) as client:
             resp = client.post(
                 url,

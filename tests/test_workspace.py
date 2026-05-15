@@ -23,6 +23,8 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
         "root_path": str(root),
         "repos": [{"name": "api", "path": "api-repo", "role": "api"}],
         "pr_provider": "github",
+        "pr_reviewers": ["reviewer@example.com"],
+        "required_pr_reviewers": ["lead@example.com"],
     }
     ws_file = tmp_path / "workspace.yaml"
     ws_file.write_text(yaml.dump(cfg), encoding="utf-8")
@@ -35,6 +37,8 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
     assert ws.repos[0].name == "api"
     assert ws.repos[0].role == "api"
     assert ws.pr_provider == "github"
+    assert ws.pr_reviewers == ["reviewer@example.com"]
+    assert ws.required_pr_reviewers == ["lead@example.com"]
 
 
 def test_load_workspace_valid_json(tmp_path: Path) -> None:

@@ -20,6 +20,8 @@ class RepoConfig(BaseModel):
     default_branch: str = "main"
     pr_target_branch: str | None = None
     branch_name_template: str | None = None
+    pr_reviewers: list[str] = Field(default_factory=list)
+    required_pr_reviewers: list[str] = Field(default_factory=list)
     package_manager: str | None = None
     test_command: str | None = None
     build_command: str | None = None
@@ -36,6 +38,7 @@ class WorkspaceConfig(BaseModel):
     new_projects_dir: str = "Projetos/novos"
     pr_provider: Literal["github", "azuredevops"] = "github"
     pr_reviewers: list[str] = Field(default_factory=list)
+    required_pr_reviewers: list[str] = Field(default_factory=list)
     default_base_branch: str = "develop"
     branch_name_template: str = "feature/{number}-{title}"
 

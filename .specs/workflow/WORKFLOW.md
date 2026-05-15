@@ -133,6 +133,21 @@ CI blocks merge if any of the three fail.
 
 ---
 
+## Delivery evidence checklist
+
+Use this checklist when SendSprint executes user sprint work in external repos:
+
+- [ ] Branch was created from `develop` or the configured base branch in an isolated worktree.
+- [ ] Dirty original checkouts were not reused for delivery changes.
+- [ ] Each repo was classified as changed, validated-only, or not applicable.
+- [ ] Validated-only repos have a reason, such as "API contract already covers the behavior".
+- [ ] Targeted tests for the affected area passed.
+- [ ] Full-suite failures outside the affected area were reported as unrelated, not ignored.
+- [ ] Visual evidence includes screenshot/video, or an auth/environment blocker artifact.
+- [ ] Azure DevOps PR links the originating work item and includes configured required reviewers.
+
+---
+
 ## Release
 
 1. Bump version in `pyproject.toml` + `sendsprint/__init__.py:__version__`.
