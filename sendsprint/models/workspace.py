@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from sendsprint.llm.client import Provider as LlmProvider
+
 RepoRole = Literal["front", "api", "back", "infra", "mobile", "lib", "other"]
 ScopeMode = Literal["all", "mine"]
 
@@ -33,7 +35,7 @@ class CodeGenerationConfig(BaseModel):
     """Opt-in LLM patch generation between build and lint."""
 
     enabled: bool = False
-    provider: str | None = None
+    provider: LlmProvider | None = None
     model: str | None = None
     max_usd: float = 1.0
     max_tokens: int = 8_000

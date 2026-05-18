@@ -20,6 +20,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - release: refresh coverage badge and changelog
 - publish: use PyPI token secret
 
+### Fixed
+
+- Fix mypy coverage for LLM code generation provider typing and CLI config override dictionaries.
+
 ## [0.13.0] - 2026-05-18
 
 ### Added

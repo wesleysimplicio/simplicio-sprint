@@ -8,7 +8,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import typer
 from rich.console import Console
@@ -779,7 +779,7 @@ def _resolve_codegen_config(
         if workspace is not None and hasattr(workspace, "code_generation")
         else CodeGenerationConfig()
     )
-    updates = {}
+    updates: dict[str, Any] = {}
     if enabled is not None:
         updates["enabled"] = enabled
     if provider is not None:
@@ -805,7 +805,7 @@ def _resolve_deploy_config(
         if workspace is not None and hasattr(workspace, "deploy")
         else DeployWorkflowConfig()
     )
-    updates = {}
+    updates: dict[str, Any] = {}
     if enabled is not None:
         updates["enabled"] = enabled
     if url is not None:
