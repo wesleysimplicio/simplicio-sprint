@@ -4,6 +4,24 @@ SendSprint's next product step is to become a reliable sprint operator: it shoul
 
 This roadmap turns the next improvements into implementation-ready workstreams. Each workstream should become a GitHub issue with acceptance criteria and validation steps before implementation starts.
 
+## GitHub issue map
+
+| Priority | Issue | Workstream |
+| --- | --- | --- |
+| P0 | [#27](https://github.com/wesleysimplicio/SendSprint/issues/27) | Real PyPI trusted publishing |
+| P0 | [#28](https://github.com/wesleysimplicio/SendSprint/issues/28) | `sendsprint doctor` |
+| P0 | [#29](https://github.com/wesleysimplicio/SendSprint/issues/29) | Full dry-run execution plan |
+| P0 | [#30](https://github.com/wesleysimplicio/SendSprint/issues/30) | Per-task worktree isolation |
+| P0 | [#31](https://github.com/wesleysimplicio/SendSprint/issues/31) | Evidence bundle |
+| P1 | [#32](https://github.com/wesleysimplicio/SendSprint/issues/32) | GitHub Issues as a first-class tracker |
+| P1 | [#33](https://github.com/wesleysimplicio/SendSprint/issues/33) | Configurable autonomy policy |
+| P1 | [#34](https://github.com/wesleysimplicio/SendSprint/issues/34) | Native Ralph and Goal loop semantics |
+| P1 | [#35](https://github.com/wesleysimplicio/SendSprint/issues/35) | Stack templates |
+| P1 | [#36](https://github.com/wesleysimplicio/SendSprint/issues/36) | Local dashboard |
+| P2 | [#37](https://github.com/wesleysimplicio/SendSprint/issues/37) | Sprint Autopilot demo |
+| P2 | [#38](https://github.com/wesleysimplicio/SendSprint/issues/38) | Executive report |
+| P2 | [#39](https://github.com/wesleysimplicio/SendSprint/issues/39) | Multi-agent control plane |
+
 ## North star
 
 SendSprint should let an operator say "finish this sprint" and get a bounded, auditable delivery loop:

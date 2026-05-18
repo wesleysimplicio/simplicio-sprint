@@ -42,6 +42,22 @@ Lista priorizada de tudo que precisa ser feito no SendSprint. Fonte da verdade d
 | 20  | Executive report output                                              | P2         | sprint-7    | todo   |
 | 21  | Multi-agent control plane                                            | P2         | sprint-8    | todo   |
 
+## Issues GitHub criadas para o roadmap
+
+- [#27](https://github.com/wesleysimplicio/SendSprint/issues/27) — Release: restore PyPI trusted publishing
+- [#28](https://github.com/wesleysimplicio/SendSprint/issues/28) — CLI: add `sendsprint doctor` readiness command
+- [#29](https://github.com/wesleysimplicio/SendSprint/issues/29) — Dry-run: generate full execution plan
+- [#30](https://github.com/wesleysimplicio/SendSprint/issues/30) — Execution: isolate each task in its own worktree
+- [#31](https://github.com/wesleysimplicio/SendSprint/issues/31) — Evidence: bundle run artifacts for audit and review
+- [#32](https://github.com/wesleysimplicio/SendSprint/issues/32) — Tracker: make GitHub Issues first-class
+- [#33](https://github.com/wesleysimplicio/SendSprint/issues/33) — Policy: add configurable autonomy levels
+- [#34](https://github.com/wesleysimplicio/SendSprint/issues/34) — Loop: model Ralph Wiggum and Codex Goal semantics
+- [#35](https://github.com/wesleysimplicio/SendSprint/issues/35) — Templates: ship stack-specific validation recipes
+- [#36](https://github.com/wesleysimplicio/SendSprint/issues/36) — Dashboard: add local sprint execution view
+- [#37](https://github.com/wesleysimplicio/SendSprint/issues/37) — Demo: build Sprint Autopilot reference scenario
+- [#38](https://github.com/wesleysimplicio/SendSprint/issues/38) — Reports: generate executive sprint summaries
+- [#39](https://github.com/wesleysimplicio/SendSprint/issues/39) — Control plane: coordinate multi-agent execution safely
+
 ## Histórico recente (últimos done)
 
 | #   | Título                                                       | Sprint     | Concluído em |
