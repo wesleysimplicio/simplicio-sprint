@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from sendsprint.operators.azure_devops_operator import (
@@ -105,3 +106,37 @@ def test_chunked_splits_list() -> None:
     assert _chunked([1, 2, 3, 4, 5], 2) == [[1, 2], [3, 4], [5]]
     assert _chunked([], 3) == []
     assert _chunked([1], 200) == [[1]]
+
+
+def test_update_status_patches_work_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests: list[tuple[str, str]] = []
+    real_client = httpx.Client
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, str(request.url)))
+        return httpx.Response(200, json={})
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            self._client = real_client(transport=httpx.MockTransport(handler))
+
+        def __enter__(self):
+            return self._client
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self._client.close()
+
+    monkeypatch.setattr("sendsprint.operators.azure_devops_operator.httpx.Client", FakeClient)
+    op = AzureDevopsOperator(
+        organization="myorg",
+        project="myproj",
+        pat="secret",
+        transport="api",
+    )
+    op.update_status("123", "Deployed", "done")
+    assert requests == [
+        (
+            "PATCH",
+            "https://dev.azure.com/myorg/myproj/_apis/wit/workitems/123?api-version=7.1",
+        )
+    ]

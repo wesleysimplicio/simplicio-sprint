@@ -25,6 +25,8 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
         "pr_provider": "github",
         "pr_reviewers": ["reviewer@example.com"],
         "required_pr_reviewers": ["lead@example.com"],
+        "code_generation": {"enabled": True, "provider": "openai", "max_usd": 2.5},
+        "deploy": {"enabled": True, "url": "https://deploy.example/hook"},
     }
     ws_file = tmp_path / "workspace.yaml"
     ws_file.write_text(yaml.dump(cfg), encoding="utf-8")
@@ -39,6 +41,11 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
     assert ws.pr_provider == "github"
     assert ws.pr_reviewers == ["reviewer@example.com"]
     assert ws.required_pr_reviewers == ["lead@example.com"]
+    assert ws.code_generation.enabled is True
+    assert ws.code_generation.provider == "openai"
+    assert ws.code_generation.max_usd == 2.5
+    assert ws.deploy.enabled is True
+    assert ws.deploy.url == "https://deploy.example/hook"
 
 
 def test_load_workspace_valid_json(tmp_path: Path) -> None:

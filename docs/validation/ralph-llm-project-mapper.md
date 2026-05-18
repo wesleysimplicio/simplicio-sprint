@@ -27,6 +27,52 @@ At least one of these paths should be recorded before closing Sprint-1 validatio
 2. Codex `/goal` completes the mapped pilot task flow in `llm-project-mapper`.
 3. The run stops with a concrete blocker and leaves enough evidence to diagnose the host/tooling gap.
 
+## Current validation result
+
+Path `3` is now satisfied with concrete blocker evidence from the current
+`wesleysimplicio/llm-project-mapper` checkout.
+
+### Commands executed
+
+```bash
+taskflow inspect /Users/wesleysimplicio/Projetos/skills/llm-project-mapper
+npm run lint
+npm test
+gh issue list --repo wesleysimplicio/llm-project-mapper --state open --limit 20
+ls -la /Users/wesleysimplicio/Projetos/skills/llm-project-mapper/.plans
+```
+
+### Observed evidence
+
+- `taskflow inspect` resolved the repo as a Node project and the local automation surface is healthy.
+- `npm run lint` passed.
+- `npm test` passed with `33` passing and `5` skipped tests.
+- The GitHub repo had no open issues at the moment of validation.
+- `.plans/` is absent in the pilot repo.
+- The current sprint/task files in `.specs/sprints/sprint-01/` are still illustrative placeholders, not a real two-task autonomous pilot backlog.
+
+### Why this is a blocker
+
+The old SendSprint-local acceptance for Sprint 1 assumed a legacy `.plans/`
+loop and concrete task progression artifacts. After the maintainer clarified
+that the canonical pilot is `llm-project-mapper` and the tools are Claude
+Code's Ralph Wiggum skill or Codex `/goal`, the actual host-repo blocker
+became:
+
+- the pilot repo does not expose a real two-task sprint prepared for autonomous
+  closure;
+- the old `.plans/prd.json` and `.plans/progress.txt` artifacts are not part of
+  the target repo contract;
+- there is no honest way to claim the original validation acceptance happened
+  end to end against the current pilot repo without inventing tasks or
+  backfilling artifacts that the repo does not currently own.
+
+### Closure interpretation
+
+For SendSprint, this validation issue can be closed as **resolved with blocker
+evidence recorded**: the product contract is now correct, and the remaining gap
+is in the external pilot repo readiness rather than inside SendSprint itself.
+
 ## Non-goals
 
 - Proving a self-hosted `ralph run` flow inside SendSprint only.

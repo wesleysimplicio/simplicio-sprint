@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, BinaryIO
 
+from .. import __version__ as SENDSPRINT_VERSION
 from ..tech import detect_tech
 
 PROTOCOL_VERSION = "2024-11-05"
@@ -42,7 +43,7 @@ class McpTool:
 @dataclass
 class McpServer:
     name: str = "sendsprint"
-    version: str = "0.12.0"
+    version: str = SENDSPRINT_VERSION
     tools: dict[str, McpTool] = field(default_factory=dict)
 
     def register(self, tool: McpTool) -> None:

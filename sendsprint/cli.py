@@ -213,6 +213,16 @@ def run_flow(
         help="Comma-separated allowed statuses (default: new,active,todo,open,in progress,...)",
     ),
     output: Path | None = typer.Option(None, "-o", help="Write RunReport JSON"),
+    llm_codegen: bool | None = typer.Option(
+        None,
+        "--llm-codegen/--no-llm-codegen",
+        help="Override workspace code_generation.enabled",
+    ),
+    deploy_url_override: str | None = typer.Option(
+        None,
+        "--deploy-url-override",
+        help="Override deploy.url for this run",
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -307,6 +317,8 @@ def run_flow(
         dry_run=dry_run,
         resume=resume,
         run_id=run_id,
+        llm_codegen=llm_codegen,
+        deploy_url_override=deploy_url_override,
     )
 
     _render_sprint(result.sprint)

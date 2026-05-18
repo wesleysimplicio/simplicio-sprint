@@ -52,6 +52,10 @@ class BaseOperator(ABC):
     def _mcp_available(self) -> bool:
         return os.getenv(f"MCP_{self.source.upper()}_AVAILABLE") == "1"
 
+    def update_status(self, item_key: str, status: str, comment: str | None = None) -> None:
+        """Update the remote ticket status and optionally attach a comment."""
+        raise TransportUnavailable(f"{self.source} status updates are not available")
+
     @abstractmethod
     def _api_available(self) -> bool: ...
 

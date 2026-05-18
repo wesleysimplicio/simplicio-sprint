@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import httpx
 import pytest
 
 from sendsprint.operators.base import TransportUnavailable
@@ -165,3 +166,38 @@ def test_sprint_from_jira_issues_aggregates_by_type() -> None:
     assert len(sprint.stories) == 1
     assert len(sprint.tasks) == 1
     assert len(sprint.bugs) == 1
+
+
+def test_update_status_posts_comment_and_transition(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests: list[tuple[str, str]] = []
+    real_client = httpx.Client
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append((request.method, str(request.url)))
+        if request.method == "GET":
+            return httpx.Response(200, json={"transitions": [{"id": "31", "name": "Deployed"}]})
+        return httpx.Response(204)
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs) -> None:
+            self._client = real_client(transport=httpx.MockTransport(handler))
+
+        def __enter__(self):
+            return self._client
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            self._client.close()
+
+    monkeypatch.setattr("sendsprint.operators.jira_operator.httpx.Client", FakeClient)
+    op = JiraOperator(
+        base_url="https://example.atlassian.net",
+        email="x@y.com",
+        api_token="secret",
+        transport="api",
+    )
+    op.update_status("PROJ-1", "Deployed", "done")
+    assert requests == [
+        ("POST", "https://example.atlassian.net/rest/api/3/issue/PROJ-1/comment"),
+        ("GET", "https://example.atlassian.net/rest/api/3/issue/PROJ-1/transitions"),
+        ("POST", "https://example.atlassian.net/rest/api/3/issue/PROJ-1/transitions"),
+    ]
