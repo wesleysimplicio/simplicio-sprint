@@ -8,11 +8,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Docs
 
+- roadmap: link sprint autopilot issues
 - roadmap: define sprint autopilot backlog
 - changelog: promote 0.13.0
 
 ### CI
 
+- release: refresh coverage badge and changelog
 - release: refresh coverage badge and changelog
 - publish: use PyPI token secret
 
