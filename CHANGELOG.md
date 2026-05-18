@@ -12,6 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Docs
 
+- roadmap: require Angular, React, Vue.js, and Node.js templates in the stack-template issue
 - roadmap: link sprint autopilot issues
 - roadmap: define sprint autopilot backlog
 - changelog: promote 0.13.0

@@ -143,7 +143,9 @@ Target state: common stacks ship with tested templates.
 
 Acceptance criteria:
 
-- Adds templates for Python, Node/TypeScript, PHP, .NET, mobile, and monorepo projects.
+- Adds templates for Angular, React, Vue.js, Node.js, Python, PHP, .NET, mobile, and monorepo projects.
+- Frontend templates cover framework-specific install, lint, typecheck, build, and Playwright expectations.
+- Node.js templates cover API/library projects separately from browser framework projects.
 - Each template defines install, lint, unit, E2E, security, changelog, and release expectations.
 - `sendsprint doctor` and dry-run explain which template matched and why.
 

@@ -36,7 +36,7 @@ Lista priorizada de tudo que precisa ser feito no SendSprint. Fonte da verdade d
 | 14  | GitHub Issues as a first-class tracker                               | P1         | sprint-6    | todo   |
 | 15  | Configurable autonomy policy                                         | P1         | sprint-6    | todo   |
 | 16  | Native Ralph Wiggum and Codex Goal loop semantics                    | P1         | sprint-6    | todo   |
-| 17  | Stack templates for common project types                             | P1         | sprint-6    | todo   |
+| 17  | Stack templates for Angular, React, Vue.js, Node.js and common stacks | P1         | sprint-6    | todo   |
 | 18  | Local dashboard for sprint execution                                 | P1         | sprint-7    | todo   |
 | 19  | Sprint Autopilot demo                                                | P2         | sprint-7    | todo   |
 | 20  | Executive report output                                              | P2         | sprint-7    | todo   |
