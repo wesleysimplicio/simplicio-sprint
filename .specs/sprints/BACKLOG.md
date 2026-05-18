@@ -38,9 +38,10 @@ Lista priorizada de tudo que precisa ser feito no SendSprint. Fonte da verdade d
 | 16  | Native Ralph Wiggum and Codex Goal loop semantics                    | P1         | sprint-6    | todo   |
 | 17  | Stack templates for Angular, React, Vue.js, Node.js and common stacks | P1         | sprint-6    | todo   |
 | 18  | Local dashboard for sprint execution                                 | P1         | sprint-7    | todo   |
-| 19  | Sprint Autopilot demo                                                | P2         | sprint-7    | todo   |
-| 20  | Executive report output                                              | P2         | sprint-7    | todo   |
-| 21  | Multi-agent control plane                                            | P2         | sprint-8    | todo   |
+| 19  | Extract project tasks from meeting transcripts                       | P1         | sprint-7    | todo   |
+| 20  | Sprint Autopilot demo                                                | P2         | sprint-7    | todo   |
+| 21  | Executive report output                                              | P2         | sprint-7    | todo   |
+| 22  | Multi-agent control plane                                            | P2         | sprint-8    | todo   |
 
 ## Issues GitHub criadas para o roadmap
 
@@ -57,6 +58,7 @@ Lista priorizada de tudo que precisa ser feito no SendSprint. Fonte da verdade d
 - [#37](https://github.com/wesleysimplicio/SendSprint/issues/37) — Demo: build Sprint Autopilot reference scenario
 - [#38](https://github.com/wesleysimplicio/SendSprint/issues/38) — Reports: generate executive sprint summaries
 - [#39](https://github.com/wesleysimplicio/SendSprint/issues/39) — Control plane: coordinate multi-agent execution safely
+- [#40](https://github.com/wesleysimplicio/SendSprint/issues/40) — Ingest: extract project tasks from meeting transcripts
 
 ## Histórico recente (últimos done)
 

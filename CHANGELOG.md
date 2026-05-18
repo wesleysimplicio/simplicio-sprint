@@ -12,6 +12,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Docs
 
+- roadmap: add meeting transcript task extraction workstream
 - templates: require frontend stack recipes
 - roadmap: link sprint autopilot issues
 - roadmap: define sprint autopilot backlog

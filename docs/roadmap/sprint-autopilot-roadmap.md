@@ -18,6 +18,7 @@ This roadmap turns the next improvements into implementation-ready workstreams. 
 | P1 | [#34](https://github.com/wesleysimplicio/SendSprint/issues/34) | Native Ralph and Goal loop semantics |
 | P1 | [#35](https://github.com/wesleysimplicio/SendSprint/issues/35) | Stack templates |
 | P1 | [#36](https://github.com/wesleysimplicio/SendSprint/issues/36) | Local dashboard |
+| P1 | [#40](https://github.com/wesleysimplicio/SendSprint/issues/40) | Meeting transcript task extraction |
 | P2 | [#37](https://github.com/wesleysimplicio/SendSprint/issues/37) | Sprint Autopilot demo |
 | P2 | [#38](https://github.com/wesleysimplicio/SendSprint/issues/38) | Executive report |
 | P2 | [#39](https://github.com/wesleysimplicio/SendSprint/issues/39) | Multi-agent control plane |
@@ -161,6 +162,30 @@ Acceptance criteria:
 - Reads from the run report/evidence bundle instead of inventing a separate state model.
 - Works locally without requiring a hosted service.
 
+### Meeting transcript task extraction
+
+Current state: SendSprint reads structured tracker items, but planning and review meetings often contain the first version of project work before it reaches a tracker.
+
+Target state: SendSprint can turn meeting transcripts into reviewable task candidates with source traceability.
+
+Acceptance criteria:
+
+- Ingest transcript text from files or pasted content.
+- Extract candidate tasks with title, summary, owner, priority hints, due-date hints, acceptance criteria, dependencies, risks, and source excerpts.
+- Handle Portuguese, English, and mixed-language meetings.
+- Deduplicate candidates against GitHub Issues, Jira, and Azure DevOps items when tracker context is available.
+- Support review mode for draft backlog/task files before anything is created externally.
+- Support apply mode for creating tracker issues only when autonomy policy allows it.
+- Preserve transcript line ranges or timestamp ranges for traceability.
+- Redact or flag sensitive content before publishing task bodies to external trackers.
+
+Validation:
+
+- Unit tests cover parsing, extraction, deduplication, redaction, and source citation rendering.
+- Fixture transcripts cover Portuguese, English, mixed-language meetings, ambiguous action items, and repeated decisions.
+- Dry-run smoke previews extracted tasks without creating issues.
+- Apply-mode smoke uses a mocked tracker boundary.
+
 ## Priority 2
 
 ### Sprint Autopilot demo
@@ -200,5 +225,5 @@ Recommended build order:
 1. Trusted publishing and `sendsprint doctor`.
 2. Dry-run plan, autonomy policy, and worktree isolation.
 3. Evidence bundle and GitHub Issues tracker.
-4. Ralph/Goal loop, templates, and dashboard.
+4. Ralph/Goal loop, templates, transcript extraction, and dashboard.
 5. Demo, executive report, and multi-agent control plane.
