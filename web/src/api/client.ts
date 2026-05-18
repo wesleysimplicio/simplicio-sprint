@@ -1,5 +1,6 @@
 import type {
   AuthResponse,
+  DashboardSnapshot,
   Health,
   ImportSprintsResponse,
   ImportStatus,
@@ -97,6 +98,10 @@ export class ApiClient {
 
   getRun(runId: string) {
     return this.req<RunStatus>(`/runs/${encodeURIComponent(runId)}`);
+  }
+
+  getRunDashboard(runId: string) {
+    return this.req<DashboardSnapshot>(`/runs/${encodeURIComponent(runId)}/dashboard`);
   }
 
   evidenceUrl(runId: string, name: string) {

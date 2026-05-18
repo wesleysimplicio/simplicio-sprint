@@ -1,12 +1,12 @@
 {
   "name": "sendsprint-root",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "description": "Root Node tooling for SendSprint: Playwright E2E + workspace lint passthrough.",
   "scripts": {
     "lint": "echo 'No JS to lint at root; web lint runs in web/' && (cd web && npm run typecheck) || true",
     "test": "echo 'Node-level smoke is a no-op — Python tests run via pytest. Pass.' && exit 0",
-    "test:e2e": "playwright test",
+    "test:e2e": "npx playwright test",
     "playwright:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {

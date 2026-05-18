@@ -35,7 +35,7 @@ from sendsprint.agents.worktree import WorktreeError, WorktreeManager
 from sendsprint.architecture import ArchitectureMapper, build_architecture
 from sendsprint.llm import LlmClient
 from sendsprint.models import ArchitectureReport, Sprint
-from sendsprint.models.reports import RunReport, StepReport
+from sendsprint.models.reports import RunReport, StepReport, StepStatus, TestEvidence
 from sendsprint.models.sprint import SprintItem
 from sendsprint.models.workspace import (
     CodeGenerationConfig,
@@ -46,6 +46,7 @@ from sendsprint.models.workspace import (
 )
 from sendsprint.operators.base import BaseOperator
 from sendsprint.planning import DeliveryPlan, build_delivery_plan
+from sendsprint.policy import AutonomyPolicy
 from sendsprint.post_validation import validate_pr_step, validate_sprint_links
 from sendsprint.run_state import RunStateStore, delivery_key, stable_run_id
 from sendsprint.scope import apply_scope
@@ -117,12 +118,14 @@ class SprintFlow:
         scope: ScopeConfig | None = None,
         code_generation: CodeGenerationConfig | None = None,
         deploy: DeployWorkflowConfig | None = None,
+        autonomy_policy: AutonomyPolicy | None = None,
     ) -> None:
         self.operator = operator
         self.workspace = workspace
         self.scope = scope or ScopeConfig()
         self.code_generation = code_generation
         self.deploy = deploy
+        self.autonomy_policy = autonomy_policy or AutonomyPolicy(level="pr")
         self.mapper = ArchitectureMapper()
 
     def run(
@@ -157,12 +160,27 @@ class SprintFlow:
 
         repos = self._resolve_repos(repo_path)
         default_target = self.workspace.default_base_branch if self.workspace else "main"
+        plan_policy = AutonomyPolicy(level="plan") if dry_run else self.autonomy_policy
         plan = build_delivery_plan(
             sprint,
             repos,
             branch_for_task=self._branch_for_task,
             detect_fingerprint=detect_tech,
             default_target_branch=default_target,
+            autonomy_policy=plan_policy,
+            llm={
+                "enabled": self._codegen_config().enabled,
+                "provider": self._codegen_config().provider,
+                "model": self._codegen_config().model,
+                "max_usd": self._codegen_config().max_usd,
+                "max_tokens": self._codegen_config().max_tokens,
+            },
+            deploy_callback={
+                "enabled": self._deploy_config().enabled,
+                "provider": self._deploy_config().provider,
+                "url": self._deploy_config().url,
+                "final_status": self._deploy_config().final_status,
+            },
         )
 
         if dry_run:
@@ -181,6 +199,7 @@ class SprintFlow:
             )
 
         # --- Step 1.5: Import sprint items as agentic-starter task specs ---
+        self.autonomy_policy.require("write-files")
         self._step1_5_import_specs(sprint, repo_path, report)
 
         notes: list[str] = []
@@ -254,6 +273,7 @@ class SprintFlow:
                 # --- Step 3: Dev (install + build) on isolated task worktree ---
                 wt_path = self._try_worktree(rpath, branch_name)
                 work_dir = wt_path or rpath
+                report.steps.append(self._worktree_step(rpath, work_dir, branch_name, wt_path))
                 dev = DevAgent(work_dir, fp)
                 self._step3_dev(dev, report, repo_cfg)
                 self._step3_5_codegen(work_dir, item, report)
@@ -289,12 +309,15 @@ class SprintFlow:
                 )
 
                 # --- Step 8: Commit ---
+                self.autonomy_policy.require("commit")
                 self._step8_commit(work_dir, task_sprint, report, item=item)
 
                 # --- Step 8b: Push branch ---
+                self.autonomy_policy.require("push")
                 self._push_branch(work_dir, branch_name)
 
                 # --- Step 9: Create PR (per task, per repo) ---
+                self.autonomy_policy.require("create-pr")
                 target = (repo_cfg.pr_target_branch if repo_cfg else None) or (
                     self.workspace.default_base_branch if self.workspace else "main"
                 )
@@ -429,6 +452,7 @@ class SprintFlow:
         config = self._codegen_config()
         if not config.enabled:
             return None
+        self.autonomy_policy.require("llm-codegen")
 
         generator = CodeGenerator(
             work_dir,
@@ -633,6 +657,7 @@ class SprintFlow:
         config = self._deploy_config()
         if not config.enabled:
             return None
+        self.autonomy_policy.require("deploy-callback")
         if pr_report.pr is None:
             skipped = StepReport(step=11, name="deploy-trigger", status="skipped")
             skipped.message = "deploy skipped because no PR was created"
@@ -718,6 +743,50 @@ class SprintFlow:
         except WorktreeError as exc:
             logger.warning("worktree skipped for %s: %s", repo.name, exc)
             return None
+
+    def _worktree_step(
+        self,
+        repo: Path,
+        work_dir: Path,
+        branch: str,
+        wt_path: Path | None,
+    ) -> StepReport:
+        status: StepStatus = "ok" if wt_path else "skipped"
+        base_commit = self._git_rev_parse(repo, "HEAD")
+        if wt_path:
+            message = (
+                f"isolated worktree branch={branch} path={work_dir} "
+                f"base={base_commit or 'unknown'} cleanup=preserved-for-review"
+            )
+        else:
+            message = f"worktree unavailable; using repo directly branch={branch}"
+        step = StepReport(step=3, name="worktree-isolation", repo=str(repo), status=status)
+        step.message = message
+        step.evidence.append(
+            TestEvidence(
+                kind="log",
+                title="worktree-isolation",
+                passed=wt_path is not None,
+                message=message,
+            )
+        )
+        return step
+
+    def _git_rev_parse(self, repo: Path, ref: str) -> str | None:
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", ref],
+                cwd=str(repo),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return None
+        if result.returncode != 0:
+            return None
+        return result.stdout.strip()
 
     def _codegen_config(self) -> CodeGenerationConfig:
         if self.code_generation is not None:

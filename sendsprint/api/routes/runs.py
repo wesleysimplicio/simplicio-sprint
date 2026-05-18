@@ -35,6 +35,27 @@ def get_run(run_id: str) -> RunStatus:
     return s
 
 
+@router.get("/{run_id}/dashboard", response_model=dict)
+def get_run_dashboard(run_id: str) -> dict:
+    """Return a local dashboard snapshot backed by run status and evidence files."""
+    status = manager.get_run(run_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    evidence_dir = manager.evidence_root(run_id)
+    evidence = [
+        {"name": path.name, "path": str(path)}
+        for path in sorted(evidence_dir.glob("*"))
+        if path.is_file()
+    ]
+    return {
+        "run": status.model_dump(),
+        "evidence": evidence,
+        "summary": status.summary,
+        "pr_url": status.pr_url,
+        "blockers": [] if not status.failed else [status.summary or "run failed"],
+    }
+
+
 @router.get("/{run_id}/events")
 async def run_events(run_id: str) -> StreamingResponse:
     """Server-Sent Events stream — one JSON event per `data:` line."""

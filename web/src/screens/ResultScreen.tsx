@@ -6,7 +6,7 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
 import type { RootStackParamList } from "../navigation";
-import type { RunStatus } from "../api/types";
+import type { DashboardSnapshot, RunStatus } from "../api/types";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
 
@@ -18,13 +18,20 @@ export const ResultScreen: React.FC = () => {
   const route = useRoute<Rt>();
   const { api } = useSession();
   const [run, setRun] = useState<RunStatus | null>(null);
+  const [snapshot, setSnapshot] = useState<DashboardSnapshot | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        setRun(await api.getRun(route.params.runId));
+        const next = await api.getRunDashboard(route.params.runId);
+        setSnapshot(next);
+        setRun(next.run);
       } catch {
-        // ignore
+        try {
+          setRun(await api.getRun(route.params.runId));
+        } catch {
+          // ignore
+        }
       }
     })();
   }, []);
@@ -71,6 +78,27 @@ export const ResultScreen: React.FC = () => {
           </Card>
         ) : null}
         <Card>
+          <Text style={styles.label}>EVIDÊNCIAS</Text>
+          <Text style={styles.value}>
+            {snapshot ? `${snapshot.evidence.length} arquivo(s) no bundle local` : "—"}
+          </Text>
+          {snapshot?.evidence.slice(0, 5).map((item) => (
+            <Text key={item.path} style={[styles.value, styles.mono]}>
+              {item.name}
+            </Text>
+          ))}
+        </Card>
+        {snapshot?.blockers.length ? (
+          <Card>
+            <Text style={styles.label}>BLOCKERS</Text>
+            {snapshot.blockers.map((item) => (
+              <Text key={item} style={[styles.value, styles.blocker]}>
+                {item}
+              </Text>
+            ))}
+          </Card>
+        ) : null}
+        <Card>
           <Text style={styles.label}>METADADOS</Text>
           <Text style={[styles.value, styles.mono]}>
             sprint: {run?.sprint_id ?? "—"}
@@ -98,4 +126,5 @@ const styles = StyleSheet.create({
   },
   value: { color: theme.text, fontSize: 16, fontWeight: "600", marginTop: 4 },
   mono: { fontFamily: theme.fontMono, fontSize: 13, fontWeight: "400" },
+  blocker: { color: theme.danger },
 });

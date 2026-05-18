@@ -82,6 +82,12 @@ class TestWorktreeManager:
         assert isinstance(branch, str)
         assert len(branch) > 0
 
+    def test_worktree_dir_sanitizes_branch_slashes(self, tmp_path: Path) -> None:
+        init_git(tmp_path)
+        wm = WorktreeManager(tmp_path)
+        path = wm.worktree_dir("feature/42-add-login")
+        assert path.name == f"{tmp_path.name}-wt-feature-42-add-login"
+
 
 # ---------------------------------------------------------------------------
 # DevAgent

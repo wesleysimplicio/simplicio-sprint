@@ -107,7 +107,30 @@ No SendSprint, o fluxo atual é dividido assim:
   - mantém `CHANGELOG.md` com bloco `[Unreleased]`;
   - promove o changelog em pushes de tag `v*.*.*`.
 - `.github/workflows/pypi-publish.yml`
-  - publica no PyPI quando uma GitHub Release é publicada.
+  - publica no PyPI quando uma GitHub Release é publicada, usando PyPI Trusted Publishing.
+
+### PyPI Trusted Publishing
+
+O workflow de produção não deve usar `PYPI_API_TOKEN`. A configuração esperada
+no PyPI para o projeto `sendsprint` é:
+
+| Claim | Valor |
+|---|---|
+| Owner | `wesleysimplicio` |
+| Repository | `SendSprint` |
+| Workflow | `pypi-publish.yml` |
+| Environment | vazio / não configurado |
+| Trigger | GitHub Release publicada a partir de tag `v*.*.*` |
+
+O workflow precisa manter:
+
+```yaml
+permissions:
+  contents: read
+  id-token: write
+```
+
+E a ação `pypa/gh-action-pypi-publish@release/v1` sem `password`.
 
 Exemplo de refresh manual local:
 

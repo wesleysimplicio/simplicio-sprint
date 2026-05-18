@@ -18,7 +18,9 @@ from sendsprint.agents.story_task_planner import (
 from sendsprint.models import Sprint
 from sendsprint.models.sprint import SprintItem
 from sendsprint.models.workspace import RepoConfig
+from sendsprint.policy import AutonomyPolicy
 from sendsprint.tech import TechFingerprint
+from sendsprint.templates import select_validation_template
 
 Confidence = Literal["high", "medium", "low"]
 
@@ -36,16 +38,25 @@ class PlannedDelivery(BaseModel):
     confidence: Confidence
     reason: str
     relationship: str = "none"
+    worktree_path: str | None = None
+    validation_template: str | None = None
+    validation_commands: list[str] = Field(default_factory=list)
 
 
 class DeliveryPlan(BaseModel):
     """Structured dry-run output used by CLI and reports."""
 
+    schema_version: str = "1.0"
     source: str
     sprint_id: str
     sprint_name: str
     deliveries: list[PlannedDelivery] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    autonomy_level: str = "plan"
+    side_effects: dict[str, bool] = Field(default_factory=dict)
+    llm: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    deploy_callback: dict[str, str | bool | None] = Field(default_factory=dict)
+    release: dict[str, str | bool | None] = Field(default_factory=dict)
 
     @property
     def low_confidence_count(self) -> int:
@@ -65,9 +76,23 @@ def build_delivery_plan(
     branch_for_task: Callable[[SprintItem, TechFingerprint, RepoConfig | None], str],
     detect_fingerprint: Callable[[Path], TechFingerprint],
     default_target_branch: str,
+    autonomy_policy: AutonomyPolicy | None = None,
+    llm: dict[str, str | int | float | bool | None] | None = None,
+    deploy_callback: dict[str, str | bool | None] | None = None,
+    release: dict[str, str | bool | None] | None = None,
 ) -> DeliveryPlan:
     """Build a read-only plan for item/repo delivery."""
-    plan = DeliveryPlan(source=sprint.source, sprint_id=sprint.id, sprint_name=sprint.name)
+    policy = autonomy_policy or AutonomyPolicy()
+    plan = DeliveryPlan(
+        source=sprint.source,
+        sprint_id=sprint.id,
+        sprint_name=sprint.name,
+        autonomy_level=policy.level,
+        side_effects=policy.side_effects(),
+        llm=llm or {},
+        deploy_callback=deploy_callback or {},
+        release=release or {"enabled": False},
+    )
     for item in delivery_items(sprint):
         matched = False
         for repo_cfg, repo_path in repos:
@@ -84,6 +109,10 @@ def build_delivery_plan(
             )
             confidence, reason = confidence_for_item(item, repo_role, fp)
             relationship = "parent" if item.parent_key else "related" if item.links else "none"
+            template = select_validation_template(fp, repo_path)
+            worktree_path = str(
+                repo_path.parent / f"{repo_path.name}-wt-{branch.replace('/', '-')}"
+            )
             plan.deliveries.append(
                 PlannedDelivery(
                     item_key=item.key or item.id,
@@ -96,6 +125,9 @@ def build_delivery_plan(
                     confidence=confidence,
                     reason=reason,
                     relationship=relationship,
+                    worktree_path=worktree_path,
+                    validation_template=template.name,
+                    validation_commands=template.commands(),
                 )
             )
         if not matched:

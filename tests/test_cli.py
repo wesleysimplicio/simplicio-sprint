@@ -33,11 +33,13 @@ def test_run_passes_codegen_and_deploy_overrides(monkeypatch, tmp_path: Path) ->
             scope,
             code_generation,
             deploy,
+            autonomy_policy,
         ) -> None:
             del operator, scope
             captured["workspace"] = workspace
             captured["code_generation"] = code_generation
             captured["deploy"] = deploy
+            captured["autonomy_policy"] = autonomy_policy
 
         def run(self, **kwargs):
             del kwargs
@@ -95,3 +97,4 @@ def test_run_passes_codegen_and_deploy_overrides(monkeypatch, tmp_path: Path) ->
     assert deploy.enabled is True
     assert deploy.url == "https://deploy.example.com/hook"
     assert deploy.final_status == "Released"
+    assert captured["autonomy_policy"].level == "deploy-callback"

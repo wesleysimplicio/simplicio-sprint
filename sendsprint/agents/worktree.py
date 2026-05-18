@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 from pathlib import Path
 
@@ -22,7 +23,7 @@ class WorktreeManager:
             raise WorktreeError(f"not a git repo: {self.repo}")
 
     def create(self, branch: str, *, base: str = "HEAD") -> Path:
-        wt_dir = self.repo.parent / f"{self.repo.name}-wt-{branch}"
+        wt_dir = self.worktree_dir(branch)
         if wt_dir.exists():
             logger.info("worktree already exists: %s", wt_dir)
             return wt_dir
@@ -31,7 +32,7 @@ class WorktreeManager:
         return wt_dir
 
     def remove(self, branch: str) -> None:
-        wt_dir = self.repo.parent / f"{self.repo.name}-wt-{branch}"
+        wt_dir = self.worktree_dir(branch)
         if not wt_dir.exists():
             return
         self._run(["git", "worktree", "remove", str(wt_dir), "--force"])
@@ -49,6 +50,11 @@ class WorktreeManager:
         cwd = str(wt_dir) if wt_dir else str(self.repo)
         result = self._run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=cwd)
         return result.stdout.strip()
+
+    def worktree_dir(self, branch: str) -> Path:
+        """Return the deterministic worktree path for a branch."""
+        safe_branch = re.sub(r"[^A-Za-z0-9._-]+", "-", branch).strip("-") or "branch"
+        return self.repo.parent / f"{self.repo.name}-wt-{safe_branch}"
 
     def _run(self, cmd: list[str], *, cwd: str | None = None) -> subprocess.CompletedProcess[str]:
         try:

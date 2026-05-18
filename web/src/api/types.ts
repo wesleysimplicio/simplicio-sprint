@@ -65,6 +65,19 @@ export type RunStatus = {
   last_step?: number | null;
 };
 
+export type DashboardEvidence = {
+  name: string;
+  path: string;
+};
+
+export type DashboardSnapshot = {
+  run: RunStatus;
+  evidence: DashboardEvidence[];
+  summary?: string | null;
+  pr_url?: string | null;
+  blockers: string[];
+};
+
 export type RunEvent = {
   type:
     | "step"

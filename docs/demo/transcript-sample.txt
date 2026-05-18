@@ -1,0 +1,4 @@
+Wesley: Ação: add sendsprint doctor readiness command owner: Platform priority: P0 prazo: this sprint aceite: checks git/GitHub/Python/Playwright; prints JSON
+Ana: TODO: generate executive sprint summary owner: Ana priority: P2 due: Friday acceptance: includes PRs; includes blockers; links evidence
+Bob: precisamos criar dashboard local de execução owner: Bob prioridade: P1 aceite: mostra runs; mostra evidências; mostra blockers
+Security: token=abc123456789SECRET must never be published; tarefa: redact sensitive transcript content owner: Platform priority: P1

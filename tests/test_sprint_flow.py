@@ -16,6 +16,7 @@ from sendsprint.models.workspace import (
     WorkspaceConfig,
 )
 from sendsprint.operators.base import BaseOperator
+from sendsprint.policy import AutonomyPolicy
 from sendsprint.tech import TechFingerprint
 
 
@@ -96,6 +97,9 @@ def test_dry_run_builds_plan_without_importing_specs(tmp_path) -> None:
 
     assert result.delivery_plan is not None
     assert result.delivery_plan.deliveries[0].branch == "feature/42-criar-tela-de-login"
+    assert result.delivery_plan.deliveries[0].worktree_path is not None
+    assert result.delivery_plan.deliveries[0].validation_template is not None
+    assert result.delivery_plan.side_effects["push"] is False
     assert result.run_report is not None
     assert result.run_report.summary == "1 planned delivery item(s), 0 low-confidence route(s)"
     assert not (tmp_path / ".specs").exists()
@@ -179,6 +183,7 @@ def test_step_11_deploy_uses_operator_ticket_updater(monkeypatch, tmp_path) -> N
             url="https://deploy.example.com/hook",
             final_status="Released",
         ),
+        autonomy_policy=AutonomyPolicy(level="deploy-callback"),
     )
     pr_report = StepReport(
         step=9,

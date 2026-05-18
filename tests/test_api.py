@@ -65,6 +65,11 @@ def test_get_run_404_for_missing():
     assert resp.status_code == 404
 
 
+def test_dashboard_run_404_for_missing():
+    resp = client.get("/runs/does-not-exist/dashboard")
+    assert resp.status_code == 404
+
+
 def test_evidence_404_when_missing():
     resp = client.get("/runs/anything/evidence/missing.png")
     assert resp.status_code == 404

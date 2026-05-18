@@ -23,16 +23,24 @@ from sendsprint.agentic_starter import (
     sync_agentic_starter,
 )
 from sendsprint.architecture import ArchitectureMapper, build_architecture
+from sendsprint.doctor import DoctorReport, run_doctor
+from sendsprint.evidence import create_evidence_bundle
 from sendsprint.flow import SprintFlow
+from sendsprint.ingest import extract_task_candidates
 from sendsprint.mcp import install_azure_devops_mcp, serve_stdio
 from sendsprint.models import Sprint
+from sendsprint.models.reports import RunReport
 from sendsprint.models.workspace import CodeGenerationConfig, DeployWorkflowConfig
 from sendsprint.operators import AzureDevopsOperator, JiraOperator
 from sendsprint.operators.base import Transport
+from sendsprint.policy import AutonomyPolicy, parse_autonomy_level
 from sendsprint.preflight import PreflightReport, run_preflight
+from sendsprint.reports import render_executive_report
 from sendsprint.scaffolder import Scaffolder
 from sendsprint.scope import build_scope
+from sendsprint.templates import catalog
 from sendsprint.tech import detect_tech
+from sendsprint.trackers import GitHubIssuesTracker
 from sendsprint.workspace import load_workspace
 from sendsprint.credentials import Provider as CredentialProvider
 
@@ -127,6 +135,58 @@ def detect_tech_cmd(
     console.print_json(data=json.loads(fp.model_dump_json()))
 
 
+@app.command(name="templates")
+def templates_cmd(
+    output: Path | None = typer.Option(None, "-o", help="Write templates JSON"),
+) -> None:
+    """List shipped validation templates."""
+    data = [item.model_dump() for item in catalog()]
+    if output:
+        output.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        console.print(f"[green]wrote templates to {output}[/green]")
+    else:
+        table = Table(show_header=True, header_style="bold")
+        for col in ("Template", "Stacks", "Install", "Unit", "E2E"):
+            table.add_column(col)
+        for item in catalog():
+            table.add_row(
+                item.name,
+                ", ".join(item.stacks),
+                item.install or "-",
+                item.unit or "-",
+                item.e2e or "-",
+            )
+        console.print(table)
+
+
+@app.command(name="doctor")
+def doctor_cmd(
+    repo_path: Path = typer.Option(Path("."), "--repo", "-r", exists=True, file_okay=False),
+    workspace_file: Path | None = typer.Option(None, "--workspace", "-w"),
+    output: Path | None = typer.Option(None, "-o", help="Write doctor JSON"),
+    llm_codegen: bool = typer.Option(False, "--llm-codegen"),
+    llm_provider: str | None = typer.Option(None, "--llm-provider"),
+    llm_model: str | None = typer.Option(None, "--llm-model"),
+    llm_max_usd: float | None = typer.Option(None, "--llm-max-usd"),
+) -> None:
+    """Check whether the machine/repo are ready for autonomous sprint delivery."""
+    codegen = _resolve_codegen_config(
+        None,
+        enabled=llm_codegen,
+        provider=llm_provider,
+        model=llm_model,
+        max_usd=llm_max_usd,
+        max_tokens=None,
+    )
+    report = run_doctor(repo_path, workspace_file=workspace_file, code_generation=codegen)
+    _render_doctor(report)
+    if output:
+        output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+        console.print(f"[green]wrote doctor report to {output}[/green]")
+    if not report.ok:
+        raise typer.Exit(1)
+
+
 @app.command(name="sync-agentic-starter")
 def sync_agentic_starter_cmd(
     repo_path: Path = typer.Argument(Path("."), exists=True, file_okay=False, help="Repo to sync"),
@@ -218,6 +278,16 @@ def run_flow(
         "--dry-run",
         help="Plan delivery without writing files, branches, commits, or PRs",
     ),
+    plan_output: Path | None = typer.Option(
+        None,
+        "--plan-output",
+        help="Write DeliveryPlan JSON artifact during dry-run or normal planning",
+    ),
+    autonomy: str | None = typer.Option(
+        None,
+        "--autonomy",
+        help="observe | plan | execute | commit | push | pr | release | deploy-callback",
+    ),
     llm_codegen: bool | None = typer.Option(
         None,
         "--llm-codegen/--no-llm-codegen",
@@ -285,12 +355,15 @@ def run_flow(
     else:
         raise typer.BadParameter("source must be 'jira' or 'azuredevops'")
 
+    default_autonomy = "plan" if dry_run else "deploy-callback" if deploy is True else "pr"
+    autonomy_level = parse_autonomy_level(autonomy or default_autonomy)
     flow = SprintFlow(
         operator=operator,
         workspace=ws,
         scope=scope,
         code_generation=code_generation,
         deploy=deploy_config,
+        autonomy_policy=AutonomyPolicy(level=autonomy_level),
     )
 
     sprint_id = None
@@ -313,6 +386,9 @@ def run_flow(
     if result.delivery_plan:
         console.rule("Delivery Plan")
         _render_delivery_plan(result.delivery_plan)
+        if plan_output:
+            plan_output.write_text(result.delivery_plan.model_dump_json(indent=2), encoding="utf-8")
+            console.print(f"[green]wrote delivery plan to {plan_output}[/green]")
     if result.architecture:
         console.rule("Architecture")
         console.print_json(data=json.loads(result.architecture.model_dump_json()))
@@ -329,6 +405,107 @@ def run_flow(
         )
         output.write_text(data)
         console.print(f"[green]wrote report to {output}[/green]")
+
+
+@app.command(name="read-github")
+def read_github_cmd(
+    repo: str = typer.Argument(..., help="owner/repo"),
+    state: str = typer.Option("open", "--state", help="open | closed | all"),
+    limit: int = typer.Option(100, "--limit"),
+    output: Path | None = typer.Option(None, "-o", help="Write issues JSON"),
+) -> None:
+    """Read GitHub Issues as a first-class tracker source."""
+    if state not in {"open", "closed", "all"}:
+        raise typer.BadParameter("state must be open, closed, or all")
+    issues = GitHubIssuesTracker(repo).list_issues(state=cast(Any, state), limit=limit)
+    data = [issue.model_dump() for issue in issues]
+    if output:
+        output.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        console.print(f"[green]wrote issues to {output}[/green]")
+    table = Table(show_header=True, header_style="bold")
+    for col in ("#", "Title", "Labels", "Assignees", "Milestone"):
+        table.add_column(col)
+    for issue in issues:
+        table.add_row(
+            str(issue.number),
+            issue.title[:80],
+            ", ".join(issue.labels) or "-",
+            ", ".join(issue.assignees) or "-",
+            issue.milestone or "-",
+        )
+    console.print(table)
+
+
+@app.command(name="ingest-transcript")
+def ingest_transcript_cmd(
+    transcript_file: Path = typer.Argument(..., exists=True, dir_okay=False),
+    output: Path | None = typer.Option(None, "-o", help="Write extracted candidates JSON"),
+    repo: str | None = typer.Option(None, "--github-repo", help="owner/repo to create issues"),
+    apply: bool = typer.Option(False, "--apply", help="Create GitHub Issues from candidates"),
+    autonomy: str = typer.Option("plan", "--autonomy"),
+) -> None:
+    """Extract reviewable task candidates from a meeting transcript."""
+    existing_titles: list[str] = []
+    tracker = GitHubIssuesTracker(repo) if repo else None
+    if tracker:
+        existing_titles = [issue.title for issue in tracker.list_issues(state="all")]
+    candidates = extract_task_candidates(
+        transcript_file.read_text(encoding="utf-8"),
+        existing_titles=existing_titles,
+    )
+    data = [candidate.model_dump() for candidate in candidates]
+    if output:
+        output.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        console.print(f"[green]wrote transcript tasks to {output}[/green]")
+    created: list[str] = []
+    if apply:
+        if not tracker:
+            raise typer.BadParameter("--apply requires --github-repo")
+        policy = AutonomyPolicy(level=parse_autonomy_level(autonomy))
+        policy.require("comment-issue")
+        for candidate in candidates:
+            body = _candidate_issue_body(candidate.model_dump())
+            created.append(tracker.create(candidate.title, body, labels=["transcript"]))
+    table = Table(show_header=True, header_style="bold")
+    for col in ("Title", "Owner", "Priority", "Due", "Sensitive"):
+        table.add_column(col)
+    for candidate in candidates:
+        table.add_row(
+            candidate.title,
+            candidate.owner or "-",
+            candidate.priority or "-",
+            candidate.due_date or "-",
+            "yes" if candidate.sensitive else "no",
+        )
+    console.print(table)
+    if created:
+        console.print("[bold]Created issues:[/bold] " + ", ".join(created))
+
+
+@app.command(name="bundle-evidence")
+def bundle_evidence_cmd(
+    report_file: Path = typer.Argument(..., exists=True, dir_okay=False),
+    output_dir: Path = typer.Option(Path("evidence-bundles"), "--output-dir"),
+) -> None:
+    """Package a RunReport into a portable evidence bundle."""
+    report = RunReport.model_validate_json(report_file.read_text(encoding="utf-8"))
+    manifest = create_evidence_bundle(report, output_dir)
+    console.print(f"[green]evidence bundle:[/green] {manifest.root}")
+
+
+@app.command(name="executive-report")
+def executive_report_cmd(
+    report_file: Path = typer.Argument(..., exists=True, dir_okay=False),
+    output: Path | None = typer.Option(None, "-o", help="Write Markdown report"),
+) -> None:
+    """Render a manager-facing sprint summary from a RunReport."""
+    report = RunReport.model_validate_json(report_file.read_text(encoding="utf-8"))
+    markdown = render_executive_report(report)
+    if output:
+        output.write_text(markdown, encoding="utf-8")
+        console.print(f"[green]wrote executive report to {output}[/green]")
+    else:
+        console.print(markdown)
 
 
 @app.command(name="preflight")
@@ -763,6 +940,56 @@ def _render_preflight(report: PreflightReport) -> None:
         table.add_row(check.name, f"[{style}]{check.status}[/{style}]", check.message[:100])
     console.print(table)
     console.print(f"[bold]Result:[/bold] {'ok' if report.ok else 'failed'}")
+
+
+def _render_doctor(report: DoctorReport) -> None:
+    console.rule("SendSprint Doctor")
+    table = Table(show_header=True, header_style="bold")
+    for col in ("Check", "Status", "Message", "Remediation"):
+        table.add_column(col)
+    for check in report.checks:
+        style = {"ok": "green", "warn": "yellow", "failed": "red"}[check.status]
+        table.add_row(
+            check.name,
+            f"[{style}]{check.status}[/{style}]",
+            check.message[:90],
+            check.remediation or "-",
+        )
+    console.print(table)
+    if report.template:
+        console.print(
+            f"[bold]Template:[/bold] {report.template.name} "
+            f"({', '.join(report.template.commands()[:4])})"
+        )
+    console.print(f"[bold]Result:[/bold] {'ok' if report.ok else 'failed'}")
+
+
+def _candidate_issue_body(candidate: dict[str, Any]) -> str:
+    refs = candidate.get("source_refs") or []
+    ref_lines = "\n".join(
+        f"- Lines {ref.get('line_start')}-{ref.get('line_end')}: {ref.get('excerpt')}"
+        for ref in refs
+    )
+    ac = "\n".join(f"- [ ] {item}" for item in candidate.get("acceptance_criteria") or [])
+    return f"""## Transcript Task
+
+{candidate.get("summary") or candidate.get("title")}
+
+## Metadata
+
+- Owner: {candidate.get("owner") or "n/a"}
+- Priority: {candidate.get("priority") or "n/a"}
+- Due date: {candidate.get("due_date") or "n/a"}
+- Sensitive content flagged: {candidate.get("sensitive")}
+
+## Acceptance Criteria
+
+{ac or "- [ ] Review and refine acceptance criteria"}
+
+## Source Traceability
+
+{ref_lines or "- No source refs"}
+"""
 
 
 def _resolve_codegen_config(
