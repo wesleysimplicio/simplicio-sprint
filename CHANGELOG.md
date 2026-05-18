@@ -8,8 +8,13 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Docs
 
-- Add Sprint Autopilot roadmap and backlog entries for the next operator-focused improvements.
-- Refresh the product vision to match shipped code generation and deploy callback capabilities.
+- roadmap: define sprint autopilot backlog
+- changelog: promote 0.13.0
+
+### CI
+
+- release: refresh coverage badge and changelog
+- publish: use PyPI token secret
 
 ## [0.13.0] - 2026-05-18
 
