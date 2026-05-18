@@ -33,8 +33,25 @@ def _seed_repo(repo: Path) -> None:
     (repo / "README.md").write_text("# Smoke\n\nDemo repo.\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
     subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+    # Disable any host-side commit.gpgsign / hook so tests work in sandboxes
+    # that inherit a global signing config.
     subprocess.run(
-        ["git", "-c", "user.email=a@b.c", "-c", "user.name=Test", "commit", "-q", "-m", "init"],
+        [
+            "git",
+            "-c",
+            "user.email=a@b.c",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "commit.gpgsign=false",
+            "-c",
+            "tag.gpgsign=false",
+            "commit",
+            "--no-verify",
+            "-q",
+            "-m",
+            "init",
+        ],
         cwd=repo,
         check=True,
     )
@@ -80,7 +97,20 @@ def test_discover_handles_missing_docs_and_manifests(tmp_path: Path) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
     subprocess.run(
-        ["git", "-c", "user.email=a@b.c", "-c", "user.name=Test", "commit", "-q", "-m", "init"],
+        [
+            "git",
+            "-c",
+            "user.email=a@b.c",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--no-verify",
+            "-q",
+            "-m",
+            "init",
+        ],
         cwd=tmp_path,
         check=True,
     )

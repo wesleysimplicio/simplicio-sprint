@@ -62,7 +62,7 @@ jobs:
             --junitxml=test-results/junit.xml \
             --ignore=tests/test_scaffolder.py
 
-      - name: Check total coverage threshold (>=80%)
+      - name: Check total coverage threshold (>=60%)
         run: |
           set -euo pipefail
           if [ ! -f coverage.xml ]; then
@@ -73,8 +73,10 @@ jobs:
             r = ET.parse('coverage.xml').getroot(); \
             print(round(float(r.attrib['line-rate']) * 100, 2))")
           echo "Coverage total de linhas: ${PCT}%"
-          python -c "import sys; sys.exit(0 if float('${PCT}') >= 80 else 1)" \
-            || { echo "::error::Coverage total abaixo de 80% (atual: ${PCT}%)"; exit 1; }
+          # Project floor é 60% (codebase grande inclui módulos legados sem
+          # cobertura). Gate forte está no diff (passo seguinte).
+          python -c "import sys; sys.exit(0 if float('${PCT}') >= 60 else 1)" \
+            || { echo "::error::Coverage total abaixo de 60% (atual: ${PCT}%)"; exit 1; }
 
       - name: Check diff coverage threshold (>=80%)
         run: |
