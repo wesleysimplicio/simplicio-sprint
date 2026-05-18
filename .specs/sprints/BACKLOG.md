@@ -28,6 +28,19 @@ Lista priorizada de tudo que precisa ser feito no SendSprint. Fonte da verdade d
 | 6   | Add Bun/Deno detectors to `tech/detector.py`                         | P2         | sprint-3    | done   |
 | 7   | Coverage badge + CHANGELOG automation in CI                          | P2         | sprint-4    | done   |
 | 8   | Telemetry (opt-in) for step duration histograms                      | P2         | backlog     | done   |
+| 9   | Real PyPI trusted publishing                                         | P0         | sprint-5    | todo   |
+| 10  | `sendsprint doctor` readiness command                                | P0         | sprint-5    | todo   |
+| 11  | Full dry-run execution plan                                          | P0         | sprint-5    | todo   |
+| 12  | Per-task worktree isolation                                          | P0         | sprint-5    | todo   |
+| 13  | Evidence bundle for every autonomous run                             | P0         | sprint-5    | todo   |
+| 14  | GitHub Issues as a first-class tracker                               | P1         | sprint-6    | todo   |
+| 15  | Configurable autonomy policy                                         | P1         | sprint-6    | todo   |
+| 16  | Native Ralph Wiggum and Codex Goal loop semantics                    | P1         | sprint-6    | todo   |
+| 17  | Stack templates for common project types                             | P1         | sprint-6    | todo   |
+| 18  | Local dashboard for sprint execution                                 | P1         | sprint-7    | todo   |
+| 19  | Sprint Autopilot demo                                                | P2         | sprint-7    | todo   |
+| 20  | Executive report output                                              | P2         | sprint-7    | todo   |
+| 21  | Multi-agent control plane                                            | P2         | sprint-8    | todo   |
 
 ## Histórico recente (últimos done)
 
@@ -48,3 +61,4 @@ Lista priorizada de tudo que precisa ser feito no SendSprint. Fonte da verdade d
 ## Próximas decisões pendentes
 
 - Validar o loop autônomo no `llm-project-mapper` usando a skill Ralph Wiggum do Claude Code e o `/goal` do Codex para o item #2.
+- Converter o roadmap de Sprint Autopilot em sprints executáveis, começando pelos itens P0 em `docs/roadmap/sprint-autopilot-roadmap.md`.

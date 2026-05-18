@@ -8,54 +8,8 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Docs
 
-- changelog: promote 0.13.0
-
-### CI
-
-- publish: use PyPI token secret
-
-## [0.13.0] - 2026-05-18
-### Added
-
-- sprint-2: wire codegen and deploy callbacks
-- flow: ship codegen and deploy hooks
-- mcp: expose stdio server command
-- implement sprint-1 through backlog issues (#4-#15)
-- add Azure required PR reviewers
-- add soundtrack to SendSprint videos
-- add productivity visuals and before-after videos
-- add preflight dry-run and resumable delivery
-- add azure devops sprint automation
-
-### Fixed
-
-- ci: unblock CI checks on the PR
-- normalize azure backlog hierarchy
-- remove product branding from generated artifacts
-
-### Docs
-
-- release: record sprint-1 blocker evidence
-- sprint: clarify ralph goal pilot
-- badge: refresh coverage snapshot
-- roadmap: sync delivered sprint state
-- align SendSprint product proposal
-- add implementation presentation decks
-- add jira azure devops core guide
-
-### CI
-
-- publish: switch PyPI workflow to repository token auth after trusted publisher rejection
-- release: refresh coverage badge and changelog
-- release: refresh coverage badge and changelog
-- release: refresh coverage badge and changelog
-- release: refresh coverage badge and changelog
-- release: automate coverage badge and changelog
-
-### Chore
-
-- add long-running AI agent playbook scaffolding
-- harden validation gates
+- Add Sprint Autopilot roadmap and backlog entries for the next operator-focused improvements.
+- Refresh the product vision to match shipped code generation and deploy callback capabilities.
 
 ## [0.13.0] - 2026-05-18
 
@@ -74,6 +28,10 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - `docs/validation/ralph-llm-project-mapper.md` now records the concrete external-pilot blocker evidence used to close Sprint 1 validation honestly.
 - Source distribution packaging now excludes heavy local artifacts and generated media so the `0.13.0` release builds a publishable PyPI sdist and wheel.
 - Bumped package metadata to `0.13.0` for the Sprint 2 epic closeout.
+
+### CI
+
+- PyPI publishing now uses the repository `PYPI_API_TOKEN` secret after trusted publishing rejected the `v0.13.0` release claims.
 
 ## [0.12.2] - 2026-05-18
 
