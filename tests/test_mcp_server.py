@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
 
 from sendsprint.mcp import McpServer, McpTool, build_default_server
+from sendsprint.mcp.server import _read_message, serve_stdio
 
 
 def _request(method: str, *, rpc_id: int = 1, params: dict | None = None) -> dict:
@@ -120,3 +122,47 @@ class TestCustomTool:
         )
         payload = json.loads(resp["result"]["content"][0]["text"])
         assert payload == {"echoed": "hi"}
+
+
+class TestStdioTransport:
+    def test_read_message_parses_content_length_frame(self) -> None:
+        body = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}'
+        frame = (
+            f"Content-Length: {len(body)}\r\nContent-Type: application/json\r\n\r\n".encode()
+            + body
+        )
+        payload = _read_message(io.BytesIO(frame))
+        assert payload is not None
+        assert payload["method"] == "initialize"
+
+    def test_serve_stdio_writes_framed_response(self) -> None:
+        request_body = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}'
+        request = (
+            (
+                f"Content-Length: {len(request_body)}\r\n"
+                "Content-Type: application/json\r\n\r\n"
+            ).encode()
+            + request_body
+        )
+        output = io.BytesIO()
+        rc = serve_stdio(instream=io.BytesIO(request), outstream=output)
+        assert rc == 0
+        written = output.getvalue()
+        assert b"Content-Length:" in written
+        _, body = written.split(b"\r\n\r\n", 1)
+        payload = json.loads(body.decode("utf-8"))
+        assert payload["result"]["protocolVersion"] == "2024-11-05"
+
+    def test_serve_stdio_skips_notification_response(self) -> None:
+        request_body = b'{"jsonrpc":"2.0","method":"notifications/initialized"}'
+        request = (
+            (
+                f"Content-Length: {len(request_body)}\r\n"
+                "Content-Type: application/json\r\n\r\n"
+            ).encode()
+            + request_body
+        )
+        output = io.BytesIO()
+        rc = serve_stdio(instream=io.BytesIO(request), outstream=output)
+        assert rc == 0
+        assert output.getvalue() == b""

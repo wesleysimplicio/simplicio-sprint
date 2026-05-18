@@ -234,6 +234,22 @@ Azure DevOps MCP can be configured for Codex with:
 sendsprint install-ado-mcp --organization my-org --project "Projetos Ágeis" --team "Squad Yankee"
 ```
 
+SendSprint can also expose its own deterministic tooling as an MCP stdio
+server:
+
+```bash
+sendsprint mcp-serve
+```
+
+Current default MCP tools:
+
+- `sendsprint_detect_tech`
+- `sendsprint_check_architecture`
+- `sendsprint_version`
+
+The transport uses JSON-RPC 2.0 with `Content-Length` framing so Claude Code
+and similar hosts can launch it directly.
+
 When a User Story has no child tasks, SendSprint creates in-memory front/back
 tasks before delivery. Generated tasks keep `parent_key` pointing to the story
 and labels `scope:front` / `scope:back`, so each task runs only against matching
@@ -329,7 +345,7 @@ pytest tests/ -v
 - [x] `--scope mine` current-user filtering
 - [ ] LLM-powered code generation per sprint item
 - [ ] Deploy trigger + status callback to ticket
-- [ ] MCP server mode (expose SendSprint as an MCP tool)
+- [x] MCP server mode (expose SendSprint as an MCP tool)
 
 ---
 

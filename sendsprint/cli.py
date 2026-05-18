@@ -24,7 +24,7 @@ from sendsprint.agentic_starter import (
 )
 from sendsprint.architecture import ArchitectureMapper, build_architecture
 from sendsprint.flow import SprintFlow
-from sendsprint.mcp import install_azure_devops_mcp
+from sendsprint.mcp import install_azure_devops_mcp, serve_stdio
 from sendsprint.models import Sprint
 from sendsprint.operators import AzureDevopsOperator, JiraOperator
 from sendsprint.operators.base import Transport
@@ -184,6 +184,12 @@ def install_ado_mcp_cmd(
         dry_run=dry_run,
     )
     console.print_json(data=result.model_dump())
+
+
+@app.command(name="mcp-serve")
+def mcp_serve_cmd() -> None:
+    """Expose SendSprint as an MCP stdio server."""
+    serve_stdio(instream=sys.stdin.buffer, outstream=sys.stdout.buffer)
 
 
 @app.command(name="run")

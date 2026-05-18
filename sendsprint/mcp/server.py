@@ -16,11 +16,12 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO
 
 from ..tech import detect_tech
 
 PROTOCOL_VERSION = "2024-11-05"
+HEADER_SEPARATOR = b"\r\n\r\n"
 
 
 @dataclass
@@ -112,6 +113,78 @@ class McpServer:
 
 class _CredentialError(RuntimeError):
     """Surface credential issues without leaking stack traces to the client."""
+
+
+# ---------------------------------------------------------------------------
+# Stdio transport helpers
+# ---------------------------------------------------------------------------
+
+
+def serve_stdio(
+    server: McpServer | None = None,
+    *,
+    instream: BinaryIO,
+    outstream: BinaryIO,
+) -> int:
+    """Serve MCP JSON-RPC over stdio using Content-Length framed messages."""
+    active = server or build_default_server()
+    while True:
+        request = _read_message(instream)
+        if request is None:
+            return 0
+        response = active.handle(request)
+        if response is not None:
+            _write_message(outstream, response)
+
+
+def _read_message(stream: BinaryIO) -> dict[str, Any] | None:
+    headers = _read_headers(stream)
+    if headers is None:
+        return None
+
+    content_length = headers.get("content-length")
+    if content_length is None:
+        raise ValueError("missing Content-Length header")
+
+    try:
+        length = int(content_length)
+    except ValueError as exc:  # pragma: no cover - defensive parse guard
+        raise ValueError(f"invalid Content-Length: {content_length!r}") from exc
+
+    payload = stream.read(length)
+    if len(payload) != length:
+        raise ValueError("incomplete MCP payload")
+    return json.loads(payload.decode("utf-8"))
+
+
+def _read_headers(stream: BinaryIO) -> dict[str, str] | None:
+    buffer = bytearray()
+    while HEADER_SEPARATOR not in buffer:
+        chunk = stream.read(1)
+        if chunk == b"":
+            if not buffer:
+                return None
+            raise ValueError("unexpected EOF while reading MCP headers")
+        buffer.extend(chunk)
+
+    raw_headers = bytes(buffer).split(HEADER_SEPARATOR, 1)[0].decode("utf-8")
+    headers: dict[str, str] = {}
+    for line in raw_headers.split("\r\n"):
+        if not line.strip():
+            continue
+        if ":" not in line:
+            raise ValueError(f"invalid MCP header line: {line!r}")
+        key, value = line.split(":", 1)
+        headers[key.strip().lower()] = value.strip()
+    return headers
+
+
+def _write_message(stream: BinaryIO, payload: dict[str, Any]) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    headers = f"Content-Length: {len(body)}\r\nContent-Type: application/json\r\n\r\n".encode()
+    stream.write(headers)
+    stream.write(body)
+    stream.flush()
 
 
 # ---------------------------------------------------------------------------

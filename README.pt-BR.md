@@ -123,6 +123,22 @@ playwright install chromium
 cp .env.example .env  # preencha credenciais
 ```
 
+O SendSprint tambem pode expor o proprio tooling deterministico como servidor
+MCP via stdio:
+
+```bash
+sendsprint mcp-serve
+```
+
+Tools MCP padrao atuais:
+
+- `sendsprint_detect_tech`
+- `sendsprint_check_architecture`
+- `sendsprint_version`
+
+O transporte usa JSON-RPC 2.0 com framing por `Content-Length`, entao Claude
+Code e hosts MCP parecidos podem subir o processo direto.
+
 ---
 
 ## Quick start
@@ -311,7 +327,7 @@ pytest tests/ -v
 - [x] Filtro `--scope mine` por usuário corrente
 - [ ] Geração de código por LLM por sprint item
 - [ ] Trigger de deploy + callback de status pra ticket
-- [ ] Modo MCP server (expor SendSprint como tool MCP)
+- [x] Modo MCP server (expor SendSprint como tool MCP)
 
 ---
 
