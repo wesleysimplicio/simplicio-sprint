@@ -29,6 +29,27 @@ class RepoConfig(BaseModel):
     e2e_command: str | None = None
 
 
+class CodeGenerationConfig(BaseModel):
+    """Opt-in LLM patch generation between build and lint."""
+
+    enabled: bool = False
+    provider: str | None = None
+    model: str | None = None
+    max_usd: float = 1.0
+    max_tokens: int = 8_000
+
+
+class DeployWorkflowConfig(BaseModel):
+    """Opt-in deploy callback executed after PR creation."""
+
+    enabled: bool = False
+    provider: str = "webhook"
+    url: str | None = None
+    method: str = "POST"
+    headers: dict[str, str] = Field(default_factory=dict)
+    final_status: str = "Deployed"
+
+
 class WorkspaceConfig(BaseModel):
     """Multi-repo workspace declared by the user (workspace.yaml)."""
 
@@ -41,6 +62,8 @@ class WorkspaceConfig(BaseModel):
     required_pr_reviewers: list[str] = Field(default_factory=list)
     default_base_branch: str = "develop"
     branch_name_template: str = "feature/{number}-{title}"
+    code_generation: CodeGenerationConfig = Field(default_factory=CodeGenerationConfig)
+    deploy: DeployWorkflowConfig = Field(default_factory=DeployWorkflowConfig)
 
 
 DEFAULT_DEVELOPABLE_STATUSES = (

@@ -26,6 +26,7 @@ from sendsprint.architecture import ArchitectureMapper, build_architecture
 from sendsprint.flow import SprintFlow
 from sendsprint.mcp import install_azure_devops_mcp, serve_stdio
 from sendsprint.models import Sprint
+from sendsprint.models.workspace import CodeGenerationConfig, DeployWorkflowConfig
 from sendsprint.operators import AzureDevopsOperator, JiraOperator
 from sendsprint.operators.base import Transport
 from sendsprint.preflight import PreflightReport, run_preflight
@@ -217,6 +218,22 @@ def run_flow(
         "--dry-run",
         help="Plan delivery without writing files, branches, commits, or PRs",
     ),
+    llm_codegen: bool | None = typer.Option(
+        None,
+        "--llm-codegen/--no-llm-codegen",
+        help="Force-enable or disable the opt-in LLM diff generation step",
+    ),
+    llm_provider: str | None = typer.Option(None, "--llm-provider"),
+    llm_model: str | None = typer.Option(None, "--llm-model"),
+    llm_max_usd: float | None = typer.Option(None, "--llm-max-usd"),
+    llm_max_tokens: int | None = typer.Option(None, "--llm-max-tokens"),
+    deploy: bool | None = typer.Option(
+        None,
+        "--deploy/--no-deploy",
+        help="Force-enable or disable the opt-in deploy callback step",
+    ),
+    deploy_url: str | None = typer.Option(None, "--deploy-url"),
+    deploy_final_status: str | None = typer.Option(None, "--deploy-final-status"),
     resume: bool = typer.Option(
         True,
         "--resume/--no-resume",
@@ -224,8 +241,22 @@ def run_flow(
     ),
     run_id: str | None = typer.Option(None, "--run-id", help="Explicit run state id"),
 ) -> None:
-    """Run the full 10-step SendSprint flow."""
+    """Run the full SendSprint flow."""
     ws = load_workspace(workspace_file) if workspace_file else None
+    code_generation = _resolve_codegen_config(
+        ws,
+        enabled=llm_codegen,
+        provider=llm_provider,
+        model=llm_model,
+        max_usd=llm_max_usd,
+        max_tokens=llm_max_tokens,
+    )
+    deploy_config = _resolve_deploy_config(
+        ws,
+        enabled=deploy,
+        url=deploy_url,
+        final_status=deploy_final_status,
+    )
 
     task_keys = _collect_task_keys(task, tasks)
     allowed = _parse_csv(status)
@@ -254,7 +285,13 @@ def run_flow(
     else:
         raise typer.BadParameter("source must be 'jira' or 'azuredevops'")
 
-    flow = SprintFlow(operator=operator, workspace=ws, scope=scope)
+    flow = SprintFlow(
+        operator=operator,
+        workspace=ws,
+        scope=scope,
+        code_generation=code_generation,
+        deploy=deploy_config,
+    )
 
     sprint_id = None
     iteration_path = None
@@ -506,6 +543,22 @@ def sprint(
         "--dry-run",
         help="Plan delivery without writing files, branches, commits, or PRs",
     ),
+    llm_codegen: bool | None = typer.Option(
+        None,
+        "--llm-codegen/--no-llm-codegen",
+        help="Force-enable or disable the opt-in LLM diff generation step",
+    ),
+    llm_provider: str | None = typer.Option(None, "--llm-provider"),
+    llm_model: str | None = typer.Option(None, "--llm-model"),
+    llm_max_usd: float | None = typer.Option(None, "--llm-max-usd"),
+    llm_max_tokens: int | None = typer.Option(None, "--llm-max-tokens"),
+    deploy: bool | None = typer.Option(
+        None,
+        "--deploy/--no-deploy",
+        help="Force-enable or disable the opt-in deploy callback step",
+    ),
+    deploy_url: str | None = typer.Option(None, "--deploy-url"),
+    deploy_final_status: str | None = typer.Option(None, "--deploy-final-status"),
     resume: bool = typer.Option(
         True,
         "--resume/--no-resume",
@@ -532,6 +585,20 @@ def sprint(
     repo = repo_path or (Path(p.default_repo_path) if p.default_repo_path else Path.cwd())
     ws_path = workspace_file or (Path(p.default_workspace) if p.default_workspace else None)
     ws = load_workspace(ws_path) if ws_path else None
+    code_generation = _resolve_codegen_config(
+        ws,
+        enabled=llm_codegen,
+        provider=llm_provider,
+        model=llm_model,
+        max_usd=llm_max_usd,
+        max_tokens=llm_max_tokens,
+    )
+    deploy_config = _resolve_deploy_config(
+        ws,
+        enabled=deploy,
+        url=deploy_url,
+        final_status=deploy_final_status,
+    )
 
     if provider == "jira":
         email, token = credentials.get_or_prompt(
@@ -592,7 +659,13 @@ def sprint(
     else:
         raise typer.BadParameter("provider must be 'jira' or 'azuredevops'")
 
-    flow = SprintFlow(operator=operator, workspace=ws, scope=scope)
+    flow = SprintFlow(
+        operator=operator,
+        workspace=ws,
+        scope=scope,
+        code_generation=code_generation,
+        deploy=deploy_config,
+    )
     result = flow.run(
         sprint_id=sprint_id,
         iteration_path=iteration_path,
@@ -690,6 +763,56 @@ def _render_preflight(report: PreflightReport) -> None:
         table.add_row(check.name, f"[{style}]{check.status}[/{style}]", check.message[:100])
     console.print(table)
     console.print(f"[bold]Result:[/bold] {'ok' if report.ok else 'failed'}")
+
+
+def _resolve_codegen_config(
+    workspace: object | None,
+    *,
+    enabled: bool | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+    max_usd: float | None = None,
+    max_tokens: int | None = None,
+) -> CodeGenerationConfig:
+    base = (
+        workspace.code_generation
+        if workspace is not None and hasattr(workspace, "code_generation")
+        else CodeGenerationConfig()
+    )
+    updates = {}
+    if enabled is not None:
+        updates["enabled"] = enabled
+    if provider is not None:
+        updates["provider"] = provider
+    if model is not None:
+        updates["model"] = model
+    if max_usd is not None:
+        updates["max_usd"] = max_usd
+    if max_tokens is not None:
+        updates["max_tokens"] = max_tokens
+    return base.model_copy(update=updates)
+
+
+def _resolve_deploy_config(
+    workspace: object | None,
+    *,
+    enabled: bool | None = None,
+    url: str | None = None,
+    final_status: str | None = None,
+) -> DeployWorkflowConfig:
+    base = (
+        workspace.deploy
+        if workspace is not None and hasattr(workspace, "deploy")
+        else DeployWorkflowConfig()
+    )
+    updates = {}
+    if enabled is not None:
+        updates["enabled"] = enabled
+    if url is not None:
+        updates["url"] = url
+    if final_status is not None:
+        updates["final_status"] = final_status
+    return base.model_copy(update=updates)
 
 
 def _parse_csv(value: str | None) -> list[str] | None:

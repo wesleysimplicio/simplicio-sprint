@@ -9,7 +9,7 @@
 > 🇺🇸 English. Leia em português: [README.pt-BR.md](README.pt-BR.md).
 
 
-SendSprint is a sprint-to-pull-request delivery platform for engineering teams. It reads Jira or Azure DevOps sprint work, maps the target architecture, creates isolated branches/worktrees, builds, tests, checks security, captures evidence, commits, opens pull requests, reviews the diff, and reports delivery state in one controlled 10-step flow.
+SendSprint is a sprint-to-pull-request delivery platform for engineering teams. It reads Jira or Azure DevOps sprint work, maps the target architecture, creates isolated branches/worktrees, builds, tests, checks security, captures evidence, commits, opens pull requests, reviews the diff, and reports delivery state in one controlled flow with opt-in LLM code generation and deploy callbacks.
 
 The proposal is simple: remove the manual coordination tax between backlog, code, tests, evidence, and PRs. SendSprint gives teams a repeatable execution lane from sprint planning to `develop`, with preflight validation, dry-run planning, resumable runs, branch-per-task delivery, and auditable output.
 
@@ -87,11 +87,11 @@ See [`web/README.md`](./web/README.md) for the full walkthrough and
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.12.2 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Azure DevOps MCP installer. Auto-scaffold `.specs` plus latest `agentic-starter` sync. Full 10-step flow. Preflight, dry-run delivery plans, resumable run state, confidence routing, required PR reviewers, and post-PR validation are built in. Product visuals, before/after Remotion explainers with music and sound effects, and bilingual implementation decks are bundled. Branches default to `feature/{number}-{title}` and PRs target `develop`; both can be configured. Azure backlog hierarchy checks prevent invalid Issue -> Task parent links. Jira/Azure DevOps core guide is bundled for stable delivery rules. Coverage badge generation and changelog promotion are now automated in GitHub Actions. PyPI publishing is automated on release tags.
+> **Status:** v0.13.0 — Chat-triggered one-command UX (`sendsprint sprint`). 13 IDE manifests. OS-keyring credential cache. Azure DevOps MCP installer. Auto-scaffold `.specs` plus latest `agentic-starter` sync. Full delivery flow with opt-in LLM code generation and deploy callbacks. Preflight, dry-run delivery plans, resumable run state, confidence routing, required PR reviewers, post-PR validation, and deploy ticket callbacks are built in. Product visuals, before/after Remotion explainers with music and sound effects, and bilingual implementation decks are bundled. Branches default to `feature/{number}-{title}` and PRs target `develop`; both can be configured. Azure backlog hierarchy checks prevent invalid Issue -> Task parent links. Jira/Azure DevOps core guide is bundled for stable delivery rules. Coverage badge generation and changelog promotion are now automated in GitHub Actions. PyPI publishing is automated on release tags.
 
 ---
 
-## 10-Step Flow
+## Flow
 
 | Step | Name | What it does |
 |------|------|-------------|
@@ -105,6 +105,11 @@ Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cur
 | 8 | **Commit** | `git add -A && git commit` on worktree branch |
 | 9 | **Create PR** | GitHub (gh CLI) or Azure DevOps REST API |
 | 10 | **PR review + Delivered** | Diff analysis + RunReport with JSON export |
+
+Optional hooks:
+
+- **Step 3.5 — LLM code generation** applies an opt-in unified diff between build and lint.
+- **Step 11 — Deploy trigger** posts an opt-in webhook after PR creation and attempts a ticket status update.
 
 Transport priority: `mcp` -> `api` -> `playwright`.
 
@@ -137,6 +142,9 @@ cp .env.example .env  # fill in credentials
 ```bash
 # Full 10-step flow against a Jira sprint
 sendsprint run jira 42 --workspace workspace.yaml --scope mine -o report.json
+
+# Same flow with opt-in LLM patch generation and deploy callback
+sendsprint run jira 42 --workspace workspace.yaml --scope mine --llm-codegen --deploy
 
 # Full flow against Azure DevOps
 sendsprint run azuredevops "Team\\Sprint 12" --repo ./repo
@@ -206,6 +214,17 @@ pr_reviewers:
   - reviewer@example.com
 required_pr_reviewers:
   - lead@example.com
+code_generation:
+  enabled: false
+  provider: anthropic
+  model: claude-opus-4-7
+  max_usd: 1.0
+  max_tokens: 8000
+deploy:
+  enabled: false
+  provider: webhook
+  url: https://deploy.example.com/hooks/sendsprint
+  final_status: Deployed
 repos:
   - name: backend-api
     path: backend-api
@@ -280,7 +299,7 @@ sendsprint/
 │   └── loader.py      YAML/JSON multi-repo workspace config
 ├── scope.py           --scope mine filtering (account_id, email, name)
 ├── flow/
-│   └── sprint_flow.py 10-step orchestrator
+│   └── sprint_flow.py orchestrator + opt-in codegen/deploy hooks
 ├── llm/               Provider-agnostic LLM client
 └── cli.py             Typer CLI
 ```
@@ -326,7 +345,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-103 tests covering operators, architecture mapper/builder, tech detector, scope filtering, workspace loading, and all agents (lint, security, PR review).
+The suite covers operators, architecture mapper/builder, tech detector, scope filtering, workspace loading, CLI overrides, and all delivery agents including codegen/deploy orchestration.
 
 ---
 
@@ -343,8 +362,8 @@ pytest tests/ -v
 - [x] Step 9 - RunReport with full evidence
 - [x] Multi-repo workspace support (workspace.yaml)
 - [x] `--scope mine` current-user filtering
-- [ ] LLM-powered code generation per sprint item
-- [ ] Deploy trigger + status callback to ticket
+- [x] LLM-powered code generation per sprint item
+- [x] Deploy trigger + status callback to ticket
 - [x] MCP server mode (expose SendSprint as an MCP tool)
 
 ---

@@ -103,6 +103,30 @@ class AzureDevopsOperator(BaseOperator):
             "displayName": auth_user.get("providerDisplayName"),
         }
 
+    def update_status(self, item_key: str, status: str, comment: str | None = None) -> None:
+        """Best-effort Azure DevOps state + history callback for deploy events."""
+        if not self._api_available():
+            raise TransportUnavailable("Azure DevOps credentials missing (ORG/PROJECT/PAT)")
+        token = base64.b64encode(f":{self.pat}".encode()).decode()
+        headers = {
+            "Authorization": f"Basic {token}",
+            "Content-Type": "application/json-patch+json",
+        }
+        operations: list[dict[str, str]] = [
+            {"op": "add", "path": "/fields/System.State", "value": status}
+        ]
+        if comment:
+            operations.append({"op": "add", "path": "/fields/System.History", "value": comment})
+        with httpx.Client(timeout=30.0, headers=headers) as client:
+            response = client.patch(
+                (
+                    f"https://dev.azure.com/{self.organization}/{self.project}"
+                    f"/_apis/wit/workitems/{item_key}?api-version=7.1"
+                ),
+                json=operations,
+            )
+            response.raise_for_status()
+
     def _read_via_mcp(self, **kwargs: Any) -> Sprint:
         iteration_path = kwargs.get("iteration_path")
         if iteration_path is None:

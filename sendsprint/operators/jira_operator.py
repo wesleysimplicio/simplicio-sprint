@@ -101,6 +101,42 @@ class JiraOperator(BaseOperator):
             "displayName": data.get("displayName"),
         }
 
+    def update_status(self, item_key: str, status: str, comment: str | None = None) -> None:
+        """Best-effort Jira transition + comment callback for deploy events."""
+        if not self._api_available():
+            raise TransportUnavailable(
+                "Jira API credentials missing (JIRA_BASE_URL/EMAIL/API_TOKEN)"
+            )
+        with httpx.Client(timeout=30.0, auth=(self.email, self.api_token)) as client:
+            if comment:
+                comment_resp = client.post(
+                    f"{self.base_url}/rest/api/3/issue/{item_key}/comment",
+                    json={"body": comment},
+                )
+                comment_resp.raise_for_status()
+
+            transitions_resp = client.get(
+                f"{self.base_url}/rest/api/3/issue/{item_key}/transitions"
+            )
+            transitions_resp.raise_for_status()
+            transitions = transitions_resp.json().get("transitions", [])
+            target = status.strip().lower()
+            transition_id = None
+            for transition in transitions:
+                name = str(transition.get("name", "")).strip().lower()
+                to_name = str((transition.get("to") or {}).get("name", "")).strip().lower()
+                if target in {name, to_name}:
+                    transition_id = transition.get("id")
+                    break
+            if transition_id is None:
+                raise RuntimeError(f"jira transition '{status}' not available for {item_key}")
+
+            transition_resp = client.post(
+                f"{self.base_url}/rest/api/3/issue/{item_key}/transitions",
+                json={"transition": {"id": transition_id}},
+            )
+            transition_resp.raise_for_status()
+
     def _read_via_mcp(self, **kwargs: Any) -> Sprint:
         sprint_id = kwargs.get("sprint_id")
         if sprint_id is None:

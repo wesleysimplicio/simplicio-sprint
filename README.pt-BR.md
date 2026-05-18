@@ -4,7 +4,7 @@
 
 > 🇧🇷 Versão em português. Read this in English: [README.md](README.md).
 
-SendSprint e uma plataforma de entrega sprint-para-PR para times de engenharia. Ele le itens da sprint no Jira ou Azure DevOps, mapeia a arquitetura alvo, cria branches/worktrees isolados, builda, testa, valida seguranca, captura evidencias, comita, abre pull requests, revisa o diff e reporta o estado da entrega em um fluxo controlado de 10 passos.
+SendSprint e uma plataforma de entrega sprint-para-PR para times de engenharia. Ele le itens da sprint no Jira ou Azure DevOps, mapeia a arquitetura alvo, cria branches/worktrees isolados, builda, testa, valida seguranca, captura evidencias, comita, abre pull requests, revisa o diff e reporta o estado da entrega em um fluxo controlado com geracao de codigo por LLM e callback de deploy opt-in.
 
 A proposta e simples: remover o custo de coordenacao manual entre backlog, codigo, testes, evidencia e PR. O SendSprint cria uma esteira repetivel da sprint ate `develop`, com preflight, dry-run, execucao resumivel, branch por task e saida auditavel.
 
@@ -82,11 +82,11 @@ Veja [`web/README.md`](./web/README.md) pro passo-a-passo e
 
 Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.12.2 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Instalador MCP do Azure DevOps. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de 10 passos. Preflight, dry-run, estado resumível, roteamento com confiança, reviewers obrigatórios e validação pós-PR inclusos. Visuais de produto, vídeos Remotion antes/depois com trilha e efeitos sonoros, e decks bilíngues da implementação estão inclusos. Branches usam `feature/{number}-{title}` e PRs miram `develop` por padrão; ambos podem ser configurados por workspace/repo. Checagens de hierarquia do backlog Azure evitam links pai Issue -> Task inválidos. Guia core de Jira/Azure DevOps incluso para regras estáveis de entrega. Geração do badge de coverage e promoção do changelog agora são automatizadas no GitHub Actions. Publicação PyPI automatizada em tags de release.
+> **Status:** v0.13.0 — UX one-command via chat (`sendsprint sprint`). 13 manifestos de IDE. Cache de credencial em OS-keyring. Instalador MCP do Azure DevOps. Auto-scaffold `.specs/` com sync do `agentic-starter` mais recente. Fluxo completo de entrega com geracao de codigo por LLM e callback de deploy opt-in. Preflight, dry-run, estado resumível, roteamento com confiança, reviewers obrigatórios, validação pós-PR e callback de status no ticket inclusos. Visuais de produto, vídeos Remotion antes/depois com trilha e efeitos sonoros, e decks bilíngues da implementação estão inclusos. Branches usam `feature/{number}-{title}` e PRs miram `develop` por padrão; ambos podem ser configurados por workspace/repo. Checagens de hierarquia do backlog Azure evitam links pai Issue -> Task inválidos. Guia core de Jira/Azure DevOps incluso para regras estáveis de entrega. Geração do badge de coverage e promoção do changelog agora são automatizadas no GitHub Actions. Publicação PyPI automatizada em tags de release.
 
 ---
 
-## Fluxo de 10 passos
+## Fluxo
 
 | Passo | Nome | O que faz |
 |------|------|-------------|
@@ -100,6 +100,11 @@ Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub
 | 8 | **Commit** | `git add -A && git commit` no branch do worktree |
 | 9 | **Criar PR** | GitHub (gh CLI) ou Azure DevOps via REST |
 | 10 | **Review do PR + Entregue** | Análise de diff + RunReport com export JSON |
+
+Hooks opcionais:
+
+- **Passo 3.5 — geracao por LLM** aplica um diff unificado opt-in entre build e lint.
+- **Passo 11 — trigger de deploy** envia um webhook opt-in apos a criacao do PR e tenta atualizar o status do ticket.
 
 Prioridade de transporte: `mcp` -> `api` -> `playwright`.
 
@@ -148,6 +153,9 @@ Code e hosts MCP parecidos podem subir o processo direto.
 ```bash
 # Fluxo completo de 10 passos contra sprint Jira
 sendsprint run jira 42 --workspace workspace.yaml --scope mine -o report.json
+
+# Mesmo fluxo com patch gerado por LLM e callback de deploy opt-in
+sendsprint run jira 42 --workspace workspace.yaml --scope mine --llm-codegen --deploy
 
 # Fluxo completo contra Azure DevOps
 sendsprint run azuredevops "Team\\Sprint 12" --repo ./repo
@@ -217,6 +225,17 @@ pr_reviewers:
   - reviewer@example.com
 required_pr_reviewers:
   - lead@example.com
+code_generation:
+  enabled: false
+  provider: anthropic
+  model: claude-opus-4-7
+  max_usd: 1.0
+  max_tokens: 8000
+deploy:
+  enabled: false
+  provider: webhook
+  url: https://deploy.example.com/hooks/sendsprint
+  final_status: Deployed
 repos:
   - name: backend-api
     path: backend-api
@@ -262,7 +281,7 @@ sendsprint/
 │   └── loader.py      Config YAML/JSON multi-repo
 ├── scope.py           Filtro `--scope mine` (account_id, email, name)
 ├── flow/
-│   └── sprint_flow.py Orquestrador de 10 passos
+│   └── sprint_flow.py Orquestrador + hooks opt-in de codegen/deploy
 ├── llm/               Cliente LLM provider-agnostic
 └── cli.py             CLI Typer
 ```
@@ -308,7 +327,7 @@ pip install -e ".[dev]"
 pytest tests/ -v
 ```
 
-103 testes cobrindo operators, mapper/builder de arquitetura, detector de tech, filtro de scope, loader de workspace e todos os agents (lint, security, PR review).
+A suite cobre operators, mapper/builder de arquitetura, detector de tech, filtro de scope, loader de workspace, overrides da CLI e todos os agents, incluindo a orquestracao de codegen/deploy.
 
 ---
 
@@ -325,8 +344,8 @@ pytest tests/ -v
 - [x] Step 9 - RunReport com evidência completa
 - [x] Suporte a workspace multi-repo (workspace.yaml)
 - [x] Filtro `--scope mine` por usuário corrente
-- [ ] Geração de código por LLM por sprint item
-- [ ] Trigger de deploy + callback de status pra ticket
+- [x] Geração de código por LLM por sprint item
+- [x] Trigger de deploy + callback de status pra ticket
 - [x] Modo MCP server (expor SendSprint como tool MCP)
 
 ---

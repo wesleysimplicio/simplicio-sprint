@@ -34,13 +34,28 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 ### CI
 
 - release: refresh coverage badge and changelog
-- release: refresh coverage badge and changelog
 - release: automate coverage badge and changelog
 
 ### Chore
 
 - add long-running AI agent playbook scaffolding
 - harden validation gates
+
+## [0.13.0] - 2026-05-18
+
+### Added
+
+- `WorkspaceConfig.code_generation` and `WorkspaceConfig.deploy` for opt-in LLM code generation and deploy callbacks.
+- CLI overrides `--llm-codegen`, `--llm-provider`, `--llm-model`, `--llm-max-usd`, `--llm-max-tokens`, `--deploy`, `--deploy-url`, and `--deploy-final-status`.
+- Jira and Azure DevOps `update_status(...)` callbacks for deploy-trigger ticket synchronization.
+- ADR-006 and ADR-007 covering codegen budgeting/provider policy and deploy idempotency semantics.
+- Flow and CLI orchestration tests for codegen/deploy integration.
+
+### Changed
+
+- `SprintFlow` now runs optional code generation after build and optional deploy callbacks after PR creation.
+- `README.md`, `README.pt-BR.md`, `examples/workspace.yaml`, and `.specs/architecture/DESIGN.md` now document the shipped codegen/deploy hooks.
+- Bumped package metadata to `0.13.0` for the Sprint 2 epic closeout.
 
 ## [0.12.2] - 2026-05-18
 

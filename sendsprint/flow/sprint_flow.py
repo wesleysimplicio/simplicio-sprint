@@ -13,12 +13,15 @@ from __future__ import annotations
 import logging
 import re
 import subprocess
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from sendsprint.agents.code_generator import CodegenBudget, CodeGenerator
+from sendsprint.agents.deploy_trigger import DeployConfig, DeployTrigger
 from sendsprint.agents.dev import DevAgent
 from sendsprint.agents.lint_runner import LintRunner
 from sendsprint.agents.pr_body_builder import PrBodyBuilder
@@ -30,10 +33,17 @@ from sendsprint.agents.story_task_planner import delivery_items, item_matches_re
 from sendsprint.agents.test_runner import TestRunner
 from sendsprint.agents.worktree import WorktreeError, WorktreeManager
 from sendsprint.architecture import ArchitectureMapper, build_architecture
+from sendsprint.llm import LlmClient
 from sendsprint.models import ArchitectureReport, Sprint
 from sendsprint.models.reports import RunReport, StepReport
 from sendsprint.models.sprint import SprintItem
-from sendsprint.models.workspace import RepoConfig, ScopeConfig, WorkspaceConfig
+from sendsprint.models.workspace import (
+    CodeGenerationConfig,
+    DeployWorkflowConfig,
+    RepoConfig,
+    ScopeConfig,
+    WorkspaceConfig,
+)
 from sendsprint.operators.base import BaseOperator
 from sendsprint.planning import DeliveryPlan, build_delivery_plan
 from sendsprint.post_validation import validate_pr_step, validate_sprint_links
@@ -105,10 +115,14 @@ class SprintFlow:
         *,
         workspace: WorkspaceConfig | None = None,
         scope: ScopeConfig | None = None,
+        code_generation: CodeGenerationConfig | None = None,
+        deploy: DeployWorkflowConfig | None = None,
     ) -> None:
         self.operator = operator
         self.workspace = workspace
         self.scope = scope or ScopeConfig()
+        self.code_generation = code_generation
+        self.deploy = deploy
         self.mapper = ArchitectureMapper()
 
     def run(
@@ -174,24 +188,27 @@ class SprintFlow:
 
         state_store = None
         state = None
-        if resume or run_id:
-            state_root = self._state_root(repo_path)
-            state_store = RunStateStore(state_root)
+        resolved_run_id = run_id
+        if resolved_run_id is None and (resume or self._deploy_config().enabled):
             identifier = sprint_id if sprint_id is not None else iteration_path
             state_scope = repo_path or (self.workspace.name if self.workspace else "")
-            resolved_run_id = run_id or stable_run_id(
+            resolved_run_id = stable_run_id(
                 self.operator.source,
                 identifier,
                 self.scope.mode,
                 ",".join(self.scope.task_keys or []),
                 state_scope,
             )
+        if resume or run_id:
+            state_root = self._state_root(repo_path)
+            state_store = RunStateStore(state_root)
             state = state_store.load_or_create(
-                resolved_run_id,
+                resolved_run_id or "run",
                 source=self.operator.source,
                 sprint_id=str(sprint.id),
             )
             state_store.save(state)
+            resolved_run_id = state.run_id
 
         if not repos:
             skip = StepReport(step=2, name="no-repos", status="skipped")
@@ -239,6 +256,7 @@ class SprintFlow:
                 work_dir = wt_path or rpath
                 dev = DevAgent(work_dir, fp)
                 self._step3_dev(dev, report, repo_cfg)
+                self._step3_5_codegen(work_dir, item, report)
 
                 # --- Step 4: Lint ---
                 lint_cmd = repo_cfg.lint_command if repo_cfg else None
@@ -311,6 +329,7 @@ class SprintFlow:
                     pr_report,
                     report,
                 )
+                self._step11_deploy(item, pr_report, report, resolved_run_id)
                 if state:
                     if pr_report.status == "ok" and pr_validation.status == "ok":
                         state.mark_completed(dkey)
@@ -400,6 +419,36 @@ class SprintFlow:
         custom_build = repo_cfg.build_command if repo_cfg else None
         build_report = dev.build(custom_command=custom_build)
         report.steps.append(build_report)
+
+    def _step3_5_codegen(
+        self,
+        work_dir: Path,
+        item: SprintItem,
+        report: RunReport,
+    ) -> StepReport | None:
+        config = self._codegen_config()
+        if not config.enabled:
+            return None
+
+        generator = CodeGenerator(
+            work_dir,
+            item_title=item.title,
+            item_description=item.description or "",
+            acceptance=self._acceptance_lines(item),
+            client=LlmClient(provider=config.provider, model=config.model),
+            budget=CodegenBudget(max_usd=config.max_usd, max_tokens=config.max_tokens),
+        )
+        codegen_report = generator.generate()
+        if codegen_report.status == "ok":
+            diff = self._codegen_diff(codegen_report)
+            applied, message = self._apply_generated_diff(work_dir, diff)
+            if applied:
+                codegen_report.message = f"{codegen_report.message}; {message}"
+            else:
+                codegen_report.status = "failed"
+                codegen_report.message = f"{codegen_report.message}; {message}"
+        report.steps.append(codegen_report)
+        return codegen_report
 
     def _step4_lint(self, linter: LintRunner, report: RunReport) -> StepReport:
         result = linter.run()
@@ -574,6 +623,40 @@ class SprintFlow:
         if pr_report and pr_report.pr:
             report.prs.append(pr_report.pr)
 
+    def _step11_deploy(
+        self,
+        item: SprintItem,
+        pr_report: StepReport,
+        report: RunReport,
+        run_id: str | None,
+    ) -> StepReport | None:
+        config = self._deploy_config()
+        if not config.enabled:
+            return None
+        if pr_report.pr is None:
+            skipped = StepReport(step=11, name="deploy-trigger", status="skipped")
+            skipped.message = "deploy skipped because no PR was created"
+            report.steps.append(skipped)
+            return skipped
+        deploy = DeployTrigger(
+            DeployConfig(
+                enabled=config.enabled,
+                provider=config.provider,
+                url=config.url,
+                method=config.method,
+                headers=config.headers,
+                final_status=config.final_status,
+            ),
+            ticket=self._ticket_updater(),
+        )
+        deploy_report = deploy.run(
+            item_key=item.key or item.id,
+            run_id=run_id or f"manual-{item.key or item.id}",
+            pr_url=pr_report.pr.url,
+        )
+        report.steps.append(deploy_report)
+        return deploy_report
+
     def _push_branch(self, work_dir: Path, branch: str) -> None:
         try:
             subprocess.run(
@@ -635,6 +718,75 @@ class SprintFlow:
         except WorktreeError as exc:
             logger.warning("worktree skipped for %s: %s", repo.name, exc)
             return None
+
+    def _codegen_config(self) -> CodeGenerationConfig:
+        if self.code_generation is not None:
+            return self.code_generation
+        if self.workspace is not None:
+            return self.workspace.code_generation
+        return CodeGenerationConfig()
+
+    def _deploy_config(self) -> DeployWorkflowConfig:
+        if self.deploy is not None:
+            return self.deploy
+        if self.workspace is not None:
+            return self.workspace.deploy
+        return DeployWorkflowConfig()
+
+    def _acceptance_lines(self, item: SprintItem) -> list[str]:
+        acceptance = (item.acceptance_criteria or "").strip()
+        if not acceptance:
+            return [item.title]
+        lines = []
+        for raw in acceptance.splitlines():
+            line = raw.strip().lstrip("-*").strip()
+            if line:
+                lines.append(line)
+        return lines or [acceptance]
+
+    def _codegen_diff(self, report: StepReport) -> str:
+        for evidence in report.evidence:
+            if evidence.title == "llm-codegen.diff" and evidence.message:
+                return evidence.message
+        return ""
+
+    def _apply_generated_diff(self, work_dir: Path, diff: str) -> tuple[bool, str]:
+        patch_file: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                suffix=".diff",
+                delete=False,
+            ) as handle:
+                handle.write(diff)
+                patch_file = Path(handle.name)
+            for command in (
+                ["git", "apply", "--whitespace=nowarn", str(patch_file)],
+                ["git", "apply", "--3way", "--whitespace=nowarn", str(patch_file)],
+            ):
+                result = subprocess.run(
+                    command,
+                    cwd=str(work_dir),
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                if result.returncode == 0:
+                    return True, "generated diff applied"
+            error = (result.stderr or result.stdout or "git apply failed").strip()
+            return False, error[:500]
+        except Exception as exc:
+            return False, str(exc)[:500]
+        finally:
+            if patch_file is not None:
+                patch_file.unlink(missing_ok=True)
+
+    def _ticket_updater(self) -> Any | None:
+        updater = getattr(self.operator, "update_status", None)
+        if callable(updater):
+            return self.operator
+        return None
 
     def _build_summary(self, report: RunReport) -> str:
         ok = sum(1 for s in report.steps if s.status == "ok")

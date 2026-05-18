@@ -20,6 +20,8 @@ from sendsprint.models.sprint import (
     SprintItem,
 )
 from sendsprint.models.workspace import (
+    CodeGenerationConfig,
+    DeployWorkflowConfig,
     RepoConfig,
     RepoRole,
     ScopeConfig,
@@ -31,6 +33,8 @@ __all__ = [
     "ArchitectureReport",
     "Attachment",
     "Comment",
+    "CodeGenerationConfig",
+    "DeployWorkflowConfig",
     "ItemType",
     "Link",
     "PrInfo",

@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import subprocess
 from typing import Any
 from unittest.mock import MagicMock
 
 from sendsprint.flow.sprint_flow import SprintFlow
+from sendsprint.models.reports import PrInfo, RunReport, StepReport
 from sendsprint.models.sprint import Sprint, SprintItem
-from sendsprint.models.workspace import RepoConfig, WorkspaceConfig
+from sendsprint.models.workspace import (
+    CodeGenerationConfig,
+    DeployWorkflowConfig,
+    RepoConfig,
+    WorkspaceConfig,
+)
 from sendsprint.operators.base import BaseOperator
 from sendsprint.tech import TechFingerprint
 
@@ -92,3 +99,106 @@ def test_dry_run_builds_plan_without_importing_specs(tmp_path) -> None:
     assert result.run_report is not None
     assert result.run_report.summary == "1 planned delivery item(s), 0 low-confidence route(s)"
     assert not (tmp_path / ".specs").exists()
+
+
+def test_step_3_5_codegen_applies_generated_diff(tmp_path, monkeypatch) -> None:
+    subprocess.run(["git", "init", "-b", "main"], cwd=tmp_path, check=True, capture_output=True)
+    file_path = tmp_path / "foo.py"
+    file_path.write_text("old\n", encoding="utf-8")
+
+    diff = """diff --git a/foo.py b/foo.py
+--- a/foo.py
++++ b/foo.py
+@@ -1 +1 @@
+-old
++new
+"""
+
+    class MockClient:
+        def __init__(self, *args, **kwargs) -> None:
+            del args, kwargs
+
+        def complete(self, prompt: str, system: str | None = None, max_tokens: int = 1024) -> str:
+            del prompt, system, max_tokens
+            return f"```diff\n{diff}```\n"
+
+    monkeypatch.setattr("sendsprint.flow.sprint_flow.LlmClient", MockClient)
+    flow = SprintFlow(
+        operator=FakeOperator(transport="api"),
+        code_generation=CodeGenerationConfig(enabled=True),
+    )
+    report = RunReport(workspace="ws")
+
+    step = flow._step3_5_codegen(tmp_path, _item("PROJ-42", "Patch foo"), report)
+
+    assert step is not None
+    assert step.status == "ok"
+    assert "generated diff applied" in (step.message or "")
+    assert file_path.read_text(encoding="utf-8") == "new\n"
+
+
+def test_step_11_deploy_uses_operator_ticket_updater(monkeypatch, tmp_path) -> None:
+    captured: dict[str, Any] = {}
+
+    class OperatorWithUpdater(FakeOperator):
+        calls: list[tuple[str, str, str | None]]
+
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(**kwargs)
+            self.calls = []
+
+        def update_status(self, item_key: str, status: str, comment: str | None = None) -> None:
+            self.calls.append((item_key, status, comment))
+
+    class FakeDeployTrigger:
+        def __init__(self, config, *, ticket=None, http_client=None, sleep=None, max_attempts=4):
+            del http_client, sleep, max_attempts
+            captured["config"] = config
+            captured["ticket"] = ticket
+
+        def run(
+            self,
+            *,
+            item_key: str,
+            run_id: str,
+            pr_url: str | None = None,
+            deploy_url_override: str | None = None,
+        ) -> StepReport:
+            del deploy_url_override
+            captured["run"] = (item_key, run_id, pr_url)
+            if captured["ticket"] is not None:
+                captured["ticket"].update_status(item_key, "Released", "Deploy comment")
+            return StepReport(step=11, name="deploy-trigger", status="ok", message="deploy ok")
+
+    monkeypatch.setattr("sendsprint.flow.sprint_flow.DeployTrigger", FakeDeployTrigger)
+    operator = OperatorWithUpdater(transport="api")
+    flow = SprintFlow(
+        operator=operator,
+        deploy=DeployWorkflowConfig(
+            enabled=True,
+            url="https://deploy.example.com/hook",
+            final_status="Released",
+        ),
+    )
+    pr_report = StepReport(
+        step=9,
+        name="create-pr",
+        status="ok",
+        pr=PrInfo(
+            provider="github",
+            repo=str(tmp_path),
+            title="PR",
+            source_branch="feature/x",
+            target_branch="main",
+            url="https://github.com/example/pr/1",
+        ),
+    )
+    report = RunReport(workspace="ws")
+
+    step = flow._step11_deploy(_item("PROJ-42", "Deploy"), pr_report, report, "run-42")
+
+    assert step is not None
+    assert step.status == "ok"
+    assert captured["run"] == ("PROJ-42", "run-42", "https://github.com/example/pr/1")
+    assert captured["config"].final_status == "Released"
+    assert operator.calls == [("PROJ-42", "Released", "Deploy comment")]

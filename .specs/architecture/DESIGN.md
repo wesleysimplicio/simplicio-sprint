@@ -14,7 +14,7 @@
                  │
 ┌────────────────▼─────────────────────────────────────────────┐
 │  Flow orchestrator        sendsprint/flow/sprint_flow.py    │
-│  ─ Runs 10 steps sequentially, builds RunReport             │
+│  ─ Runs delivery flow + opt-in hooks, builds RunReport      │
 └──┬──────────┬──────────┬──────────┬──────────┬──────────────┘
    │          │          │          │          │
 ┌──▼──┐   ┌───▼───┐  ┌───▼───┐  ┌───▼───┐  ┌──▼────┐
@@ -38,7 +38,7 @@
 | Layer | Module | Responsibility | Depends on |
 |-------|--------|----------------|------------|
 | 1. CLI | `sendsprint/cli.py` | Typer entry points, arg parsing, exit codes | flow + operators |
-| 2. Flow | `sendsprint/flow/` | 10-step orchestration, fix loop, push, RunReport assembly | all below |
+| 2. Flow | `sendsprint/flow/` | Delivery orchestration, optional codegen/deploy hooks, fix loop, push, RunReport assembly | all below |
 | 3. Operators | `sendsprint/operators/` | Read sprint via Jira/ADO, transport fallback chain | httpx, mcp client, playwright |
 | 4. Architecture | `sendsprint/architecture/` | Detect tech, score baseline, optional rebuild | filesystem |
 | 5. Agents | `sendsprint/agents/` | DevAgent, LintRunner, TestRunner, SecurityReviewer, PrCreator, PrReviewer | subprocess, gh CLI, ADO REST |
@@ -62,6 +62,7 @@ sendsprint run jira 42 --workspace workspace.yaml --scope mine
    │     ArchitectureMapper.map(repo) → score + baseline
    │     with WorktreeManager(repo, branch=f"sprint/{sprint.id}"):
    │         DevAgent.install_and_build()        # step 3
+   │         CodeGenerator.generate()            # step 3.5 (opt-in)
    │         LintRunner.run()                    # step 4
    │         TestRunner.run_unit() + run_e2e()   # step 5
    │         SecurityReviewer.scan()             # step 6
@@ -70,6 +71,7 @@ sendsprint run jira 42 --workspace workspace.yaml --scope mine
    │         git commit + push --force-with-lease # step 8
    │         PrCreator.create()                  # step 9
    │         PrReviewer.review_diff()            # step 10
+   │         DeployTrigger.run()                 # step 11 (opt-in)
    │
    └─ RunReport.to_json() → report.json
 ```
@@ -81,7 +83,7 @@ sendsprint run jira 42 --workspace workspace.yaml --scope mine
 - **Per-repo isolation** via `WorktreeManager` (git worktree). Each repo can run in parallel without branch conflicts.
 - **Within a repo**: steps run sequentially (3 → 4 → 5 → 6 → 7).
 - **Transport fallback**: sequential, never parallel (avoid double-charging API quota).
-- **LLM calls**: serialized per step. No concurrent prompts (cost control).
+- **LLM calls**: serialized per step. No concurrent prompts (cost control + budget caps).
 
 > v0.2.x runs repos sequentially. Multi-repo parallelism is on the v0.3 roadmap (`asyncio.gather` over `WorktreeManager` contexts).
 
@@ -101,6 +103,7 @@ sendsprint run jira 42 --workspace workspace.yaml --scope mine
 | Push rejected | 8 | Abort PR creation, log error |
 | PR creation fails | 9 | Log error, RunReport still emitted |
 | PR review finds issues | 10 | Flag in report, do NOT auto-comment |
+| Deploy webhook fails | 11 | Flag deploy step, keep PR as source of truth |
 
 ---
 
@@ -121,5 +124,7 @@ sendsprint run jira 42 --workspace workspace.yaml --scope mine
 - [ADR-003-mock-fallback.md](ADR-003-mock-fallback.md) — three test tiers
 - [ADR-004-worktree-isolation.md](ADR-004-worktree-isolation.md) — per-repo branches
 - [ADR-005-flag-only-security.md](ADR-005-flag-only-security.md) — never auto-fix security
+- [ADR-006-llm-codegen-budgeting.md](ADR-006-llm-codegen-budgeting.md) — opt-in LLM provider and budget policy
+- [ADR-007-deploy-callback-idempotency.md](ADR-007-deploy-callback-idempotency.md) — deploy webhook + ticket callback semantics
 - [/.specs/product/DOMAIN.md](../product/DOMAIN.md) — entities
 - [/AGENTS.md](../../AGENTS.md) — canonical instructions
