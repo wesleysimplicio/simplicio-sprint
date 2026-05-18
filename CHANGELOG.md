@@ -6,9 +6,37 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- implement sprint-1 through backlog issues (#4-#15)
+- add Azure required PR reviewers
+- add soundtrack to SendSprint videos
+- add productivity visuals and before-after videos
+- add preflight dry-run and resumable delivery
+- add azure devops sprint automation
+
+### Fixed
+
+- ci: unblock CI checks on the PR
+- normalize azure backlog hierarchy
+- remove product branding from generated artifacts
+
+### Docs
+
+- badge: refresh coverage snapshot
+- roadmap: sync delivered sprint state
+- align SendSprint product proposal
+- add implementation presentation decks
+- add jira azure devops core guide
+
 ### CI
 
-- release: refresh coverage badge and changelog
+- release: automate coverage badge and changelog
+
+### Chore
+
+- add long-running AI agent playbook scaffolding
+- harden validation gates
 
 ## [0.12.2] - 2026-05-18
 
