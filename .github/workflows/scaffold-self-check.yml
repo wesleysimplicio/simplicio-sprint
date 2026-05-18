@@ -21,6 +21,7 @@ jobs:
   structure:
     name: Required scaffold files
     runs-on: ubuntu-latest
+    if: github.repository == 'wesleysimplicio/agentic-starter'
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -78,6 +79,7 @@ jobs:
   cli-smoke:
     name: CLI smoke (node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    if: github.repository == 'wesleysimplicio/agentic-starter'
     timeout-minutes: 5
     strategy:
       fail-fast: false
@@ -113,6 +115,7 @@ jobs:
   npm-pack:
     name: npm pack dry-run
     runs-on: ubuntu-latest
+    if: github.repository == 'wesleysimplicio/agentic-starter'
     timeout-minutes: 5
     steps:
       - name: Checkout
@@ -132,6 +135,7 @@ jobs:
   shellcheck:
     name: shellcheck bootstrap.sh
     runs-on: ubuntu-latest
+    if: github.repository == 'wesleysimplicio/agentic-starter'
     timeout-minutes: 5
     steps:
       - name: Checkout

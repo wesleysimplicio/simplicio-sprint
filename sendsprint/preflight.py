@@ -87,12 +87,12 @@ def run_preflight(
         return report
 
     try:
-        kwargs = (
+        kwargs: dict[str, object] = (
             {"sprint_id": int(identifier)}
             if operator.source == "jira"
             else {"iteration_path": str(identifier)}
         )
-        sprint = operator.read_sprint(**kwargs)
+        sprint = operator.read_sprint(**kwargs)  # type: ignore[arg-type]
         sprint = apply_scope(sprint, scope or ScopeConfig())
         sprint, planning = plan_story_tasks(sprint, workspace)
         report.sprint = sprint

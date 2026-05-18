@@ -66,8 +66,10 @@ class McpServer:
         if method == "tools/list":
             return self._success(rpc_id, {"tools": [t.to_listing() for t in self.tools.values()]})
         if method == "tools/call":
-            name = params.get("name")
+            name = params.get("name") or ""
             arguments = params.get("arguments") or {}
+            if not name:
+                return self._error(rpc_id, -32602, "missing tool name")
             tool = self.tools.get(name)
             if tool is None:
                 return self._error(rpc_id, -32601, f"unknown tool: {name}")
@@ -161,7 +163,7 @@ def _check_architecture_tool() -> McpTool:
         # Import lazily so the MCP module can be imported without the full graph.
         from ..architecture.mapper import ArchitectureMapper
 
-        result = ArchitectureMapper().map(Path(repo))
+        result = ArchitectureMapper().inspect(Path(repo))
         return result.model_dump() if hasattr(result, "model_dump") else dict(result)
 
     return McpTool(
