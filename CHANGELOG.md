@@ -8,15 +8,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Sprint Autopilot foundation with `sendsprint doctor`, validation template catalog, autonomy policy, Ralph Wiggum / Codex Goal loop contracts, evidence bundle generation, GitHub Issues tracker helpers, transcript task extraction, executive reports, and multi-agent control-plane primitives.
-- Dry-run delivery plans now include deterministic worktree paths, matched validation templates, validation commands, LLM/deploy settings, and side-effect policy metadata.
-- Local API run dashboard snapshot endpoint backed by run status and evidence files.
-- Operational project map docs covering architecture, setup, domain, feature map, evidence policy, troubleshooting, scripts, dependencies, deploy topology, and a Sprint Autopilot demo.
-
-### Changed
-
-- Task worktree paths are now sanitized deterministically for branch names with slashes, and run reports record worktree isolation metadata as evidence.
-- Bumped package metadata to `0.14.0` for the Sprint Autopilot foundation.
+- add sprint autopilot foundation
 
 ### Fixed
 
@@ -32,7 +24,7 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### CI
 
-- publish: restore PyPI Trusted Publishing workflow permissions and remove token-based publish input
+- release: refresh coverage badge and changelog
 - release: refresh coverage badge and changelog
 - release: refresh coverage badge and changelog
 - release: refresh coverage badge and changelog
