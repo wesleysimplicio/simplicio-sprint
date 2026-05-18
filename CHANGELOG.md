@@ -4,8 +4,7 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
-
+## [0.14.0] - 2026-05-18
 ### Added
 
 - add sprint autopilot foundation
