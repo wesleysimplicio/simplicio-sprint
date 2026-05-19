@@ -9,15 +9,17 @@
 > 🇺🇸 English. Leia em português: [README.pt-BR.md](README.pt-BR.md).
 
 
-SendSprint is a sprint-to-pull-request delivery platform for engineering teams. It reads Jira or Azure DevOps sprint work, maps the target architecture, creates isolated branches/worktrees, builds, tests, checks security, captures evidence, commits, opens pull requests, reviews the diff, and reports delivery state in one controlled flow with opt-in LLM code generation and deploy callbacks.
+SendSprint is a **personal autonomous sprint-to-pull-request delivery utility** — a public open-source package you install into your own machine and authorize against the repos you already work on. It reads Jira or Azure DevOps sprint work, maps the target architecture, creates isolated branches/worktrees, builds, tests, checks security, captures evidence, commits, opens pull requests, reviews the diff, and reports delivery state in one controlled flow with opt-in LLM code generation and deploy callbacks.
 
-The proposal is simple: remove the manual coordination tax between backlog, code, tests, evidence, and PRs. SendSprint gives teams a repeatable execution lane from sprint planning to `develop`, with preflight validation, dry-run planning, resumable runs, branch-per-task delivery, and auditable output.
+**There is no hosted service, no SaaS tenant, no billing, no subscription.** Everything runs locally under your control: credentials live in your OS keyring, work happens in worktrees on your disk, and any action against a company project is gated by the operator who launched the run. The repo stays public on GitHub so others can install it the same way — but the workflow is yours, not someone else's product.
+
+The proposal is simple: remove the manual coordination tax between backlog, code, tests, evidence, and PRs. SendSprint gives a single engineer a repeatable execution lane from sprint planning to `develop`, with preflight validation, dry-run planning, resumable runs, branch-per-task delivery, and auditable output.
 
 ## Productivity Visuals
 
-### Team without vs. with SendSprint
+### Without vs. with SendSprint
 
-![Team without vs. with SendSprint](./docs/assets/sendsprint-productivity-before-after.png)
+![Without vs. with SendSprint](./docs/assets/sendsprint-productivity-before-after.png)
 
 ### SendSprint as the delivery engine
 
@@ -367,6 +369,25 @@ The suite covers operators, architecture mapper/builder, tech detector, scope fi
 - [x] MCP server mode (expose SendSprint as an MCP tool)
 
 ---
+
+## Personal use and operator authorization
+
+SendSprint is a personal utility. Practical implications:
+
+- **No hosted service exists.** There is no SaaS dashboard, no managed tenant, no
+  billing portal. Everything runs from your terminal against `localhost`.
+- **You are the operator.** Every Jira/ADO read, every git operation, every PR
+  is initiated by a human launching `sendsprint sprint` (or starting the local
+  API). The tool never acts on its own schedule.
+- **Company repos are run under your authority.** When you point SendSprint at a
+  company repo, you are using your existing access — same credentials and same
+  branches you'd use by hand. No new permission boundary is introduced.
+- **Public utility.** This repo is MIT-licensed on GitHub. Other engineers can
+  install it the same way (`pip install -e .`) and run it on their own machines
+  against their own work. There is no commercial offering planned.
+
+If you ever want a hosted/multi-tenant version, fork the repo and build it
+yourself — the architecture is intentionally local-first.
 
 ## License
 
