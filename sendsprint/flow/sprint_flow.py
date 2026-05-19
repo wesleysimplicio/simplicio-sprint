@@ -434,8 +434,7 @@ class SprintFlow:
             )
         else:
             step.message = (
-                f"already mapped, score {arch.score:.2f}, "
-                f"substrate {arch.mapping_substrate}"
+                f"already mapped, score {arch.score:.2f}, substrate {arch.mapping_substrate}"
             )
         step.status = "ok" if arch.is_mapped else "failed"
         step.finished_at = datetime.now(tz=UTC)

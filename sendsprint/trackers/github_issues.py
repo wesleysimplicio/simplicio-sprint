@@ -26,6 +26,7 @@ class GitHubIssue(BaseModel):
     assignees: list[str] = Field(default_factory=list)
     milestone: str | None = None
     url: str | None = None
+    body: str | None = None
     linked_prs: list[str] = Field(default_factory=list)
 
 
@@ -59,7 +60,7 @@ class GitHubIssuesTracker:
                 "--limit",
                 str(limit),
                 "--json",
-                "number,title,state,labels,assignees,milestone,url,closedByPullRequestsReferences",
+                "number,title,state,labels,assignees,milestone,url,body,closedByPullRequestsReferences",
             ]
         )
         return [_issue_from_gh(item) for item in data]
@@ -129,5 +130,6 @@ def _issue_from_gh(data: dict) -> GitHubIssue:
         assignees=assignees,
         milestone=milestone.get("title") if isinstance(milestone, dict) else None,
         url=data.get("url"),
+        body=data.get("body"),
         linked_prs=linked,
     )

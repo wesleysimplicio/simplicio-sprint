@@ -128,8 +128,7 @@ class TestStdioTransport:
     def test_read_message_parses_content_length_frame(self) -> None:
         body = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}'
         frame = (
-            f"Content-Length: {len(body)}\r\nContent-Type: application/json\r\n\r\n".encode()
-            + body
+            f"Content-Length: {len(body)}\r\nContent-Type: application/json\r\n\r\n".encode() + body
         )
         payload = _read_message(io.BytesIO(frame))
         assert payload is not None
@@ -138,12 +137,8 @@ class TestStdioTransport:
     def test_serve_stdio_writes_framed_response(self) -> None:
         request_body = b'{"jsonrpc":"2.0","id":1,"method":"initialize"}'
         request = (
-            (
-                f"Content-Length: {len(request_body)}\r\n"
-                "Content-Type: application/json\r\n\r\n"
-            ).encode()
-            + request_body
-        )
+            f"Content-Length: {len(request_body)}\r\nContent-Type: application/json\r\n\r\n"
+        ).encode() + request_body
         output = io.BytesIO()
         rc = serve_stdio(instream=io.BytesIO(request), outstream=output)
         assert rc == 0
@@ -156,12 +151,8 @@ class TestStdioTransport:
     def test_serve_stdio_skips_notification_response(self) -> None:
         request_body = b'{"jsonrpc":"2.0","method":"notifications/initialized"}'
         request = (
-            (
-                f"Content-Length: {len(request_body)}\r\n"
-                "Content-Type: application/json\r\n\r\n"
-            ).encode()
-            + request_body
-        )
+            f"Content-Length: {len(request_body)}\r\nContent-Type: application/json\r\n\r\n"
+        ).encode() + request_body
         output = io.BytesIO()
         rc = serve_stdio(instream=io.BytesIO(request), outstream=output)
         assert rc == 0

@@ -170,9 +170,7 @@ def _extract_acceptance(line: str) -> list[str]:
     if not match:
         return []
     return [
-        part.strip(" .")
-        for part in re.split(r"\s*\|\s*|\s*;\s*", match.group(2))
-        if part.strip()
+        part.strip(" .") for part in re.split(r"\s*\|\s*|\s*;\s*", match.group(2)) if part.strip()
     ]
 
 
@@ -182,9 +180,7 @@ def _extract_list(line: str, labels: tuple[str, ...]) -> list[str]:
     if not match:
         return []
     return [
-        part.strip(" .")
-        for part in re.split(r"\s*,\s*|\s*;\s*", match.group(2))
-        if part.strip()
+        part.strip(" .") for part in re.split(r"\s*,\s*|\s*;\s*", match.group(2)) if part.strip()
     ]
 
 

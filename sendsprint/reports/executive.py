@@ -23,8 +23,7 @@ def render_executive_report(
         or "- No PRs created"
     )
     blockers = (
-        "\n".join(f"- {step.name}: {step.message or 'failed'}" for step in failed_steps)
-        or "- None"
+        "\n".join(f"- {step.name}: {step.message or 'failed'}" for step in failed_steps) or "- None"
     )
     evidence_line = (
         f"- Evidence bundle: `{evidence.root}`" if evidence else "- Evidence bundle: not generated"

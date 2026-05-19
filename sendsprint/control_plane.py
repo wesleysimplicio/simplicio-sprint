@@ -54,8 +54,7 @@ class ControlPlaneState(BaseModel):
                 )
             if current.worktree_path == assignment.worktree_path:
                 raise ValueError(
-                    f"worktree already assigned to {current.worker_id}: "
-                    f"{current.worktree_path}"
+                    f"worktree already assigned to {current.worker_id}: {current.worktree_path}"
                 )
         return self.model_copy(update={"assignments": [*self.assignments, assignment]})
 

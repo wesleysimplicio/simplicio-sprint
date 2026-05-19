@@ -90,8 +90,7 @@ class AutonomyPolicy(BaseModel):
         if not self.allows(action):
             required = ACTION_REQUIREMENTS[action]
             raise AutonomyDenied(
-                f"autonomy level '{self.level}' does not allow '{action}' "
-                f"(requires '{required}')"
+                f"autonomy level '{self.level}' does not allow '{action}' (requires '{required}')"
             )
 
     def side_effects(self) -> dict[str, bool]:
