@@ -197,6 +197,9 @@ def build_default_server() -> McpServer:
     server = McpServer()
     server.register(_detect_tech_tool())
     server.register(_check_architecture_tool())
+    server.register(_snapshot_tool())
+    server.register(_dispatch_tool())
+    server.register(_inspect_tool())
     server.register(_list_runs_tool())
     server.register(_run_status_tool())
     server.register(_version_tool())
@@ -279,6 +282,71 @@ def _list_runs_tool() -> McpTool:
         name="sendsprint_list_runs",
         description="List locally known SendSprint runs and their current state.",
         input_schema={"type": "object", "properties": {}},
+        handler=handler,
+    )
+
+
+def _snapshot_tool() -> McpTool:
+    def handler(args: dict[str, Any]) -> dict[str, Any]:
+        from ..yool.runtime import snapshot
+
+        limit = int(args.get("limit", 5))
+        return snapshot(limit=limit)
+
+    return McpTool(
+        name="sendsprint_snapshot",
+        description="Return the spec-shaped yool catalog plus recent tuple run summaries.",
+        input_schema={
+            "type": "object",
+            "properties": {"limit": {"type": "integer", "minimum": 1}},
+        },
+        handler=handler,
+    )
+
+
+def _dispatch_tool() -> McpTool:
+    def handler(args: dict[str, Any]) -> dict[str, Any]:
+        yool_id = args.get("yool_id")
+        if not yool_id:
+            raise ValueError("missing required arg: yool_id")
+        from ..yool.runtime import dispatch_yool
+
+        payload = args.get("payload")
+        return dispatch_yool(str(yool_id), payload, run_id=args.get("run_id"))
+
+    return McpTool(
+        name="sendsprint_dispatch",
+        description="Emit one yool tuple into the append-only log and return its run metadata.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "yool_id": {"type": "string"},
+                "payload": {},
+                "run_id": {"type": "string"},
+            },
+            "required": ["yool_id", "payload"],
+        },
+        handler=handler,
+    )
+
+
+def _inspect_tool() -> McpTool:
+    def handler(args: dict[str, Any]) -> dict[str, Any]:
+        run_id = args.get("run_id")
+        if not run_id:
+            raise ValueError("missing required arg: run_id")
+        from ..yool.runtime import inspect_run
+
+        return inspect_run(str(run_id))
+
+    return McpTool(
+        name="sendsprint_inspect",
+        description="Return the tuple DAG, receipt summaries, and cost rollup for one run.",
+        input_schema={
+            "type": "object",
+            "properties": {"run_id": {"type": "string"}},
+            "required": ["run_id"],
+        },
         handler=handler,
     )
 

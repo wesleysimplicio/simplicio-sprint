@@ -159,9 +159,14 @@ class ReceiptStore:
     def _ensure_index(self) -> None:
         if self._index_loaded:
             return
+        winners: dict[tuple[str, str], Receipt] = {}
         for r in self.all():
             if r.status == "ok":
-                self._index.setdefault((r.yool_id, r.input_id), r.id)
+                key = (r.yool_id, r.input_id)
+                cur = winners.get(key)
+                if cur is None or _receipt_sort_key(cur) < _receipt_sort_key(r):
+                    winners[key] = r
+        self._index = {key: receipt.id for key, receipt in winners.items()}
         self._index_loaded = True
 
     def invalidate_index(self) -> None:
@@ -227,3 +232,7 @@ def write_err_receipt(
     )
     store.put(receipt)
     return receipt
+
+
+def _receipt_sort_key(receipt: Receipt) -> tuple[str, str, str]:
+    return (receipt.ended_at, receipt.started_at, receipt.id)

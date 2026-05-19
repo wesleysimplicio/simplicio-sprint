@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 from sendsprint.mcp import McpServer, McpTool, build_default_server
 from sendsprint.mcp.server import _read_message, serve_stdio
+from sendsprint.yool.catalog_v2 import yool_hash, yool_slots
 
 
 def _request(method: str, *, rpc_id: int = 1, params: dict | None = None) -> dict:
@@ -16,6 +17,38 @@ def _request(method: str, *, rpc_id: int = 1, params: dict | None = None) -> dic
     if params is not None:
         req["params"] = params
     return req
+
+
+def _write_catalog(tmp_path: Path, yool_id: str = "agent.codex.plan") -> None:
+    h = yool_hash(yool_id)
+    target = tmp_path / ".catalog" / "agents.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(
+            {
+                "meta": {"count": 1},
+                "flat": {
+                    yool_id: {
+                        "hash": f"{h:030b}",
+                        "hash_hex": f"{h:08x}",
+                        "slots": yool_slots(h),
+                        "tuple": {
+                            "authority": "codex",
+                            "lane": "dev",
+                            "description": "Plan work",
+                            "guardrails": {
+                                "cpu_quota_pct": 60,
+                                "disk_quota_mb": 100,
+                                "timeout_s": 300,
+                            },
+                        },
+                    }
+                },
+                "trie": {},
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 class TestHandshake:
@@ -122,6 +155,46 @@ class TestToolsCall:
         payload = json.loads(resp["result"]["content"][0]["text"])
         assert payload["run_id"] == status.run_id
         assert payload["sprint_id"] == "123"
+
+    def test_snapshot_dispatch_and_inspect_tools(self, monkeypatch, tmp_path: Path) -> None:
+        monkeypatch.chdir(tmp_path)
+        _write_catalog(tmp_path)
+        server = build_default_server()
+
+        dispatch = server.handle(
+            _request(
+                "tools/call",
+                params={
+                    "name": "sendsprint_dispatch",
+                    "arguments": {"yool_id": "agent.codex.plan", "payload": {"story": "APP-2"}},
+                },
+            )
+        )
+        assert dispatch is not None
+        dispatch_payload = json.loads(dispatch["result"]["content"][0]["text"])
+        run_id = dispatch_payload["run_id"]
+
+        inspect = server.handle(
+            _request(
+                "tools/call",
+                params={"name": "sendsprint_inspect", "arguments": {"run_id": run_id}},
+            )
+        )
+        assert inspect is not None
+        inspect_payload = json.loads(inspect["result"]["content"][0]["text"])
+        assert inspect_payload["run_id"] == run_id
+        assert inspect_payload["tuples"][0]["yool_id"] == "agent.codex.plan"
+
+        snapshot = server.handle(
+            _request(
+                "tools/call",
+                params={"name": "sendsprint_snapshot", "arguments": {"limit": 1}},
+            )
+        )
+        assert snapshot is not None
+        snapshot_payload = json.loads(snapshot["result"]["content"][0]["text"])
+        assert "catalog" in snapshot_payload
+        assert snapshot_payload["recent_runs"][0]["run_id"] == run_id
 
 
 class TestUnknownMethod:

@@ -9,7 +9,6 @@ from typing import Any
 
 from .tuples import Tuple
 
-
 SENTINEL: Any = object()
 
 
@@ -56,8 +55,12 @@ class TupleBus:
                 queue.task_done()
 
     async def drain(self) -> None:
-        for queue in self._lanes.values():
-            await queue.join()
+        while True:
+            queues = list(self._lanes.values())
+            for queue in queues:
+                await queue.join()
+            if len(queues) == len(self._lanes):
+                break
         await self.close()
 
     async def close(self) -> None:
@@ -65,8 +68,11 @@ class TupleBus:
             return
         self._closed = True
         for queue in self._lanes.values():
-            with contextlib.suppress(asyncio.QueueFull):
-                queue.put_nowait(SENTINEL)
+            while True:
+                with contextlib.suppress(asyncio.QueueFull):
+                    queue.put_nowait(SENTINEL)
+                    break
+                await asyncio.sleep(0)
 
     def stats(self) -> dict[str, int]:
         return {lane: q.qsize() for lane, q in self._lanes.items()}

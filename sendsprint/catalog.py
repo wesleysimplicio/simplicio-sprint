@@ -60,7 +60,7 @@ class CatalogNode(BaseModel):
 
     kind: NodeKind
     entries: list[CatalogEntry] = Field(default_factory=list)
-    children: dict[int, "CatalogNode"] = Field(default_factory=dict)
+    children: dict[int, CatalogNode] = Field(default_factory=dict)
 
 
 CatalogNode.model_rebuild()

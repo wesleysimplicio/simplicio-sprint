@@ -1,90 +1,59 @@
-# Goal Result
+﻿# Goal Result
 
-## Summary
+## Objective
 
-Finished the open SendSprint tracker slice by landing a broad backend/autonomy foundation pass: planning issue publishing, issue quality scoring, test intent generation, failure learning, operational memory, flaky tracking, trust scoring, scheduler/locks/risk/validation policy, delivery authorization, mission handoff, CI repair planning, review packs, OSS mode detection, release recommendations, dependency autopilot detection, historical reporting, review pipeline primitives, and watchdog retry logic.
+After pulling the latest `main`, finish the open SendSprint yool/tuple/HAMT issues using 5 real agents in parallel, validate the repo, and publish the result.
 
-## Changed Files
+## Outcome
 
-- `package.json`
-- `sendsprint/trackers/github_issues.py`
-- `sendsprint/issue_quality.py`
-- `sendsprint/planning_publish.py`
-- `sendsprint/failure_learning.py`
-- `sendsprint/operational_memory.py`
-- `sendsprint/locks.py`
-- `sendsprint/risk_policy.py`
-- `sendsprint/validation_planner.py`
-- `sendsprint/scheduler.py`
-- `sendsprint/delivery_authorization.py`
-- `sendsprint/mission.py`
-- `sendsprint/ci_repair.py`
-- `sendsprint/review_pack.py`
-- `sendsprint/oss_mode.py`
-- `sendsprint/release_manager.py`
-- `sendsprint/dependency_autopilot.py`
-- `sendsprint/historical_reporting.py`
-- `sendsprint/review_pipeline.py`
-- `sendsprint/watchdog.py`
-- `tests/test_issue_quality.py`
-- `tests/test_planning_publish.py`
-- `tests/test_failure_learning.py`
-- `tests/test_operational_memory.py`
-- `tests/test_locks.py`
-- `tests/test_risk_policy.py`
-- `tests/test_validation_planner.py`
-- `tests/test_scheduler.py`
-- `tests/test_delivery_authorization.py`
-- `tests/test_mission.py`
-- `tests/test_ci_repair.py`
-- `tests/test_review_pack.py`
-- `tests/test_oss_mode.py`
-- `tests/test_release_manager.py`
-- `tests/test_dependency_autopilot.py`
-- `tests/test_historical_reporting.py`
-- `tests/test_review_pipeline.py`
-- `tests/test_watchdog.py`
+Partially completed in this round.
 
-## Validation Commands
+### Closed issues
 
-```bash
-python -m pytest tests -q
-python -m ruff check sendsprint tests
-npm run lint
-npm run test:e2e
-```
+- `#77` Agent catalog as HAMT
+- `#78` CLI `sprint catalog` list/find/show
+- `#79` Receipt store content-addressable execution log
+- `#80` Cache lookup in dispatcher
+- `#81` Tuple log + parent chain surface
+- `#82` CLI `sprint resume <run_id>` replay from tuple log
+- `#83` Tuple bus lane/runtime hardening
+- `#85` MCP `snapshot` + `dispatch` + `inspect`
+- `#86` CLI `sprint dispatch` parity with MCP
+- `#87` `agent_terms` budget enforcement surface + rollup
 
-## Validation Results
+### Remaining open issues
 
-- build: pass (`npm run lint` / web typecheck)
-- tests: pass
-- lint: pass
-- e2e: pass with skips (6 skipped because `BASE_URL` was not set for live dashboard smoke)
+- `#84` Agent workers as lane subscribers in the real legacy delivery path
+- `#88` Remove/replace the legacy linear `SprintFlow.run()` orchestration
+- `#76` Epic tracking the full yool/tuple/HAMT refactor
+
+### Main code landed in this round
+
+- New shared tuple runtime helpers in `sendsprint/yool/runtime.py`
+- `sendsprint sprint catalog|dispatch|inspect|resume|snapshot`
+- MCP `sendsprint_snapshot`, `sendsprint_dispatch`, `sendsprint_inspect`
+- Stronger `TupleBus` drain/close semantics
+- Stronger `ReceiptStore` index rebuild semantics
+- New runtime, CLI, MCP, and catalog drift/collision tests
+- Committed `.catalog/agents.json`
+- Docs updates in `README.md` and `ARCHITECTURE.md`
+
+## Validation
+
+- `python scripts/build_agent_catalog.py` ✅
+- `python scripts/build_agent_catalog.py --check` ✅
+- `python -m pytest tests -q` ✅ `377 passed, 1 skipped`
+- `python -m ruff check sendsprint tests` ✅
+- `npm run lint` ✅
+- `npm run test:e2e` ✅ `6 skipped`
 
 ## Remaining Risks
 
-- The new orchestration modules are foundation primitives; higher-level flow wiring can deepen later without blocking the current tracker closure.
-- Playwright executed successfully, but the smoke suite skipped without a live `BASE_URL`, so browser evidence is limited to the configured skip path.
+- The repo now has the yool runtime surfaces and validated infrastructure, but the old `SprintFlow` path still coexists and remains the last major refactor before the epic is honestly done.
+- Issue `#84` needs a deeper runtime migration than the generic worker primitives already present.
 
-## Suggested PR Title
+## Final State
 
-`feat: finish SendSprint autonomy and tracker foundations`
-
-## Suggested PR Body
-
-```md
-## Summary
-- add planning, quality, learning, scheduler, risk, authorization, mission, CI, review, OSS, release, dependency, and reporting primitives
-- extend the GitHub issue boundary for planning-dedupe body markers
-- add broad unit coverage across the new autonomy foundations
-- make the root lint command work cleanly on Windows
-
-## Validation
-- [x] tests
-- [x] build
-- [x] lint
-- [x] playwright command
-
-## Risks
-- deeper runtime integration of the new primitives into every flow can continue incrementally
-```
+- Open issues after this round: `3` (`#76`, `#84`, `#88`)
+- Open PRs: `0`
+- Not ready to mark the full user objective complete yet.

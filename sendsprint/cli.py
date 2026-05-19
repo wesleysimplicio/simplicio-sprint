@@ -40,13 +40,13 @@ from sendsprint.reports import render_executive_report
 from sendsprint.scaffolder import Scaffolder
 from sendsprint.scope import build_scope
 from sendsprint.templates import catalog
-from sendsprint import catalog as agent_catalog
 from sendsprint.tech import detect_tech
 from sendsprint.trackers import GitHubIssuesTracker
 from sendsprint.watch import WatchCycleResult, Watcher
 from sendsprint.watch_config import parse_interval_minutes
 from sendsprint.workspace import load_workspace
 from sendsprint.credentials import Provider as CredentialProvider
+from sendsprint.yool.runtime import dispatch_yool, inspect_run, parse_payload, resume_run, snapshot
 
 app = typer.Typer(
     add_completion=False,
@@ -54,6 +54,14 @@ app = typer.Typer(
 )
 console = Console()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+
+sprint_app = typer.Typer(
+    invoke_without_command=True,
+    add_completion=False,
+    help="One-shot sprint flow plus yool/tuple runtime subcommands.",
+)
+app.add_typer(sprint_app, name="sprint")
 
 
 @app.command()
@@ -770,8 +778,8 @@ def logout(
     console.print(f"[green]forgot {provider} credentials for {account}[/green]")
 
 
-@app.command()
-def sprint(
+@sprint_app.callback(invoke_without_command=True)
+def sprint(ctx: typer.Context, 
     provider: str | None = typer.Option(
         None, "--provider", help="jira | azuredevops (defaults to profile)"
     ),
@@ -818,6 +826,8 @@ def sprint(
 
     Equivalent to: ``run <provider> <id> --scope mine``. Prompts for missing pieces once.
     """
+    if ctx.invoked_subcommand is not None:
+        return
     p = profile_mod.load()
     provider = provider or p.default_provider
     if not provider:
@@ -943,6 +953,47 @@ def sprint(
         )
         output.write_text(data)
         console.print(f"[green]wrote report to {output}[/green]")
+
+
+@sprint_app.command("dispatch")
+def sprint_dispatch_cmd(
+    yool_id: str = typer.Argument(..., help="Catalog yool id, e.g. agent.codex.plan"),
+    payload: str = typer.Option(..., "--payload", help="JSON payload for the tuple"),
+    run_id: str | None = typer.Option(None, "--run-id", help="Optional existing run id"),
+) -> None:
+    """Emit one tuple into the append-only log using the shared CLI/MCP dispatch path."""
+    result = dispatch_yool(yool_id, parse_payload(payload), run_id=run_id)
+    console.print_json(data=result)
+
+
+@sprint_app.command("snapshot")
+def sprint_snapshot_cmd(
+    limit: int = typer.Option(5, "--limit", min=1, help="How many recent runs to include."),
+) -> None:
+    """Show the yool catalog and recent tuple-run summaries."""
+    console.print_json(data=snapshot(limit=limit))
+
+
+@sprint_app.command("inspect")
+def sprint_inspect_cmd(
+    run_id: str = typer.Argument(..., help="Tuple run id"),
+    cost: bool = typer.Option(False, "--cost", help="Print aggregated cost rollup"),
+) -> None:
+    """Inspect one tuple run: DAG/tree, receipts, and optional cost rollup."""
+    data = inspect_run(run_id)
+    if data["tree"]:
+        console.print(data["tree"])
+    console.print_json(data={"run_id": data["run_id"], "tuples": data["tuples"]})
+    if cost:
+        console.print_json(data=data["cost"])
+
+
+@sprint_app.command("resume")
+def sprint_resume_cmd(
+    run_id: str = typer.Argument(..., help="Tuple run id to replay pending tuples from"),
+) -> None:
+    """Replay pending tuples from the append-only tuple log."""
+    console.print_json(data=resume_run(run_id))
 
 
 def _render_sprint(sprint: Sprint) -> None:
@@ -1171,100 +1222,141 @@ catalog_app = typer.Typer(
     help="Manage the HAMT-backed agent capability catalog (yool/tuple/HAMT).",
 )
 app.add_typer(catalog_app, name="catalog")
+sprint_app.add_typer(catalog_app, name="catalog")
+
+_DEFAULT_AGENT_CATALOG = Path(".catalog/agents.json")
+_CATALOG_SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "build_agent_catalog.py"
+
+
+def _build_catalog_file(output: Path, *, check: bool = False) -> None:
+    cmd = [sys.executable, str(_CATALOG_SCRIPT), "--output", str(output)]
+    if check:
+        cmd.append("--check")
+    result = __import__("subprocess").run(cmd, check=False, capture_output=True, text=True)
+    if result.returncode != 0:
+        message = (result.stderr or result.stdout).strip() or "catalog build failed"
+        raise typer.BadParameter(message)
+    if result.stdout.strip():
+        console.print(result.stdout.strip())
+
+
+def _load_spec_catalog(path: Path) -> dict[str, Any]:
+    from sendsprint.yool.catalog_v2 import load_catalog
+
+    if not path.exists():
+        _build_catalog_file(path)
+    return load_catalog(path)
+
+
+def _render_spec_entries(entries: list[Any]) -> None:
+    from sendsprint.yool.catalog_v2 import to_table_rows
+
+    table = Table(title="Agent yools", show_lines=False)
+    for column in ("yool_id", "authority", "lane", "cpu%", "disk_mb", "timeout_s", "description"):
+        table.add_column(column, style="cyan" if column == "yool_id" else "")
+    for row in to_table_rows(entries):
+        table.add_row(
+            row["yool_id"],
+            row["authority"],
+            row["lane"],
+            row["cpu%"],
+            row["disk_mb"],
+            row["timeout_s"],
+            row["description"],
+        )
+    console.print(table)
 
 
 @catalog_app.command("build")
 def catalog_build(
     output: Path = typer.Option(
-        agent_catalog.DEFAULT_CATALOG_PATH,
+        _DEFAULT_AGENT_CATALOG,
         "--output",
         "-o",
-        help="Destination JSON path (default .catalog/hamt.json).",
+        help="Destination JSON path (default .catalog/agents.json).",
     ),
+    check: bool = typer.Option(False, "--check", help="Fail if the committed catalog drifted."),
 ) -> None:
-    """Build the agent catalog from the default registry and persist it."""
-    cat = agent_catalog.build_agent_catalog()
-    target = agent_catalog.save_catalog(cat, output)
-    entries = agent_catalog.list_entries(cat)
-    console.print(f"[green]wrote {len(entries)} yools[/green] -> {target}")
-
-
-def _load_or_build(path: Path) -> agent_catalog.CatalogNode:
-    if path.exists():
-        return agent_catalog.load_catalog(path)
-    return agent_catalog.build_agent_catalog()
-
-
-def _render_entries(rows: list[agent_catalog.CatalogEntry]) -> None:
-    table = Table(title="Agent yools", show_lines=False)
-    table.add_column("yool_id", style="cyan")
-    table.add_column("cost")
-    table.add_column("cpu%")
-    table.add_column("disk_mb")
-    table.add_column("timeout_s")
-    table.add_column("description", style="dim")
-    for entry in rows:
-        table.add_row(
-            entry.yool_id,
-            entry.cost_profile,
-            str(entry.cpu_quota_pct),
-            str(entry.disk_quota_mb),
-            str(entry.timeout_s),
-            entry.description,
-        )
-    console.print(table)
+    """Build or validate the spec-shaped `.catalog/agents.json` file."""
+    _build_catalog_file(output, check=check)
 
 
 @catalog_app.command("list")
 def catalog_list(
     source: Path = typer.Option(
-        agent_catalog.DEFAULT_CATALOG_PATH,
+        _DEFAULT_AGENT_CATALOG,
         "--source",
         "-s",
-        help="Catalog JSON path; rebuilt from registry if missing.",
+        help="Catalog JSON path; built from registry if missing.",
     ),
 ) -> None:
-    """List every yool in the catalog."""
-    cat = _load_or_build(source)
-    _render_entries(agent_catalog.list_entries(cat))
+    """List every yool in the spec-shaped catalog."""
+    from sendsprint.yool.catalog_v2 import list_yools
+
+    _render_spec_entries(list_yools(_load_spec_catalog(source)))
 
 
 @catalog_app.command("find")
 def catalog_find(
-    query: str = typer.Argument(..., help="Substring to match against yool_id."),
+    query: str = typer.Argument(
+        ..., help="Regex, glob, or substring pattern to match against yool_id."
+    ),
     source: Path = typer.Option(
-        agent_catalog.DEFAULT_CATALOG_PATH,
+        _DEFAULT_AGENT_CATALOG,
         "--source",
         "-s",
-        help="Catalog JSON path; rebuilt from registry if missing.",
+        help="Catalog JSON path; built from registry if missing.",
     ),
 ) -> None:
-    """Find yools whose id contains the given substring."""
-    cat = _load_or_build(source)
-    hits = agent_catalog.find_entries(cat, query)
+    """Find yools via regex (/expr/), glob (*foo*), or substring."""
+    import fnmatch
+    import re
+
+    from sendsprint.yool.catalog_v2 import list_yools
+
+    entries = list_yools(_load_spec_catalog(source))
+    if query.startswith("/") and query.endswith("/") and len(query) > 2:
+        regex = re.compile(query[1:-1], re.IGNORECASE)
+        hits = [entry for entry in entries if regex.search(entry.yool_id)]
+    elif any(ch in query for ch in "*?[]"):
+        pattern = query.lower()
+        hits = [entry for entry in entries if fnmatch.fnmatch(entry.yool_id.lower(), pattern)]
+    else:
+        lowered = query.lower()
+        hits = [entry for entry in entries if lowered in entry.yool_id.lower()]
     if not hits:
         console.print(f"[yellow]no yools match[/yellow] '{query}'")
         raise typer.Exit(code=1)
-    _render_entries(hits)
+    _render_spec_entries(hits)
 
 
 @catalog_app.command("show")
 def catalog_show(
     yool_id: str = typer.Argument(..., help="Exact yool id, e.g. agent.codex.plan"),
     source: Path = typer.Option(
-        agent_catalog.DEFAULT_CATALOG_PATH,
+        _DEFAULT_AGENT_CATALOG,
         "--source",
         "-s",
-        help="Catalog JSON path; rebuilt from registry if missing.",
+        help="Catalog JSON path; built from registry if missing.",
     ),
 ) -> None:
-    """Show the full record for one yool."""
-    cat = _load_or_build(source)
-    entry = agent_catalog.lookup_yool(cat, yool_id)
+    """Show the full record for one yool, including its HAMT slot path."""
+    from sendsprint.yool.catalog_v2 import lookup_yool
+
+    catalog = _load_spec_catalog(source)
+    entry = lookup_yool(catalog, yool_id)
     if entry is None:
         console.print(f"[red]not found[/red]: {yool_id}")
         raise typer.Exit(code=1)
-    console.print_json(json.dumps(entry.model_dump(mode="json"), sort_keys=True))
+    console.print_json(
+        data={
+            "yool_id": entry.yool_id,
+            "hash": entry.hash_bits,
+            "slots": list(entry.slots),
+            "tuple": entry.tuple,
+        }
+    )
+
 
 
 if __name__ == "__main__":

@@ -81,7 +81,7 @@ def test_find_entries_is_case_insensitive_substring() -> None:
 
 def test_roundtrip_via_canonical_json(tmp_path: Path) -> None:
     cat = build_agent_catalog()
-    target = tmp_path / ".catalog/hamt.json"
+    target = tmp_path / ".catalog/agents.json"
     save_catalog(cat, target)
     assert target.exists()
     cat2 = load_catalog(target)
@@ -95,12 +95,10 @@ def test_roundtrip_via_canonical_json(tmp_path: Path) -> None:
 def test_insert_overwrites_same_key() -> None:
     cap_a = AgentCapability(key="plan", description="v1", cost_profile="research")
     cap_b = AgentCapability(key="plan", description="v2", cost_profile="research")
-    cat = build_agent_catalog(
-        AgentRegistry(providers=[AgentProvider(key="p", name="P", runtime="x", capabilities=[cap_a])])
-    )
-    cat2 = build_agent_catalog(
-        AgentRegistry(providers=[AgentProvider(key="p", name="P", runtime="x", capabilities=[cap_b])])
-    )
+    provider_a = AgentProvider(key="p", name="P", runtime="x", capabilities=[cap_a])
+    provider_b = AgentProvider(key="p", name="P", runtime="x", capabilities=[cap_b])
+    cat = build_agent_catalog(AgentRegistry(providers=[provider_a]))
+    cat2 = build_agent_catalog(AgentRegistry(providers=[provider_b]))
     e1 = lookup_yool(cat, "agent.p.plan")
     e2 = lookup_yool(cat2, "agent.p.plan")
     assert e1 is not None and e1.description == "v1"
@@ -114,14 +112,14 @@ def test_cli_catalog_build_and_list(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     result = runner.invoke(app, ["catalog", "build"])
     assert result.exit_code == 0, result.output
     assert "wrote" in result.output
-    out_path = tmp_path / ".catalog/hamt.json"
+    out_path = tmp_path / ".catalog/agents.json"
     assert out_path.exists()
     data = json.loads(out_path.read_text())
-    assert data["kind"] in {"branch", "leaf"}
+    assert "flat" in data and "agent.codex.plan" in data["flat"]
 
     list_result = runner.invoke(app, ["catalog", "list"])
     assert list_result.exit_code == 0
-    assert "agent.codex.plan" in list_result.output
+    assert "codex" in list_result.output
 
 
 def test_cli_catalog_show_and_find(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
