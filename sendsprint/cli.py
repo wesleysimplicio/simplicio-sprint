@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Any, cast
 
@@ -41,6 +42,8 @@ from sendsprint.scope import build_scope
 from sendsprint.templates import catalog
 from sendsprint.tech import detect_tech
 from sendsprint.trackers import GitHubIssuesTracker
+from sendsprint.watch import WatchCycleResult, Watcher
+from sendsprint.watch_config import parse_interval_minutes
 from sendsprint.workspace import load_workspace
 from sendsprint.credentials import Provider as CredentialProvider
 
@@ -405,6 +408,73 @@ def run_flow(
         )
         output.write_text(data)
         console.print(f"[green]wrote report to {output}[/green]")
+
+
+@app.command(name="watch")
+def watch_cmd(
+    workspace_file: Path = typer.Option(
+        ...,
+        "--workspace",
+        "-w",
+        exists=True,
+        dir_okay=False,
+        help="Workspace YAML/JSON with a watch section",
+    ),
+    interval: str | None = typer.Option(
+        None,
+        "--interval",
+        help="Polling interval, for example 15, 15m or 1h",
+    ),
+    autonomy: str = typer.Option(
+        "plan",
+        "--autonomy",
+        help="observe | plan | execute | commit | push | pr | release | deploy-callback",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="List eligible tasks without modifying repos or watch state",
+    ),
+    once: bool = typer.Option(
+        False,
+        "--once",
+        help="Run one polling cycle and exit",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Reprocess tasks even if watch-state says they were already handled",
+    ),
+    transport: str = typer.Option("auto", "--transport", help="auto | mcp | api | playwright"),
+) -> None:
+    """Watch Jira/Azure DevOps periodically and process eligible assigned tasks."""
+    ws = load_workspace(workspace_file)
+    if not ws.watch.enabled and not dry_run:
+        raise typer.BadParameter("workspace watch.enabled must be true unless --dry-run is used")
+    try:
+        interval_minutes = parse_interval_minutes(interval, default=ws.watch.interval_minutes)
+        autonomy_level = parse_autonomy_level(autonomy)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+
+    watcher = Watcher(
+        workspace=ws,
+        autonomy_policy=AutonomyPolicy(level=autonomy_level),
+        transport=cast(Transport, transport),
+    )
+    if dry_run or once:
+        result = watcher.run_once(dry_run=dry_run, force=force)
+        _render_watch_cycle(result)
+        return
+
+    console.print(
+        f"[green]watching {ws.watch.provider} every {interval_minutes}m "
+        f"with autonomy={autonomy_level}[/green]"
+    )
+    while True:
+        result = watcher.run_once(dry_run=False, force=force)
+        _render_watch_cycle(result)
+        time.sleep(interval_minutes * 60)
 
 
 @app.command(name="read-github")
@@ -928,6 +998,31 @@ def _render_delivery_plan(plan) -> None:
         for warning in plan.warnings:
             console.print(f"[yellow]warning:[/yellow] {warning}")
     console.print(f"[bold]Plan:[/bold] {plan.summary()}")
+
+
+def _render_watch_cycle(result: WatchCycleResult) -> None:
+    console.rule(f"Watch {result.provider} sprint={result.sprint_id}")
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Action")
+    table.add_column("Task")
+    table.add_column("State")
+    table.add_column("Revision")
+    table.add_column("Run")
+    table.add_column("Branch", overflow="fold", no_wrap=True)
+    table.add_column("Reason/PR", overflow="fold")
+    rows = [*result.eligible, *result.processed, *result.skipped, *result.blocked]
+    for decision in rows:
+        table.add_row(
+            decision.action,
+            decision.key or decision.task_id,
+            decision.status,
+            decision.revision or "-",
+            decision.run_id or "-",
+            decision.branch or "-",
+            decision.pr_url or decision.reason or "-",
+        )
+    console.print(table)
+    console.print(f"[bold]Watch:[/bold] {result.summary()}")
 
 
 def _render_preflight(report: PreflightReport) -> None:

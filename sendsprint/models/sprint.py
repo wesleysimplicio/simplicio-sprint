@@ -36,6 +36,7 @@ class SprintItem(BaseModel):
     title: str
     description: str | None = None
     status: str
+    revision: int | str | None = None
     assignee: str | None = None
     assignee_email: str | None = None
     assignee_account_id: str | None = None

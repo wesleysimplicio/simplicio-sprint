@@ -89,7 +89,7 @@ See [`web/README.md`](./web/README.md) for the full walkthrough and
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.14.0 — Sprint Autopilot foundation. `sendsprint doctor`, stack validation templates (Angular, React, Vue.js, Node.js, Python, PHP, .NET, mobile, monorepo), autonomy policy, fuller dry-run plans, deterministic task worktrees, evidence bundles, GitHub Issues tracker helpers, Ralph Wiggum / Codex Goal loop contracts, transcript-to-task ingestion, local dashboard snapshots, demo docs, executive reports, and PyPI Trusted Publishing workflow support are built in. Core delivery still includes chat-triggered `sendsprint sprint`, Jira/Azure DevOps reads, opt-in LLM code generation/deploy callbacks, resumable run state, PR creation, post-PR validation, coverage badge automation, and changelog promotion.
+> **Status:** v0.16.0 — Sprint Autopilot watcher. `sendsprint watch` can poll Jira/Azure DevOps for eligible assigned tasks, deduplicate by item revision/state, respect autonomy policy, run in conservative planning mode by default, and persist local watch-state/evidence. `sendsprint doctor`, stack validation templates, dry-run plans, deterministic task worktrees, evidence bundles, GitHub Issues tracker helpers, Ralph Wiggum / Codex Goal loop contracts, transcript-to-task ingestion, dashboard snapshots, executive reports, and PyPI Trusted Publishing workflow support are built in. Core delivery still includes chat-triggered `sendsprint sprint`, Jira/Azure DevOps reads, opt-in LLM code generation/deploy callbacks, resumable run state, PR creation, post-PR validation, coverage badge automation, and changelog promotion.
 
 ---
 
@@ -160,6 +160,12 @@ sendsprint run azuredevops "Team\\Sprint 12" --workspace workspace.yaml --dry-ru
 # Resume a previous run idempotently
 sendsprint run azuredevops "Team\\Sprint 12" --workspace workspace.yaml --run-id sprint-12
 
+# Watch assigned tasks periodically in conservative planning mode
+sendsprint watch --workspace workspace.yaml --autonomy plan
+
+# Watch once without changing repos or watch-state
+sendsprint watch --workspace workspace.yaml --dry-run
+
 # Detect tech stack
 sendsprint detect-tech ./repo
 
@@ -227,6 +233,26 @@ deploy:
   provider: webhook
   url: https://deploy.example.com/hooks/sendsprint
   final_status: Deployed
+watch:
+  enabled: true
+  provider: azuredevops
+  interval_minutes: 15
+  scope: assigned_to_me
+  allowed_states:
+    - New
+  ignored_states:
+    - Removed
+    - Closed
+    - Done
+  work_item_types:
+    - Task
+  iteration_path: Team\\Sprint 12
+  max_tasks_per_cycle: 1
+  require_clean_worktree: true
+  evidence_required: true
+  playwright_required_for_front: true
+  create_pr: true
+  pr_target_branch: develop
 repos:
   - name: backend-api
     path: backend-api

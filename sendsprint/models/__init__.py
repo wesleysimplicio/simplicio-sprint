@@ -26,6 +26,9 @@ from sendsprint.models.workspace import (
     RepoRole,
     ScopeConfig,
     ScopeMode,
+    WatchConfig,
+    WatchProvider,
+    WatchScope,
     WorkspaceConfig,
 )
 
@@ -51,5 +54,8 @@ __all__ = [
     "StepReport",
     "StepStatus",
     "TestEvidence",
+    "WatchConfig",
+    "WatchProvider",
+    "WatchScope",
     "WorkspaceConfig",
 ]

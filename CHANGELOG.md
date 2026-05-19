@@ -8,6 +8,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `sendsprint watch` polling autopilot for assigned Jira/Azure DevOps tasks, with
+  conservative default autonomy (`plan`), dry-run listing, local watch-state
+  deduplication, evidence/report writing, and workspace `watch` configuration.
 - expose agent-grade sprint run status
 - finish autonomy tracker foundations
 - rollback and safe-exit plan generator (closes #58)

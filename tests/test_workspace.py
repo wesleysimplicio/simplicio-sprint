@@ -25,6 +25,18 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
         "pr_provider": "github",
         "pr_reviewers": ["reviewer@example.com"],
         "required_pr_reviewers": ["lead@example.com"],
+        "user_email": "dev@example.com",
+        "watch": {
+            "enabled": True,
+            "provider": "azuredevops",
+            "interval_minutes": 15,
+            "scope": "assigned_to_me",
+            "allowed_states": ["New"],
+            "ignored_states": ["Removed", "Closed"],
+            "work_item_types": ["Task"],
+            "iteration_path": "Team\\Sprint 29",
+            "max_tasks_per_cycle": 1,
+        },
         "code_generation": {"enabled": True, "provider": "openai", "max_usd": 2.5},
         "deploy": {"enabled": True, "url": "https://deploy.example/hook"},
     }
@@ -41,6 +53,11 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
     assert ws.pr_provider == "github"
     assert ws.pr_reviewers == ["reviewer@example.com"]
     assert ws.required_pr_reviewers == ["lead@example.com"]
+    assert ws.user_email == "dev@example.com"
+    assert ws.watch.enabled is True
+    assert ws.watch.provider == "azuredevops"
+    assert ws.watch.iteration_path == "Team\\Sprint 29"
+    assert ws.watch.max_tasks_per_cycle == 1
     assert ws.code_generation.enabled is True
     assert ws.code_generation.provider == "openai"
     assert ws.code_generation.max_usd == 2.5

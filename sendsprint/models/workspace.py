@@ -10,6 +10,8 @@ from sendsprint.llm.client import Provider as LlmProvider
 
 RepoRole = Literal["front", "api", "back", "infra", "mobile", "lib", "other"]
 ScopeMode = Literal["all", "mine"]
+WatchProvider = Literal["jira", "azuredevops"]
+WatchScope = Literal["assigned_to_me", "all"]
 
 
 class RepoConfig(BaseModel):
@@ -52,11 +54,37 @@ class DeployWorkflowConfig(BaseModel):
     final_status: str = "Deployed"
 
 
+class WatchConfig(BaseModel):
+    """Opt-in polling watcher configuration."""
+
+    enabled: bool = False
+    provider: WatchProvider = "azuredevops"
+    interval_minutes: int = Field(default=15, ge=1)
+    scope: WatchScope = "assigned_to_me"
+    allowed_states: list[str] = Field(default_factory=lambda: ["New"])
+    ignored_states: list[str] = Field(default_factory=lambda: ["Removed", "Closed", "Done"])
+    work_item_types: list[str] = Field(default_factory=lambda: ["Task"])
+    iteration_path: str | None = None
+    sprint_id: int | str | None = None
+    max_tasks_per_cycle: int = Field(default=1, ge=1)
+    max_concurrent_tasks: int = Field(default=1, ge=1)
+    require_clean_worktree: bool = True
+    evidence_required: bool = True
+    playwright_required_for_front: bool = True
+    create_pr: bool = True
+    pr_target_branch: str | None = None
+    state_path: str = ".sendsprint/runs/watch-state.json"
+
+
 class WorkspaceConfig(BaseModel):
     """Multi-repo workspace declared by the user (workspace.yaml)."""
 
     name: str = "workspace"
     root_path: str
+    user_email: str | None = None
+    user_display_name: str | None = None
+    user_account_id: str | None = None
+    user_descriptor: str | None = None
     repos: list[RepoConfig] = Field(default_factory=list)
     new_projects_dir: str = "Projetos/novos"
     pr_provider: Literal["github", "azuredevops"] = "github"
@@ -66,6 +94,7 @@ class WorkspaceConfig(BaseModel):
     branch_name_template: str = "feature/{number}-{title}"
     code_generation: CodeGenerationConfig = Field(default_factory=CodeGenerationConfig)
     deploy: DeployWorkflowConfig = Field(default_factory=DeployWorkflowConfig)
+    watch: WatchConfig = Field(default_factory=WatchConfig)
 
 
 DEFAULT_DEVELOPABLE_STATUSES = (
