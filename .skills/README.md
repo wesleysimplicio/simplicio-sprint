@@ -87,6 +87,7 @@ Por isso, **o `description` é a coisa mais importante do frontmatter**. Escreva
 | [`caveman/`](./caveman/SKILL.md) | **Always-on.** Modo terse de resposta para economizar tokens (~65% saída) |
 | [`everything-claude-code/`](./everything-claude-code/SKILL.md) | **Always-on.** Catálogo + protocolo de uso da suite ECC (60 agents, 221 skills) em paralelo |
 | [`rtk-cli/`](./rtk-cli/SKILL.md) | Use RTK CLI para reduzir tokens em exploração shell e validação verbosa |
+| [`open-source-contribution/`](./open-source-contribution/SKILL.md) | Executar ciclos OSS com snapshot, dedupe, candidato pequeno, validação, publicação limpa, monitoramento, rework e aprendizado |
 
 ### Skills always-on (padrão do projeto)
 

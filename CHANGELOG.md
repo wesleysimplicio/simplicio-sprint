@@ -6,6 +6,18 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-05-20
+
+### Added
+
+- Open-source contribution mode for SendSprint, including OSS candidate gates,
+  duplicate-risk checks, validation/publish/monitor/rework plans, and compact
+  learning records.
+- Repository operational memory for OSS contribution learning, dedupe markers,
+  monitor refs, and gate history.
+- `.skills/open-source-contribution/SKILL.md` plus public PR, internal decision,
+  and learning templates under `templates/opensource/`.
+
 ## [0.16.2] - 2026-05-19
 
 ### Added

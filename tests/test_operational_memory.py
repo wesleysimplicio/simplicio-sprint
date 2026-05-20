@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sendsprint.failure_learning import FailureEvent
 from sendsprint.operational_memory import OperationalMemoryStore
+from sendsprint.oss_mode import OssGateDecision, OssLearningRecord
 
 
 def test_operational_memory_store_persists_repo_facts_and_events(tmp_path) -> None:
@@ -67,3 +68,37 @@ def test_operational_memory_caps_recent_events_but_keeps_aggregates(tmp_path) ->
     assert len(memory.recent_events) == 10
     assert memory.learned_failures["lint::ruff"].total_runs == 60
     assert memory.learned_failures["lint::ruff"].is_flaky is True
+
+
+def test_operational_memory_persists_oss_learning_and_follow_up(tmp_path) -> None:
+    store = OperationalMemoryStore(tmp_path)
+    repo = "NousResearch/hermes-agent"
+    record = OssLearningRecord(
+        candidate_id="fix-nameerror-in-conversation-loop",
+        repo=repo,
+        title="Fix NameError in conversation loop",
+        decision="salvage",
+        signal="closed duplicate lineage points to the accepted fix",
+        result="defer new PR and review the existing fix",
+        reusable_rule="check closed PR lineage before opening tiny fixes",
+        related_refs=["PR #27359"],
+    )
+    gate = OssGateDecision(
+        gate="dedupe",
+        status="blocked",
+        reason="duplicate-risk match found",
+        evidence=["PR #27359"],
+    )
+
+    store.remember_oss_candidate(repo, record)
+    store.record_oss_gate(repo, record.candidate_id, gate)
+    store.remember_oss_monitor_ref(repo, record.candidate_id, "PR #27359")
+
+    loaded = store.load_or_create(repo)
+
+    assert loaded.oss_candidates[record.candidate_id].reusable_rule == (
+        "check closed PR lineage before opening tiny fixes"
+    )
+    assert loaded.find_oss_dedupe("Fix NameError") == "PR #27359"
+    assert loaded.oss_gate_history[record.candidate_id][0].status == "blocked"
+    assert loaded.oss_monitor_refs[record.candidate_id] == "PR #27359"

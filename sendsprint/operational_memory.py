@@ -14,6 +14,7 @@ from sendsprint.failure_learning import (
     TrustScore,
     calculate_trust_score,
 )
+from sendsprint.oss_mode import OssGateDecision, OssLearningRecord
 
 
 class RepositoryOperationalMemory(BaseModel):
@@ -26,6 +27,10 @@ class RepositoryOperationalMemory(BaseModel):
     facts: dict[str, str] = Field(default_factory=dict)
     recent_events: list[FailureEvent] = Field(default_factory=list)
     learned_failures: dict[str, LearnedFailure] = Field(default_factory=dict)
+    oss_candidates: dict[str, OssLearningRecord] = Field(default_factory=dict)
+    oss_dedupe_markers: dict[str, str] = Field(default_factory=dict)
+    oss_monitor_refs: dict[str, str] = Field(default_factory=dict)
+    oss_gate_history: dict[str, list[OssGateDecision]] = Field(default_factory=dict)
 
     def remember(self, key: str, value: str) -> None:
         self.facts[key] = value
@@ -46,6 +51,40 @@ class RepositoryOperationalMemory(BaseModel):
     def flaky_fingerprints(self) -> list[str]:
         tracker = FlakyOutcomeTracker(failures=self.learned_failures)
         return tracker.flaky_fingerprints()
+
+    def remember_oss_candidate(self, record: OssLearningRecord) -> None:
+        self.oss_candidates[record.candidate_id] = record
+        public_ref = record.related_refs[0] if record.related_refs else record.candidate_id
+        markers = {record.candidate_id.lower(), record.title.lower()}
+        markers.update(ref.lower() for ref in record.related_refs)
+        for marker in markers:
+            if marker:
+                self.oss_dedupe_markers[marker] = public_ref
+        self.updated_at = datetime.now(UTC)
+
+    def find_oss_dedupe(self, marker: str) -> str | None:
+        needle = marker.lower()
+        for remembered_marker, ref in self.oss_dedupe_markers.items():
+            if needle in remembered_marker or remembered_marker in needle:
+                return ref
+        return None
+
+    def remember_oss_monitor_ref(self, candidate_id: str, ref: str) -> None:
+        self.oss_monitor_refs[candidate_id] = ref
+        self.updated_at = datetime.now(UTC)
+
+    def record_oss_gate(
+        self,
+        candidate_id: str,
+        decision: OssGateDecision,
+        *,
+        max_gates: int = 100,
+    ) -> None:
+        history = self.oss_gate_history.setdefault(candidate_id, [])
+        history.append(decision)
+        if len(history) > max_gates:
+            self.oss_gate_history[candidate_id] = history[-max_gates:]
+        self.updated_at = datetime.now(UTC)
 
 
 class OperationalMemoryStore:
@@ -80,5 +119,41 @@ class OperationalMemoryStore:
     def record_event(self, repo: str, event: FailureEvent) -> RepositoryOperationalMemory:
         memory = self.load_or_create(repo)
         memory.record_event(event)
+        self.save(memory)
+        return memory
+
+    def remember_oss_candidate(
+        self,
+        repo: str,
+        record: OssLearningRecord,
+    ) -> RepositoryOperationalMemory:
+        memory = self.load_or_create(repo)
+        memory.remember_oss_candidate(record)
+        self.save(memory)
+        return memory
+
+    def find_oss_dedupe(self, repo: str, marker: str) -> str | None:
+        memory = self.load_or_create(repo)
+        return memory.find_oss_dedupe(marker)
+
+    def remember_oss_monitor_ref(
+        self,
+        repo: str,
+        candidate_id: str,
+        ref: str,
+    ) -> RepositoryOperationalMemory:
+        memory = self.load_or_create(repo)
+        memory.remember_oss_monitor_ref(candidate_id, ref)
+        self.save(memory)
+        return memory
+
+    def record_oss_gate(
+        self,
+        repo: str,
+        candidate_id: str,
+        decision: OssGateDecision,
+    ) -> RepositoryOperationalMemory:
+        memory = self.load_or_create(repo)
+        memory.record_oss_gate(candidate_id, decision)
         self.save(memory)
         return memory
