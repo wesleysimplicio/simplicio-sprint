@@ -6,6 +6,24 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-05-20
+
+### Added
+
+- Generic action lifecycle models in `sendsprint/actions/lifecycle.py`:
+  `ActionPhase` enum (plan, execute, validate, evidence, publish, monitor,
+  rework, learn), `Action`, `Objective`, `ExecutionStep`, `ValidationResult`,
+  `EvidenceRecord`, `PublicationRecord`, `MonitorEntry`, `LearningRecord`,
+  `ApprovalPolicy`, `DomainDescriptor` (#121).
+- `DomainAdapter` abstract base class in `sendsprint/actions/adapter.py`
+  defining the contract every domain adapter must implement (#121).
+- `CodeDomainAdapter` in `sendsprint/actions/code_adapter.py` mapping the
+  existing 10-step sprint-to-PR flow onto the generic lifecycle with full
+  backwards compatibility (#121).
+- 39 tests in `tests/test_action_lifecycle.py` covering schema serialization,
+  backwards-compatible defaults, non-software domain support, adapter contract
+  enforcement, and full lifecycle walkthrough (#121).
+
 ## [0.17.3] - 2026-05-20
 
 ### Added
