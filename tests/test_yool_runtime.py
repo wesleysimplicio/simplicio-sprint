@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import os
 import subprocess
@@ -104,20 +103,13 @@ def test_worker_consumes_lane_and_emits_child_tuple(tmp_path: Path) -> None:
     log.append(parent)
 
     async def scenario() -> None:
-        task = asyncio.create_task(worker.run())
+        await worker._handle(parent)
 
-        async def drain_review() -> None:
-            async for tup in bus.subscribe("review"):
-                assert tup.parent_id == parent.id
-                return
-
-        review_task = asyncio.create_task(drain_review())
-        await bus.publish(parent)
-        await review_task
-        await bus.drain()
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await task
+        review_stream = bus.subscribe("review")
+        child = await asyncio.wait_for(anext(review_stream), timeout=5)
+        assert child.parent_id == parent.id
+        await review_stream.aclose()
+        await bus.close()
 
     asyncio.run(scenario())
 
@@ -138,12 +130,8 @@ def test_tuple_bus_preserves_order_within_lane() -> None:
                     return
 
         task = asyncio.create_task(consumer())
-        first = emit_tuple(
-            yool_id="agent.codex.plan", lane="dev", payload={"n": 1}, run_id="r"
-        )
-        second = emit_tuple(
-            yool_id="agent.codex.plan", lane="dev", payload={"n": 2}, run_id="r"
-        )
+        first = emit_tuple(yool_id="agent.codex.plan", lane="dev", payload={"n": 1}, run_id="r")
+        second = emit_tuple(yool_id="agent.codex.plan", lane="dev", payload={"n": 2}, run_id="r")
         await bus.publish(first)
         await bus.publish(second)
         await task
@@ -260,7 +248,7 @@ def test_resume_after_kill_replays_pending_tuple(tmp_path: Path) -> None:
             "import time\n"
             "from pathlib import Path\n"
             "from sendsprint.yool.tuples import TupleLog, emit_tuple\n\n"
-            f"tuple_root = Path(r\"{tuple_root}\")\n"
+            f'tuple_root = Path(r"{tuple_root}")\n'
             "log = TupleLog('run-kill', tuple_root)\n"
             "tup = emit_tuple(\n"
             "    yool_id='agent.codex.plan',\n"

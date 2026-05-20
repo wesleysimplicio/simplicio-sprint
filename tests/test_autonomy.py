@@ -6,16 +6,15 @@ import pytest
 
 from sendsprint.models.reports import RunReport
 from sendsprint.policy import (
+    ACTION_REQUIREMENTS,
+    LEVEL_ORDER,
     AutonomyDenied,
     AutonomyPolicy,
-    LEVEL_ORDER,
-    ACTION_REQUIREMENTS,
     level_rank,
     parse_autonomy_level,
 )
 from sendsprint.reports import render_executive_report
 from sendsprint.run_state import RunState, RunStateStore
-
 
 # ---------------------------------------------------------------------------
 # AutonomyPolicy — permissions allowed and denied per level
@@ -166,9 +165,7 @@ class TestRunStateAutonomy:
         assert state.autonomy_level == "plan"
 
     def test_explicit_autonomy_level(self) -> None:
-        state = RunState(
-            run_id="run-1", source="jira", sprint_id="42", autonomy_level="pr"
-        )
+        state = RunState(run_id="run-1", source="jira", sprint_id="42", autonomy_level="pr")
         assert state.autonomy_level == "pr"
 
     def test_autonomy_level_persists(self, tmp_path) -> None:
@@ -177,9 +174,7 @@ class TestRunStateAutonomy:
             "run-auto", source="jira", sprint_id="42", autonomy_level="execute"
         )
         store.save(state)
-        loaded = store.load_or_create(
-            "run-auto", source="jira", sprint_id="42"
-        )
+        loaded = store.load_or_create("run-auto", source="jira", sprint_id="42")
         assert loaded.autonomy_level == "execute"
 
     def test_autonomy_serialized_in_json(self, tmp_path) -> None:

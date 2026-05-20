@@ -88,9 +88,7 @@ def _insert(node: CatalogNode, entry: CatalogEntry, level: int) -> CatalogNode:
         if any(e.yool_id == entry.yool_id for e in node.entries):
             return CatalogNode(
                 kind="leaf",
-                entries=[
-                    entry if e.yool_id == entry.yool_id else e for e in node.entries
-                ],
+                entries=[entry if e.yool_id == entry.yool_id else e for e in node.entries],
             )
         promoted = CatalogNode(kind="branch")
         for existing in node.entries:

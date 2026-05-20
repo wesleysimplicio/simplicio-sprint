@@ -8,6 +8,9 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Cross-stack runtime readiness closeout for epic #105 with ADR-009, a
+  `sendsprint runtime-readiness` CLI command, and tests tying Python/Go/Rust/
+  Node/Copilot boundaries to validation and rollback evidence.
 - Deterministic read-only `/runs/{run_id}/status-answer` endpoint for
   Claude/Codex/Hermes status responses backed by existing run snapshots (#116).
 - Resource-aware fan-out decision receipts with CPU idle/memory/capacity

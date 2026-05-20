@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -25,7 +25,7 @@ CONTRACT_VERSION = "1.0.0"
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
-class CommandType(str, Enum):
+class CommandType(StrEnum):
     """Commands the control plane can send to external workers."""
 
     plan = "plan"
@@ -41,7 +41,7 @@ class CommandType(str, Enum):
     inspect = "inspect"
 
 
-class EventType(str, Enum):
+class EventType(StrEnum):
     """Events workers emit back to the control plane."""
 
     started = "started"
@@ -55,7 +55,7 @@ class EventType(str, Enum):
     log = "log"
 
 
-class WorkerStack(str, Enum):
+class WorkerStack(StrEnum):
     """Supported worker runtime stacks."""
 
     python = "python"

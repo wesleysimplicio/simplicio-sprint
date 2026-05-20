@@ -178,13 +178,21 @@ def _build_quality_gate(run_id: str) -> QualityGateResponse | None:
         name = ev.get("name", "unknown")
         step_status = ev.get("status", "unknown")
         passed = step_status in {"ok", "done"}
-        severity = "info" if passed else "blocking" if name in {"tests-regression", "tests-unit"} else "error"
-        checks.append({
-            "check_name": name,
-            "passed": passed,
-            "details": ev.get("message", ""),
-            "severity": severity,
-        })
+        severity = (
+            "info"
+            if passed
+            else "blocking"
+            if name in {"tests-regression", "tests-unit"}
+            else "error"
+        )
+        checks.append(
+            {
+                "check_name": name,
+                "passed": passed,
+                "details": ev.get("message", ""),
+                "severity": severity,
+            }
+        )
         if not passed:
             reasons.append(f"{name}: {ev.get('message', 'failed')}")
 
@@ -219,13 +227,15 @@ def _build_evidence(run_id: str) -> EvidenceBundleResponse | None:
 
     items: list[dict[str, Any]] = []
     for ev in evidence_events:
-        items.append({
-            "type": "evidence",
-            "path": ev.get("evidence_path", ""),
-            "label": ev.get("evidence_label", ""),
-            "iteration": ev.get("iteration"),
-            "observed_at": ev.get("observed_at"),
-        })
+        items.append(
+            {
+                "type": "evidence",
+                "path": ev.get("evidence_path", ""),
+                "label": ev.get("evidence_label", ""),
+                "iteration": ev.get("iteration"),
+                "observed_at": ev.get("observed_at"),
+            }
+        )
 
     status = manager.get_run(run_id)
     finalized = status.state in {"done", "failed"} if status else False
@@ -275,11 +285,9 @@ def get_control_plane_run(run_id: str) -> ControlPlaneRunDetail:
     evidence = _build_evidence(run_id)
 
     history = events.history(run_id)
-    logs = [
-        e.get("message", "")
-        for e in history
-        if e.get("type") == "log" and e.get("message")
-    ][-50:]
+    logs = [e.get("message", "") for e in history if e.get("type") == "log" and e.get("message")][
+        -50:
+    ]
     timeline = history[-100:]
 
     return ControlPlaneRunDetail(

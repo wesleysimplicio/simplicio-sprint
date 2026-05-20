@@ -53,11 +53,7 @@ def fast_diff(diff_text: str) -> dict[str, int]:
             current_file = file_match.group(2)
             counts.setdefault(current_file, 0)
             continue
-        if (
-            current_file is not None
-            and line.startswith("+")
-            and not line.startswith("+++")
-        ):
+        if current_file is not None and line.startswith("+") and not line.startswith("+++"):
             counts[current_file] = counts.get(current_file, 0) + 1
     return counts
 
@@ -89,8 +85,6 @@ def fast_receipt_hash(payload: Any) -> str:
     Identical to :func:`sendsprint.yool.receipts.sha256_canonical` but kept
     here to avoid import coupling.
     """
-    text = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
+    text = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     return f"sha256:{digest}"

@@ -88,9 +88,7 @@ class Receipt:
         )
 
 
-def make_receipt_id(
-    *, yool_id: str, input_id: str, output_id: str | None, started_at: str
-) -> str:
+def make_receipt_id(*, yool_id: str, input_id: str, output_id: str | None, started_at: str) -> str:
     digest = hashlib.sha256(
         f"{yool_id}|{input_id}|{output_id or ''}|{started_at}".encode()
     ).hexdigest()
@@ -220,9 +218,7 @@ def write_err_receipt(
     cost: ReceiptCost | None = None,
 ) -> Receipt:
     input_id = sha256_canonical(input_payload)
-    rid = make_receipt_id(
-        yool_id=yool_id, input_id=input_id, output_id=None, started_at=started_at
-    )
+    rid = make_receipt_id(yool_id=yool_id, input_id=input_id, output_id=None, started_at=started_at)
     receipt = Receipt(
         id=rid,
         yool_id=yool_id,

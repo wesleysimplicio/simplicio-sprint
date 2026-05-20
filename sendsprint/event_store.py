@@ -19,7 +19,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sendsprint.contracts import RunEvent
 
-
 # ---------------------------------------------------------------------------
 # Retention policy
 # ---------------------------------------------------------------------------
@@ -140,9 +139,8 @@ class EventStore:
                 if from_seq > 0:
                     if idx < from_seq:
                         continue
-                elif from_timestamp is not None:
-                    if ev.timestamp < from_timestamp:
-                        continue
+                elif from_timestamp is not None and ev.timestamp < from_timestamp:
+                    continue
                 results.append((ev, idx))
             return results
 
@@ -153,9 +151,7 @@ class EventStore:
         with self._lock:
             before = len(self._events)
             # Keep events newer than cutoff.
-            kept: list[RunEvent] = [
-                ev for ev in self._events if ev.timestamp >= cutoff
-            ]
+            kept: list[RunEvent] = [ev for ev in self._events if ev.timestamp >= cutoff]
             # Trim to max_events (keep newest).
             if len(kept) > policy.max_events:
                 kept = kept[-policy.max_events :]
@@ -209,9 +205,7 @@ class EventStore:
 
     @staticmethod
     def _safe_id(run_id: str) -> str:
-        return "".join(
-            ch for ch in run_id if ch.isalnum() or ch in {"-", "_"}
-        ).strip("-_") or "run"
+        return "".join(ch for ch in run_id if ch.isalnum() or ch in {"-", "_"}).strip("-_") or "run"
 
     def _ensure_dir(self) -> None:
         self._run_dir.mkdir(parents=True, exist_ok=True)
@@ -254,9 +248,7 @@ class EventStore:
     def _write_snapshot_unlocked(self) -> None:
         self._ensure_dir()
         snap = self._build_snapshot_unlocked()
-        self._snapshot_path.write_text(
-            snap.model_dump_json(indent=2), encoding="utf-8"
-        )
+        self._snapshot_path.write_text(snap.model_dump_json(indent=2), encoding="utf-8")
 
     def _load_from_disk(self) -> None:
         """Reload events from the NDJSON file on disk (cold start)."""

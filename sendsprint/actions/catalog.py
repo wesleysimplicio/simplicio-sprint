@@ -16,10 +16,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from sendsprint.actions.lifecycle import ApprovalPolicy
 
-
 # ---------------------------------------------------------------------------
 # Template model
 # ---------------------------------------------------------------------------
+
 
 class PlaybookTemplate(BaseModel):
     """Reusable playbook template for a domain action."""
@@ -89,7 +89,9 @@ SPRINT_TO_PR = PlaybookTemplate(
         "security-no-critical",
         "pr-created",
     ],
-    approval_policy=ApprovalPolicy(auto_approve=False, required_approvers=1, approver_roles=["reviewer"]),
+    approval_policy=ApprovalPolicy(
+        auto_approve=False, required_approvers=1, approver_roles=["reviewer"]
+    ),
     output_format="json",
 )
 
@@ -115,7 +117,9 @@ BUG_FIX = PlaybookTemplate(
         "no-regressions",
         "security-no-critical",
     ],
-    approval_policy=ApprovalPolicy(auto_approve=False, required_approvers=1, approver_roles=["reviewer"]),
+    approval_policy=ApprovalPolicy(
+        auto_approve=False, required_approvers=1, approver_roles=["reviewer"]
+    ),
     output_format="json",
 )
 
@@ -143,7 +147,9 @@ REFACTOR = PlaybookTemplate(
         "no-behaviour-change",
         "diff-within-scope",
     ],
-    approval_policy=ApprovalPolicy(auto_approve=False, required_approvers=1, approver_roles=["reviewer"]),
+    approval_policy=ApprovalPolicy(
+        auto_approve=False, required_approvers=1, approver_roles=["reviewer"]
+    ),
     output_format="json",
 )
 
@@ -173,7 +179,9 @@ CAMPAIGN_BRIEF = PlaybookTemplate(
         "budget-approved",
         "timeline-feasible",
     ],
-    approval_policy=ApprovalPolicy(auto_approve=False, required_approvers=1, approver_roles=["marketing-lead"]),
+    approval_policy=ApprovalPolicy(
+        auto_approve=False, required_approvers=1, approver_roles=["marketing-lead"]
+    ),
     output_format="markdown",
 )
 
@@ -199,7 +207,9 @@ LANDING_PAGE = PlaybookTemplate(
         "seo-metadata-present",
         "link-checks-passed",
     ],
-    approval_policy=ApprovalPolicy(auto_approve=False, required_approvers=1, approver_roles=["marketing-lead"]),
+    approval_policy=ApprovalPolicy(
+        auto_approve=False, required_approvers=1, approver_roles=["marketing-lead"]
+    ),
     output_format="markdown",
 )
 
@@ -226,7 +236,9 @@ EMAIL_SEQUENCE = PlaybookTemplate(
         "send-schedule-defined",
         "utm-parameters-set",
     ],
-    approval_policy=ApprovalPolicy(auto_approve=False, required_approvers=1, approver_roles=["marketing-lead"]),
+    approval_policy=ApprovalPolicy(
+        auto_approve=False, required_approvers=1, approver_roles=["marketing-lead"]
+    ),
     output_format="markdown",
 )
 

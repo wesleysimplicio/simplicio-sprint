@@ -21,7 +21,6 @@ from sendsprint.dashboard_spec import (
     SSEEventType,
 )
 
-
 # ---------------------------------------------------------------------------
 # SSEEventType
 # ---------------------------------------------------------------------------
@@ -30,8 +29,17 @@ from sendsprint.dashboard_spec import (
 class TestSSEEventType:
     def test_all_event_types_present(self):
         expected = {
-            "hello", "step", "log", "evidence", "loop", "regression",
-            "summary", "done", "error", "agent_state", "operator_chat",
+            "hello",
+            "step",
+            "log",
+            "evidence",
+            "loop",
+            "regression",
+            "summary",
+            "done",
+            "error",
+            "agent_state",
+            "operator_chat",
             "keepalive",
         }
         assert {e.value for e in SSEEventType} == expected
@@ -148,7 +156,7 @@ class TestDashboardEventProtocol:
 
     def test_frozen(self):
         proto = DashboardEventProtocol()
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             proto.transport = "ws"  # type: ignore[misc]
 
     def test_ordering_guarantee_documented(self):
@@ -211,8 +219,7 @@ class TestNodeDashboardSpec:
     def test_consumed_apis_include_evidence_endpoint(self):
         spec = NodeDashboardSpec()
         evidence_apis = [
-            a for a in spec.consumed_apis
-            if "evidence" in a["path"] and "{name}" in a["path"]
+            a for a in spec.consumed_apis if "evidence" in a["path"] and "{name}" in a["path"]
         ]
         assert len(evidence_apis) == 1
 
@@ -222,7 +229,7 @@ class TestNodeDashboardSpec:
 
     def test_frozen(self):
         spec = NodeDashboardSpec()
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             spec.spec_version = "2.0.0"  # type: ignore[misc]
 
     def test_serialization_roundtrip(self):
@@ -267,7 +274,8 @@ class TestPlaywrightLaneSpec:
     def test_no_run_state_access_rule(self):
         spec = PlaywrightLaneSpec()
         state_rules = [
-            r for r in spec.isolation_rules
+            r
+            for r in spec.isolation_rules
             if "state" in r.lower() and ("read" in r.lower() or "write" in r.lower())
         ]
         assert len(state_rules) >= 1
@@ -287,14 +295,13 @@ class TestPlaywrightLaneSpec:
     def test_quality_gate_evaluation_forbidden(self):
         spec = PlaywrightLaneSpec()
         gate_rules = [
-            r for r in spec.forbidden_actions
-            if "quality" in r.lower() and "gate" in r.lower()
+            r for r in spec.forbidden_actions if "quality" in r.lower() and "gate" in r.lower()
         ]
         assert len(gate_rules) >= 1
 
     def test_frozen(self):
         spec = PlaywrightLaneSpec()
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             spec.spec_version = "2.0.0"  # type: ignore[misc]
 
     def test_serialization_roundtrip(self):
@@ -332,9 +339,7 @@ class TestCrossSpecConsistency:
         """Playwright output dir pattern and evidence API path use same run_id."""
         pw = PlaywrightLaneSpec()
         dash = NodeDashboardSpec()
-        evidence_apis = [
-            a for a in dash.consumed_apis if "evidence" in a["path"]
-        ]
+        evidence_apis = [a for a in dash.consumed_apis if "evidence" in a["path"]]
         assert len(evidence_apis) > 0
         # Both reference run_id
         assert "{run_id}" in pw.output_dir_pattern

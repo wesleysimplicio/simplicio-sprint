@@ -117,7 +117,11 @@ class CodeDomainAdapter(DomainAdapter):
         """Validate phase: lint + tests + security review."""
         checks: list[dict[str, Any]] = [
             {"name": "lint", "sprint_step": 5, "description": "Run linters (ruff, eslint, etc.)"},
-            {"name": "tests", "sprint_step": 6, "description": "Run unit / integration / e2e tests"},
+            {
+                "name": "tests",
+                "sprint_step": 6,
+                "description": "Run unit / integration / e2e tests",
+            },
             {"name": "security", "sprint_step": 7, "description": "Static security analysis"},
         ]
         return ValidationResult(passed=True, checks=checks, message="All checks passed")
@@ -177,7 +181,10 @@ class CodeDomainAdapter(DomainAdapter):
         if action.rework_count > 0:
             lessons.append(
                 LearningRecord(
-                    lesson=f"Required {action.rework_count} rework iteration(s) before passing validation",
+                    lesson=(
+                        f"Required {action.rework_count} rework iteration(s) "
+                        "before passing validation"
+                    ),
                     tags=["rework", "code"],
                     source_action_id=action.id,
                 )

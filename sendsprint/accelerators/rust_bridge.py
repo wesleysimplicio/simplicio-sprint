@@ -134,9 +134,7 @@ class RustBridge:
         return python_impl.fast_dedupe(items)
 
     def fast_receipt_hash(self, payload: Any) -> str:
-        stdin_text = json.dumps(
-            payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-        )
+        stdin_text = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
         out = self._run("receipt-hash", stdin_text)
         if out is not None:
             stripped = out.strip()

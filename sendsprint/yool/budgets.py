@@ -14,9 +14,7 @@ class BudgetExceeded(RuntimeError):
     """Raised when a worker's external call would breach ``agent_terms``."""
 
     def __init__(self, dimension: str, used: float, limit: float) -> None:
-        super().__init__(
-            f"budget exceeded on {dimension}: used={used} limit={limit}"
-        )
+        super().__init__(f"budget exceeded on {dimension}: used={used} limit={limit}")
         self.dimension = dimension
         self.used = used
         self.limit = limit

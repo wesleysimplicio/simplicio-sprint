@@ -170,7 +170,9 @@ def pause_run(run_id: str, req: ActionRequest | None = None) -> ActionResponse:
         raise HTTPException(status_code=409, detail=f"cannot pause run in state '{status.state}'")
 
     _enqueue_control("pause", run_id)
-    events.publish_threadsafe(run_id, {"type": "log", "message": f"operator pause by {req.operator}"})
+    events.publish_threadsafe(
+        run_id, {"type": "log", "message": f"operator pause by {req.operator}"}
+    )
     _record("pause", run_id, req.operator)
     return ActionResponse(run_id=run_id, action="pause")
 
@@ -187,7 +189,9 @@ def resume_run(run_id: str, req: ActionRequest | None = None) -> ActionResponse:
         raise HTTPException(status_code=409, detail=f"cannot resume run in state '{status.state}'")
 
     _enqueue_control("resume", run_id)
-    events.publish_threadsafe(run_id, {"type": "log", "message": f"operator resume by {req.operator}"})
+    events.publish_threadsafe(
+        run_id, {"type": "log", "message": f"operator resume by {req.operator}"}
+    )
     _record("resume", run_id, req.operator)
     return ActionResponse(run_id=run_id, action="resume")
 
@@ -211,7 +215,9 @@ def cancel_run(run_id: str, req: ActionRequest | None = None) -> ActionResponse:
     _enqueue_control("cancel", run_id)
     status.state = "failed"
     status.failed = True
-    events.publish_threadsafe(run_id, {"type": "log", "message": f"operator cancel by {req.operator}"})
+    events.publish_threadsafe(
+        run_id, {"type": "log", "message": f"operator cancel by {req.operator}"}
+    )
     _record("cancel", run_id, req.operator)
     return ActionResponse(run_id=run_id, action="cancel")
 
@@ -230,7 +236,9 @@ def rerun_failed_step(run_id: str, req: ActionRequest | None = None) -> ActionRe
     status.state = "running"
     status.failed = False
     _enqueue_control("resume", run_id, {"rerun_failed": True})
-    events.publish_threadsafe(run_id, {"type": "log", "message": f"operator rerun by {req.operator}"})
+    events.publish_threadsafe(
+        run_id, {"type": "log", "message": f"operator rerun by {req.operator}"}
+    )
     _record("rerun", run_id, req.operator, detail={"last_step": status.last_step})
     return ActionResponse(
         run_id=run_id,
@@ -250,7 +258,9 @@ def approve_publish(run_id: str, req: ActionRequest | None = None) -> ActionResp
         raise HTTPException(status_code=409, detail="approve is only available for completed runs")
 
     _enqueue_control("approve", run_id)
-    events.publish_threadsafe(run_id, {"type": "log", "message": f"operator approve by {req.operator}"})
+    events.publish_threadsafe(
+        run_id, {"type": "log", "message": f"operator approve by {req.operator}"}
+    )
     _record("approve", run_id, req.operator)
     return ActionResponse(run_id=run_id, action="approve")
 

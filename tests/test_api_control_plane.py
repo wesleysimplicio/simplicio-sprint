@@ -116,7 +116,10 @@ def test_get_run_detail_has_quality_and_evidence():
     assert body["quality_gate"] is not None
     assert body["quality_gate"]["run_id"] == run_id
     assert body["quality_gate"]["verdict"] in {
-        "pass", "needs_rework", "needs_human_approval", "pending",
+        "pass",
+        "needs_rework",
+        "needs_human_approval",
+        "pending",
     }
 
     # logs
@@ -182,7 +185,10 @@ def test_quality_returns_gate_report_after_run():
     body = resp.json()
     assert body["run_id"] == run_id
     assert body["verdict"] in {
-        "pass", "needs_rework", "needs_human_approval", "pending",
+        "pass",
+        "needs_rework",
+        "needs_human_approval",
+        "pending",
     }
     assert isinstance(body["checks"], list)
     assert isinstance(body["reasons"], list)
@@ -253,9 +259,7 @@ def test_cli_web_command_registered():
 # ---------------------------------------------------------------------------
 
 
-def _wait_for_state(
-    run_id: str, target_states: set[str], timeout: float = 10.0
-) -> dict:
+def _wait_for_state(run_id: str, target_states: set[str], timeout: float = 10.0) -> dict:
     """Poll /api/runs/{run_id} until state is in target_states."""
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:

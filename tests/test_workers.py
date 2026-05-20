@@ -25,23 +25,21 @@ from sendsprint.workers.go_spec import (
     detect_go_worker,
 )
 from sendsprint.workers.python_worker import (
-    DEFAULT_LOG_TAIL_LINES,
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_MEM_LIMIT_MB,
     DEFAULT_QUEUE_SIZE,
     PythonWorker,
-    TaskState,
-    WorkerTask,
 )
 from sendsprint.workers.resolver import resolve_worker
-
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _cmd(run_id: str = "run-1", cmd_type: CommandType = CommandType.plan,
-         timeout_s: int = 300) -> RunCommand:
+
+def _cmd(
+    run_id: str = "run-1", cmd_type: CommandType = CommandType.plan, timeout_s: int = 300
+) -> RunCommand:
     return RunCommand(command_type=cmd_type, run_id=run_id, timeout_s=timeout_s)
 
 
@@ -270,7 +268,7 @@ class TestGoWorkerSpec:
 
     def test_spec_is_frozen(self) -> None:
         spec = GoWorkerSpec()
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             spec.binary_name = "other"  # type: ignore[misc]
 
     def test_spec_json_roundtrip(self) -> None:
@@ -287,7 +285,10 @@ class TestDetectGoWorker:
             assert detect_go_worker() is False
 
     def test_found(self) -> None:
-        with patch("sendsprint.workers.go_spec.shutil.which", return_value="/usr/local/bin/sendsprint-worker"):
+        with patch(
+            "sendsprint.workers.go_spec.shutil.which",
+            return_value="/usr/local/bin/sendsprint-worker",
+        ):
             assert detect_go_worker() is True
 
 
@@ -306,80 +307,118 @@ class TestGoWorkerProxy:
 
     def test_send_binary_missing(self) -> None:
         proxy = GoWorkerProxy()
-        with patch("sendsprint.workers.go_spec.shutil.which", return_value=None):
-            with pytest.raises(RuntimeError, match="not found on PATH"):
-                proxy.send("heartbeat")
+        with (
+            patch("sendsprint.workers.go_spec.shutil.which", return_value=None),
+            pytest.raises(RuntimeError, match="not found on PATH"),
+        ):
+            proxy.send("heartbeat")
 
     def test_send_ok_response(self) -> None:
         proxy = GoWorkerProxy()
-        mock_result = type("R", (), {
-            "returncode": 0,
-            "stdout": json.dumps({"ok": True, "data": {"status": "alive"}}),
-            "stderr": "",
-        })()
-        with patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"), \
-             patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result):
+        mock_result = type(
+            "R",
+            (),
+            {
+                "returncode": 0,
+                "stdout": json.dumps({"ok": True, "data": {"status": "alive"}}),
+                "stderr": "",
+            },
+        )()
+        with (
+            patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"),
+            patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result),
+        ):
             resp = proxy.send("heartbeat")
             assert resp["ok"] is True
             assert resp["data"]["status"] == "alive"
 
     def test_send_error_response(self) -> None:
         proxy = GoWorkerProxy()
-        mock_result = type("R", (), {
-            "returncode": 0,
-            "stdout": json.dumps({"ok": False, "error": "queue full"}),
-            "stderr": "",
-        })()
-        with patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"), \
-             patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result):
-            with pytest.raises(RuntimeError, match="queue full"):
-                proxy.send("queue", run_id="r1")
+        mock_result = type(
+            "R",
+            (),
+            {
+                "returncode": 0,
+                "stdout": json.dumps({"ok": False, "error": "queue full"}),
+                "stderr": "",
+            },
+        )()
+        with (
+            patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"),
+            patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result),
+            pytest.raises(RuntimeError, match="queue full"),
+        ):
+            proxy.send("queue", run_id="r1")
 
     def test_send_nonzero_exit(self) -> None:
         proxy = GoWorkerProxy()
-        mock_result = type("R", (), {
-            "returncode": 1,
-            "stdout": "",
-            "stderr": "segfault",
-        })()
-        with patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"), \
-             patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result):
-            with pytest.raises(RuntimeError, match="exited 1"):
-                proxy.send("status")
+        mock_result = type(
+            "R",
+            (),
+            {
+                "returncode": 1,
+                "stdout": "",
+                "stderr": "segfault",
+            },
+        )()
+        with (
+            patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"),
+            patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result),
+            pytest.raises(RuntimeError, match="exited 1"),
+        ):
+            proxy.send("status")
 
     def test_send_invalid_json(self) -> None:
         proxy = GoWorkerProxy()
-        mock_result = type("R", (), {
-            "returncode": 0,
-            "stdout": "not json",
-            "stderr": "",
-        })()
-        with patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"), \
-             patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result):
-            with pytest.raises(RuntimeError, match="invalid JSON"):
-                proxy.send("status")
+        mock_result = type(
+            "R",
+            (),
+            {
+                "returncode": 0,
+                "stdout": "not json",
+                "stderr": "",
+            },
+        )()
+        with (
+            patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"),
+            patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result),
+            pytest.raises(RuntimeError, match="invalid JSON"),
+        ):
+            proxy.send("status")
 
     def test_queue_via_proxy(self) -> None:
         proxy = GoWorkerProxy()
-        mock_result = type("R", (), {
-            "returncode": 0,
-            "stdout": json.dumps({"ok": True}),
-            "stderr": "",
-        })()
-        with patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"), \
-             patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result):
+        mock_result = type(
+            "R",
+            (),
+            {
+                "returncode": 0,
+                "stdout": json.dumps({"ok": True}),
+                "stderr": "",
+            },
+        )()
+        with (
+            patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"),
+            patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result),
+        ):
             rid = proxy.queue(_cmd("run-go"))
             assert rid == "run-go"
 
     def test_cancel_via_proxy(self) -> None:
         proxy = GoWorkerProxy()
-        mock_result = type("R", (), {
-            "returncode": 0,
-            "stdout": json.dumps({"ok": True, "event": {"note": "done"}}),
-            "stderr": "",
-        })()
-        with patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"), \
-             patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result):
+        mock_result = type(
+            "R",
+            (),
+            {
+                "returncode": 0,
+                "stdout": json.dumps({"ok": True, "event": {"note": "done"}}),
+                "stderr": "",
+            },
+        )()
+        with (
+            patch("sendsprint.workers.go_spec.shutil.which", return_value="/bin/sw"),
+            patch("sendsprint.workers.go_spec.subprocess.run", return_value=mock_result),
+        ):
             event = proxy.cancel("run-go")
             assert event.event_type == EventType.cancelled
             assert event.source_stack == WorkerStack.go
@@ -423,6 +462,7 @@ class TestPackageImports:
             detect_go_worker,
             resolve_worker,
         )
+
         assert PythonWorker is not None
         assert GoWorkerProxy is not None
         assert GoWorkerSpec is not None

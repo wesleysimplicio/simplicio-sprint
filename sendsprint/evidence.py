@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -104,7 +104,7 @@ def _copy_into(root: Path, source: Path, kind: str) -> EvidenceFile:
 # ---------------------------------------------------------------------------
 
 
-class EvidenceItemType(str, Enum):
+class EvidenceItemType(StrEnum):
     """Types of evidence items captured during a run."""
 
     command = "command"

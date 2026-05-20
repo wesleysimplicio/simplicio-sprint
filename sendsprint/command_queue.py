@@ -14,7 +14,7 @@ import threading
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -27,7 +27,7 @@ from sendsprint.status_relay import ControlAction
 # ---------------------------------------------------------------------------
 
 
-class CommandStatus(str, Enum):
+class CommandStatus(StrEnum):
     """Lifecycle states for a control command."""
 
     queued = "queued"
@@ -124,19 +124,25 @@ class CommandQueue:
                 f"'{command_type}' (requires '{required_level}')"
             )
 
-        cmd = RunControlCommand(
-            command_type=command_type,
-            run_id=run_id,
-            params=params or {},
-            issued_by=issued_by,
-            **({"command_id": command_id} if command_id else {}),
-        )
+        if command_id:
+            cmd = RunControlCommand(
+                command_type=command_type,
+                run_id=run_id,
+                params=params or {},
+                issued_by=issued_by,
+                command_id=command_id,
+            )
+        else:
+            cmd = RunControlCommand(
+                command_type=command_type,
+                run_id=run_id,
+                params=params or {},
+                issued_by=issued_by,
+            )
 
         with self._lock:
             if cmd.command_id in self._commands:
-                raise DuplicateCommandError(
-                    f"command '{cmd.command_id}' already exists"
-                )
+                raise DuplicateCommandError(f"command '{cmd.command_id}' already exists")
             self._commands[cmd.command_id] = cmd
             self._by_run[run_id].append(cmd.command_id)
 
@@ -219,9 +225,7 @@ class CommandQueue:
         try:
             return self._commands[command_id]
         except KeyError:
-            raise CommandNotFoundError(
-                f"command '{command_id}' not found"
-            ) from None
+            raise CommandNotFoundError(f"command '{command_id}' not found") from None
 
     @staticmethod
     def _require_status(

@@ -85,9 +85,7 @@ def test_roundtrip_via_canonical_json(tmp_path: Path) -> None:
     save_catalog(cat, target)
     assert target.exists()
     cat2 = load_catalog(target)
-    assert {e.yool_id for e in list_entries(cat)} == {
-        e.yool_id for e in list_entries(cat2)
-    }
+    assert {e.yool_id for e in list_entries(cat)} == {e.yool_id for e in list_entries(cat2)}
     e = lookup_yool(cat2, "agent.claude-code.browser-e2e")
     assert e is not None and e.provider_key == "claude-code"
 

@@ -63,7 +63,7 @@ REQUEST_SCHEMA: dict[str, Any] = {
         },
         "params": {
             "type": "object",
-            "description": "Action-specific parameters (e.g. {\"n\": 50} for log_tail).",
+            "description": 'Action-specific parameters (e.g. {"n": 50} for log_tail).',
         },
     },
 }
@@ -170,9 +170,14 @@ class GoWorkerProxy:
             metadata={"binary": self.binary, "transport": "stdio"},
         )
 
-    def send(self, action: str, *, run_id: str | None = None,
-             command: RunCommand | None = None,
-             params: dict[str, Any] | None = None) -> dict[str, Any]:
+    def send(
+        self,
+        action: str,
+        *,
+        run_id: str | None = None,
+        command: RunCommand | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Send a request to the Go worker and return the parsed response.
 
         Raises RuntimeError if the binary is missing or returns an error.
@@ -202,9 +207,9 @@ class GoWorkerProxy:
                 timeout=self.timeout_s,
             )
         except FileNotFoundError:
-            raise RuntimeError(f"{self.binary} not found")
+            raise RuntimeError(f"{self.binary} not found") from None
         except subprocess.TimeoutExpired:
-            raise RuntimeError(f"{self.binary} timed out after {self.timeout_s}s")
+            raise RuntimeError(f"{self.binary} timed out after {self.timeout_s}s") from None
 
         if result.returncode != 0:
             raise RuntimeError(f"{self.binary} exited {result.returncode}: {result.stderr.strip()}")
@@ -212,7 +217,7 @@ class GoWorkerProxy:
         try:
             response = json.loads(result.stdout.strip())
         except json.JSONDecodeError as exc:
-            raise RuntimeError(f"invalid JSON from {self.binary}: {exc}")
+            raise RuntimeError(f"invalid JSON from {self.binary}: {exc}") from exc
 
         if not response.get("ok", False):
             raise RuntimeError(f"go worker error: {response.get('error', 'unknown')}")
@@ -221,7 +226,7 @@ class GoWorkerProxy:
 
     def queue(self, command: RunCommand) -> str:
         """Queue a command on the Go worker. Returns run_id."""
-        resp = self.send("queue", run_id=command.run_id, command=command)
+        self.send("queue", run_id=command.run_id, command=command)
         return command.run_id
 
     def cancel(self, run_id: str) -> RunEvent:

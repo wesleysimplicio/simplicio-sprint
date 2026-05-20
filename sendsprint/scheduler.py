@@ -113,8 +113,7 @@ class AgentFanoutPolicy(BaseModel):
         if snapshot.available_memory_mb:
             memory_slots = max(
                 1,
-                (snapshot.available_memory_mb - self.reserve_memory_mb)
-                // self.memory_mb_per_agent,
+                (snapshot.available_memory_mb - self.reserve_memory_mb) // self.memory_mb_per_agent,
             )
         else:
             memory_slots = self.max_agents
@@ -219,7 +218,8 @@ def _available_memory_mb() -> int:
 
         status = MemoryStatusEx()
         status.dwLength = ctypes.sizeof(MemoryStatusEx)
-        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        if kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
             return int(status.ullAvailPhys // (1024 * 1024))
         return 0
 
@@ -264,7 +264,8 @@ def _windows_cpu_idle_percent() -> float | None:
         idle = FileTime()
         kernel = FileTime()
         user = FileTime()
-        if not ctypes.windll.kernel32.GetSystemTimes(
+        kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
+        if not kernel32.GetSystemTimes(
             ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user)
         ):
             return None

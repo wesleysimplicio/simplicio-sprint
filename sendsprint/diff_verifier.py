@@ -8,20 +8,19 @@ Issue: #99
 from __future__ import annotations
 
 import re
-from enum import Enum
+from enum import StrEnum
 from pathlib import PurePosixPath
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from sendsprint.plan_verifier import VerifiablePlan
 
-
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 
 
-class DiffVerdict(str, Enum):
+class DiffVerdict(StrEnum):
     """Outcome of the diff verification."""
 
     passed = "pass"
@@ -29,7 +28,7 @@ class DiffVerdict(str, Enum):
     block = "block"
 
 
-class FindingType(str, Enum):
+class FindingType(StrEnum):
     """Category of a diff finding."""
 
     unexpected_file = "unexpected_file"
@@ -38,7 +37,7 @@ class FindingType(str, Enum):
     generated_artifact = "generated_artifact"
 
 
-class FindingSeverity(str, Enum):
+class FindingSeverity(StrEnum):
     """How critical a finding is."""
 
     info = "info"
@@ -142,9 +141,24 @@ def _is_source_file(path: str) -> bool:
     """Heuristic: file is a code source file (not config, docs, etc.)."""
     ext = PurePosixPath(path).suffix.lower()
     return ext in {
-        ".py", ".js", ".ts", ".tsx", ".jsx", ".go", ".rs", ".java",
-        ".kt", ".cs", ".rb", ".php", ".swift", ".dart", ".c", ".cpp",
-        ".h", ".hpp",
+        ".py",
+        ".js",
+        ".ts",
+        ".tsx",
+        ".jsx",
+        ".go",
+        ".rs",
+        ".java",
+        ".kt",
+        ".cs",
+        ".rb",
+        ".php",
+        ".swift",
+        ".dart",
+        ".c",
+        ".cpp",
+        ".h",
+        ".hpp",
     }
 
 

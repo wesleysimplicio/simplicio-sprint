@@ -19,7 +19,6 @@ from sendsprint.platform import (
     venv_activate_cmd,
 )
 
-
 # ---------------------------------------------------------------------------
 # detect_platform
 # ---------------------------------------------------------------------------
@@ -41,7 +40,7 @@ class TestDetectPlatform:
 
     def test_frozen(self):
         info = detect_platform()
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             info.os_name = "fake"  # type: ignore[misc]
 
 

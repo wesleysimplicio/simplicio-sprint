@@ -41,14 +41,16 @@ OPEN_PATHS: tuple[str, ...] = (
 )
 
 # Allowed origins for browser requests.  Localhost variants only.
-ALLOWED_ORIGINS: frozenset[str] = frozenset({
-    "http://localhost",
-    "https://localhost",
-    "http://127.0.0.1",
-    "https://127.0.0.1",
-    "http://[::1]",
-    "https://[::1]",
-})
+ALLOWED_ORIGINS: frozenset[str] = frozenset(
+    {
+        "http://localhost",
+        "https://localhost",
+        "http://127.0.0.1",
+        "https://127.0.0.1",
+        "http://[::1]",
+        "https://[::1]",
+    }
+)
 
 
 def generate_operator_token() -> str:
@@ -60,8 +62,7 @@ def generate_operator_token() -> str:
     global _operator_token
     _operator_token = secrets.token_urlsafe(32)
     logger.info(
-        "Operator token generated — pass as 'Authorization: Bearer <token>' "
-        "for mutating requests."
+        "Operator token generated — pass as 'Authorization: Bearer <token>' for mutating requests."
     )
     return _operator_token
 
@@ -89,10 +90,7 @@ def _is_origin_allowed(origin: str) -> bool:
     if origin in ALLOWED_ORIGINS:
         return True
     # Match with port — strip ``:<port>`` and check the base.
-    for allowed in ALLOWED_ORIGINS:
-        if origin.startswith(allowed + ":"):
-            return True
-    return False
+    return any(origin.startswith(allowed + ":") for allowed in ALLOWED_ORIGINS)
 
 
 # ---------------------------------------------------------------------------
@@ -106,9 +104,7 @@ class LocalAuthMiddleware(BaseHTTPMiddleware):
     Read-only requests and explicitly open paths pass through without auth.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Always allow read-only methods.
         if request.method in READ_ONLY_METHODS:
             return await call_next(request)
@@ -155,9 +151,7 @@ class OriginCheckMiddleware(BaseHTTPMiddleware):
     localhost variant.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         # Only enforce on mutating methods.
         if request.method in READ_ONLY_METHODS:
             return await call_next(request)
@@ -250,7 +244,8 @@ def _audit_rejected(
     # Record to audit log with a synthetic run_id so it shows up in queries.
     entry = AuditEntry(
         operator="unknown",
-        action="pause",  # type: ignore[arg-type] — reuse closest valid literal
+        # Reuse the closest valid audit action for security rejections.
+        action="pause",  # type: ignore[arg-type]
         run_id="__security__",
         result="rejected",
         detail=info,

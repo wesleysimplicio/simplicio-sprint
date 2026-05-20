@@ -113,7 +113,9 @@ EMAIL_SEQUENCE = MarketingActionTemplate(
 SOCIAL_POSTS = MarketingActionTemplate(
     name="social_posts",
     label="Social Post Set",
-    description="Set of social media posts tailored per platform with copy, hashtags, and media specs",
+    description=(
+        "Set of social media posts tailored per platform with copy, hashtags, and media specs"
+    ),
     required_inputs=["audience", "channels", "brand_constraints", "objective", "post_count"],
     validation_checklist=[
         "brand-checklist-passed",
@@ -156,7 +158,9 @@ CONTENT_CALENDAR = MarketingActionTemplate(
 LAUNCH_CHECKLIST = MarketingActionTemplate(
     name="launch_checklist",
     label="Launch Checklist",
-    description="Pre-launch readiness checklist ensuring all marketing assets and approvals are in place",
+    description=(
+        "Pre-launch readiness checklist ensuring all marketing assets and approvals are in place"
+    ),
     required_inputs=["launch_date", "campaign_brief_ref", "approval_owner"],
     validation_checklist=[
         "all-assets-produced",
@@ -270,7 +274,9 @@ class MarketingDomainAdapter(DomainAdapter):
             steps.append(
                 ExecutionStep(
                     name="run-validations",
-                    description=f"Run validation checklist ({len(template.validation_checklist)} checks)",
+                    description=(
+                        f"Run validation checklist ({len(template.validation_checklist)} checks)"
+                    ),
                 )
             )
         else:
@@ -313,7 +319,11 @@ class MarketingDomainAdapter(DomainAdapter):
             for item in template.validation_checklist:
                 checks.append({"name": item, "passed": True})
         else:
-            for default_check in ["brand-checklist-passed", "claims-risk-review", "link-checks-passed"]:
+            for default_check in [
+                "brand-checklist-passed",
+                "claims-risk-review",
+                "link-checks-passed",
+            ]:
                 checks.append({"name": default_check, "passed": True})
 
         all_passed = all(c.get("passed", False) for c in checks)

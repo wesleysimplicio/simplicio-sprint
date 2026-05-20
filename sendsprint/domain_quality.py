@@ -9,7 +9,7 @@ Issue: #123
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,13 +20,12 @@ from sendsprint.quality_gate import (
     QualityCheckResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
 
 
-class DomainCheckType(str, Enum):
+class DomainCheckType(StrEnum):
     """Kind of quality check a domain gate can run."""
 
     checklist = "checklist"
@@ -187,16 +186,16 @@ class DomainQualityGate:
             return QualityCheckResult(
                 check_name=check.check_name,
                 passed=False,
-                details=(
-                    f"Need {required_approvals} approval(s), "
-                    f"got {review_input.approvals}"
-                ),
+                details=(f"Need {required_approvals} approval(s), got {review_input.approvals}"),
                 severity=CheckSeverity.blocking if check.required else CheckSeverity.warning,
             )
         return QualityCheckResult(
             check_name=check.check_name,
             passed=True,
-            details=f"{review_input.approvals} approval(s) obtained from: {', '.join(review_input.reviewers)}",
+            details=(
+                f"{review_input.approvals} approval(s) obtained from: "
+                f"{', '.join(review_input.reviewers)}"
+            ),
         )
 
     @staticmethod
@@ -269,52 +268,70 @@ class DomainQualityGate:
             if check.check_type == DomainCheckType.checklist:
                 items = checklists.get(check.check_name)
                 if items is None:
-                    results.append(QualityCheckResult(
-                        check_name=check.check_name,
-                        passed=False,
-                        details=f"No checklist items provided for '{check.check_name}'",
-                        severity=CheckSeverity.blocking if check.required else CheckSeverity.warning,
-                    ))
+                    results.append(
+                        QualityCheckResult(
+                            check_name=check.check_name,
+                            passed=False,
+                            details=f"No checklist items provided for '{check.check_name}'",
+                            severity=CheckSeverity.blocking
+                            if check.required
+                            else CheckSeverity.warning,
+                        )
+                    )
                 else:
                     results.append(self.run_checklist_gate(check, items))
 
             elif check.check_type == DomainCheckType.review:
                 review_input = reviews.get(check.check_name)
                 if review_input is None:
-                    results.append(QualityCheckResult(
-                        check_name=check.check_name,
-                        passed=False,
-                        details=f"No review input provided for '{check.check_name}'",
-                        severity=CheckSeverity.blocking if check.required else CheckSeverity.warning,
-                    ))
+                    results.append(
+                        QualityCheckResult(
+                            check_name=check.check_name,
+                            passed=False,
+                            details=f"No review input provided for '{check.check_name}'",
+                            severity=CheckSeverity.blocking
+                            if check.required
+                            else CheckSeverity.warning,
+                        )
+                    )
                 else:
-                    results.append(self.run_review_gate(
-                        check,
-                        review_input,
-                        required_approvals=self.approval_policy.required_approvals,
-                    ))
+                    results.append(
+                        self.run_review_gate(
+                            check,
+                            review_input,
+                            required_approvals=self.approval_policy.required_approvals,
+                        )
+                    )
 
             elif check.check_type == DomainCheckType.source:
                 evidence = sources.get(check.check_name)
                 if evidence is None:
-                    results.append(QualityCheckResult(
-                        check_name=check.check_name,
-                        passed=False,
-                        details=f"No evidence items provided for '{check.check_name}'",
-                        severity=CheckSeverity.blocking if check.required else CheckSeverity.warning,
-                    ))
+                    results.append(
+                        QualityCheckResult(
+                            check_name=check.check_name,
+                            passed=False,
+                            details=f"No evidence items provided for '{check.check_name}'",
+                            severity=CheckSeverity.blocking
+                            if check.required
+                            else CheckSeverity.warning,
+                        )
+                    )
                 else:
                     results.append(self.run_source_gate(check, evidence))
 
             elif check.check_type == DomainCheckType.risk:
                 assessment = risks.get(check.check_name)
                 if assessment is None:
-                    results.append(QualityCheckResult(
-                        check_name=check.check_name,
-                        passed=False,
-                        details=f"No risk assessment provided for '{check.check_name}'",
-                        severity=CheckSeverity.blocking if check.required else CheckSeverity.warning,
-                    ))
+                    results.append(
+                        QualityCheckResult(
+                            check_name=check.check_name,
+                            passed=False,
+                            details=f"No risk assessment provided for '{check.check_name}'",
+                            severity=CheckSeverity.blocking
+                            if check.required
+                            else CheckSeverity.warning,
+                        )
+                    )
                 else:
                     results.append(self.run_risk_gate(check, assessment, threshold=risk_threshold))
 
@@ -344,12 +361,16 @@ class DomainQualityGate:
           -> ``needs_human_approval``
         - All pass -> ``pass``
         """
-        results = checks if checks is not None else self.run_domain_checks(
-            checklists=checklists,
-            reviews=reviews,
-            sources=sources,
-            risks=risks,
-            risk_threshold=risk_threshold,
+        results = (
+            checks
+            if checks is not None
+            else self.run_domain_checks(
+                checklists=checklists,
+                reviews=reviews,
+                sources=sources,
+                risks=risks,
+                risk_threshold=risk_threshold,
+            )
         )
 
         reasons: list[str] = []

@@ -122,9 +122,7 @@ def emit_tuple(
     meta: dict[str, Any] | None = None,
 ) -> Tuple:
     ts = utcnow_iso()
-    tid = make_tuple_id(
-        yool_id=yool_id, lane=lane, parent_id=parent_id, payload=payload, ts=ts
-    )
+    tid = make_tuple_id(yool_id=yool_id, lane=lane, parent_id=parent_id, payload=payload, ts=ts)
     return Tuple(
         id=tid,
         run_id=run_id,
@@ -154,9 +152,7 @@ class TupleLog:
             fp.flush()
             os.fsync(fp.fileno())
 
-    def update_status(
-        self, tuple_id: str, status: str, receipt_id: str | None = None
-    ) -> None:
+    def update_status(self, tuple_id: str, status: str, receipt_id: str | None = None) -> None:
         marker = {
             "kind": "status",
             "id": tuple_id,
@@ -232,10 +228,7 @@ def render_ascii_tree(tuples: Iterable[Tuple]) -> str:
 
     def _walk(node: Tuple, prefix: str, last: bool) -> None:
         connector = "└── " if last else "├── "
-        label = (
-            f"{node.yool_id} [{node.lane}] "
-            f"id={node.id[:14]}… status={node.status}"
-        )
+        label = f"{node.yool_id} [{node.lane}] id={node.id[:14]}… status={node.status}"
         lines.append(f"{prefix}{connector}{label}")
         children = by_parent.get(node.id, [])
         new_prefix = prefix + ("    " if last else "│   ")

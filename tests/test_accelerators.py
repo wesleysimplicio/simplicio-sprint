@@ -13,7 +13,6 @@ import pytest
 from sendsprint.accelerators import python_impl, resolve_accelerator
 from sendsprint.accelerators.resolver import BenchmarkResult, benchmark
 from sendsprint.accelerators.rust_bridge import (
-    RUST_BINARY,
     RustBridge,
     detect_rust_accelerator,
 )
@@ -175,14 +174,12 @@ class TestRustBridgeFallback:
         assert self.bridge.fast_diff(SAMPLE_DIFF) == python_impl.fast_diff(SAMPLE_DIFF)
 
     def test_fast_dedupe(self):
-        assert self.bridge.fast_dedupe(SAMPLE_ITEMS) == python_impl.fast_dedupe(
-            SAMPLE_ITEMS
-        )
+        assert self.bridge.fast_dedupe(SAMPLE_ITEMS) == python_impl.fast_dedupe(SAMPLE_ITEMS)
 
     def test_fast_receipt_hash(self):
-        assert self.bridge.fast_receipt_hash(
+        assert self.bridge.fast_receipt_hash(SAMPLE_PAYLOAD) == python_impl.fast_receipt_hash(
             SAMPLE_PAYLOAD
-        ) == python_impl.fast_receipt_hash(SAMPLE_PAYLOAD)
+        )
 
 
 class TestRustBridgeWithMockedBinary:
@@ -191,9 +188,7 @@ class TestRustBridgeWithMockedBinary:
     def test_fast_scan_uses_rust_output(self):
         bridge = RustBridge("/fake/sendsprint-accel")
         with patch("sendsprint.accelerators.rust_bridge.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout='["a.py","b.py"]', stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout='["a.py","b.py"]', stderr="")
             result = bridge.fast_scan("ignored")
             assert result == ["a.py", "b.py"]
             mock_run.assert_called_once()
@@ -201,18 +196,14 @@ class TestRustBridgeWithMockedBinary:
     def test_fast_scan_falls_back_on_bad_json(self):
         bridge = RustBridge("/fake/sendsprint-accel")
         with patch("sendsprint.accelerators.rust_bridge.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="not json", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout="not json", stderr="")
             result = bridge.fast_scan(SAMPLE_DIFF)
             assert result == python_impl.fast_scan(SAMPLE_DIFF)
 
     def test_fast_scan_falls_back_on_nonzero_rc(self):
         bridge = RustBridge("/fake/sendsprint-accel")
         with patch("sendsprint.accelerators.rust_bridge.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=1, stdout="", stderr="boom"
-            )
+            mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="boom")
             result = bridge.fast_scan(SAMPLE_DIFF)
             assert result == python_impl.fast_scan(SAMPLE_DIFF)
 
@@ -229,27 +220,21 @@ class TestRustBridgeWithMockedBinary:
         bridge = RustBridge("/fake/sendsprint-accel")
         fake_hash = "sha256:abc123"
         with patch("sendsprint.accelerators.rust_bridge.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout=f"{fake_hash}\n", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout=f"{fake_hash}\n", stderr="")
             result = bridge.fast_receipt_hash({"x": 1})
             assert result == fake_hash
 
     def test_fast_diff_uses_rust_output(self):
         bridge = RustBridge("/fake/sendsprint-accel")
         with patch("sendsprint.accelerators.rust_bridge.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout='{"foo.py":5}', stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout='{"foo.py":5}', stderr="")
             result = bridge.fast_diff("ignored")
             assert result == {"foo.py": 5}
 
     def test_fast_dedupe_uses_rust_output(self):
         bridge = RustBridge("/fake/sendsprint-accel")
         with patch("sendsprint.accelerators.rust_bridge.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout='["a","b"]', stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout='["a","b"]', stderr="")
             result = bridge.fast_dedupe(["a", "b", "a"])
             assert result == ["a", "b"]
 

@@ -96,6 +96,5 @@ def _summary(snapshot: AgentRunSnapshot, *, current_step: str, next_action: str)
         pr = f" PR: {snapshot.pr_url}." if snapshot.pr_url else ""
         return f"Run {snapshot.run_id} is done.{pr} Next: {next_action}."
     return (
-        f"Run {snapshot.run_id} is {snapshot.state}. "
-        f"Current: {current_step}. Next: {next_action}."
+        f"Run {snapshot.run_id} is {snapshot.state}. Current: {current_step}. Next: {next_action}."
     )

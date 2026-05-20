@@ -207,7 +207,8 @@ def test_watch_cli_help_documents_command() -> None:
 
     assert result.exit_code == 0
     assert "Watch Jira/Azure DevOps periodically" in result.output
-    assert "--dry-run" in result.output
+    normalized = result.output.replace("\n", "").replace(" ", "")
+    assert "--dry-run" in normalized
 
 
 def test_watch_cli_dry_run_lists_tasks(monkeypatch, tmp_path: Path) -> None:

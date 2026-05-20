@@ -17,10 +17,10 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ---------------------------------------------------------------------------
 # YoolContract
 # ---------------------------------------------------------------------------
+
 
 class YoolContract(BaseModel):
     """Declares expected input/output schema and budget limits for a yool."""
@@ -47,13 +47,15 @@ class YoolContract(BaseModel):
     retryable_errors: list[str] = Field(default_factory=list)
 
     def has_budget_limits(self) -> bool:
-        return any([
-            self.token_limit > 0,
-            self.cost_limit_usd > 0.0,
-            self.timeout_s > 0,
-            self.cpu_quota_pct > 0,
-            self.disk_quota_mb > 0,
-        ])
+        return any(
+            [
+                self.token_limit > 0,
+                self.cost_limit_usd > 0.0,
+                self.timeout_s > 0,
+                self.cpu_quota_pct > 0,
+                self.disk_quota_mb > 0,
+            ]
+        )
 
 
 class ContractViolation(ValueError):
@@ -87,8 +89,7 @@ def validate_payload(schema: dict[str, Any], payload: Any) -> list[str]:
                 prop_type = prop_schema.get("type")
                 if prop_type and not _type_matches(prop_type, payload[key]):
                     errors.append(
-                        f"field '{key}': expected {prop_type}, "
-                        f"got {type(payload[key]).__name__}"
+                        f"field '{key}': expected {prop_type}, got {type(payload[key]).__name__}"
                     )
     elif expected_type == "string":
         if not isinstance(payload, str):
@@ -129,6 +130,7 @@ def _type_matches(json_type: str, value: Any) -> bool:
 # BudgetEnforcer
 # ---------------------------------------------------------------------------
 
+
 class BudgetEnforcer(BaseModel):
     """Multi-dimension budget enforcement for a single dispatch."""
 
@@ -148,9 +150,7 @@ class BudgetEnforcer(BaseModel):
 
     def check_tokens(self, additional: int = 0) -> None:
         if self.token_limit > 0 and (self.tokens_used + additional) > self.token_limit:
-            raise BudgetEnforcerExceeded(
-                "tokens", self.tokens_used + additional, self.token_limit
-            )
+            raise BudgetEnforcerExceeded("tokens", self.tokens_used + additional, self.token_limit)
 
     def check_cost(self, additional: float = 0.0) -> None:
         if self.cost_limit_usd > 0.0 and (self.cost_used_usd + additional) > self.cost_limit_usd:
@@ -160,9 +160,7 @@ class BudgetEnforcer(BaseModel):
 
     def check_timeout(self, additional: float = 0.0) -> None:
         if self.timeout_s > 0 and (self.wall_s_used + additional) > self.timeout_s:
-            raise BudgetEnforcerExceeded(
-                "timeout_s", self.wall_s_used + additional, self.timeout_s
-            )
+            raise BudgetEnforcerExceeded("timeout_s", self.wall_s_used + additional, self.timeout_s)
 
     def check_disk(self, additional: float = 0.0) -> None:
         if self.disk_quota_mb > 0 and (self.disk_mb_used + additional) > self.disk_quota_mb:
@@ -227,9 +225,7 @@ class BudgetEnforcerExceeded(RuntimeError):
     """Raised when a BudgetEnforcer dimension is breached."""
 
     def __init__(self, dimension: str, used: float, limit: float) -> None:
-        super().__init__(
-            f"budget enforcer exceeded on {dimension}: used={used} limit={limit}"
-        )
+        super().__init__(f"budget enforcer exceeded on {dimension}: used={used} limit={limit}")
         self.dimension = dimension
         self.used = used
         self.limit = limit
@@ -238,6 +234,7 @@ class BudgetEnforcerExceeded(RuntimeError):
 # ---------------------------------------------------------------------------
 # RetryPolicy
 # ---------------------------------------------------------------------------
+
 
 class RetryPolicy(BaseModel):
     """Selective retry with exponential backoff."""
@@ -262,7 +259,7 @@ class RetryPolicy(BaseModel):
 
     def delay_for_attempt(self, attempt: int) -> float:
         """Compute backoff delay in seconds for the given attempt (0-indexed)."""
-        delay = self.backoff_base_s * (self.backoff_factor ** attempt)
+        delay = self.backoff_base_s * (self.backoff_factor**attempt)
         return min(delay, self.backoff_max_s)
 
     def should_retry(self, attempt: int, exc: BaseException) -> bool:
@@ -284,6 +281,7 @@ class RetryPolicy(BaseModel):
 # ---------------------------------------------------------------------------
 # InputCache
 # ---------------------------------------------------------------------------
+
 
 class CacheEntry(BaseModel):
     """One cached result."""
@@ -389,6 +387,7 @@ class InputCache:
 # InspectReport
 # ---------------------------------------------------------------------------
 
+
 class RetryRecord(BaseModel):
     """One retry attempt record."""
 
@@ -425,6 +424,7 @@ class InspectReport(BaseModel):
 # Contract registry helper
 # ---------------------------------------------------------------------------
 
+
 class ContractRegistry:
     """In-memory registry of YoolContract by yool_id."""
 
@@ -440,9 +440,7 @@ class ContractRegistry:
     def require(self, yool_id: str) -> YoolContract:
         contract = self.get(yool_id)
         if contract is None:
-            raise ContractViolation(
-                yool_id, "registry", f"no contract registered for {yool_id}"
-            )
+            raise ContractViolation(yool_id, "registry", f"no contract registered for {yool_id}")
         return contract
 
     def validate_input(self, yool_id: str, payload: Any) -> list[str]:

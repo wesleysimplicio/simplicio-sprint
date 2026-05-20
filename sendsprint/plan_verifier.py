@@ -97,9 +97,7 @@ class PlanVerifier:
     def assert_approved(self, plan: VerifiablePlan) -> None:
         """Raise if approval is required but the plan lacks it."""
         if self.requires_approval(plan) and plan.approved_by is None:
-            raise PlanNotApprovedError(
-                "plan requires human approval before implementation"
-            )
+            raise PlanNotApprovedError("plan requires human approval before implementation")
 
     # -- duplicate detection ---------------------------------------------------
 
@@ -121,14 +119,13 @@ class PlanVerifier:
         overlapping: list[str] = []
         for key in completed_keys:
             item_key = key.split("::")[0] if "::" in key else key
-            if item_key in plan.task_summary or any(
-                item_key in f for f in plan.target_files
-            ):
+            if item_key in plan.task_summary or any(item_key in f for f in plan.target_files):
                 overlapping.append(key)
 
-        if overlapping and plan.target_files and all(
-            any(k.split("::")[0] in f for k in overlapping)
-            for f in plan.target_files
+        if (
+            overlapping
+            and plan.target_files
+            and all(any(k.split("::")[0] in f for k in overlapping) for f in plan.target_files)
         ):
             raise DuplicateWorkError(
                 f"all target files already covered by completed work: {overlapping}"
@@ -165,9 +162,7 @@ class PlanVerifier:
         }
         if plan.approved_by:
             metadata["approved_by"] = plan.approved_by
-            metadata["approved_at"] = (
-                plan.approved_at.isoformat() if plan.approved_at else None
-            )
+            metadata["approved_at"] = plan.approved_at.isoformat() if plan.approved_at else None
 
         self._bundle_manager.add_item(
             bundle,

@@ -87,7 +87,9 @@ class RunSnapshot(BaseModel):
 # Queued control commands
 # ---------------------------------------------------------------------------
 
-ControlAction = Literal["pause", "resume", "cancel", "change_autonomy", "reprioritize", "approve", "reject"]
+ControlAction = Literal[
+    "pause", "resume", "cancel", "change_autonomy", "reprioritize", "approve", "reject"
+]
 
 
 class ControlCommand(BaseModel):

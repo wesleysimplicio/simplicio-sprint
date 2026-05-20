@@ -8,18 +8,18 @@ Domain-specific concepts live in adapter implementations.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
 
-class ActionPhase(str, Enum):
+
+class ActionPhase(StrEnum):
     """Ordered phases an action traverses."""
 
     plan = "plan"
@@ -32,7 +32,7 @@ class ActionPhase(str, Enum):
     learn = "learn"
 
 
-class ActionStatus(str, Enum):
+class ActionStatus(StrEnum):
     """High-level status of an action."""
 
     pending = "pending"
@@ -45,6 +45,7 @@ class ActionStatus(str, Enum):
 # ---------------------------------------------------------------------------
 # Supporting models
 # ---------------------------------------------------------------------------
+
 
 class DomainDescriptor(BaseModel):
     """Identifies the domain an action belongs to."""
@@ -126,7 +127,9 @@ class MonitorEntry(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    signal: str = Field(..., description="What was observed, e.g. 'deploy-healthy', 'error-rate-spike'")
+    signal: str = Field(
+        ..., description="What was observed, e.g. 'deploy-healthy', 'error-rate-spike'"
+    )
     details: dict[str, Any] = Field(default_factory=dict)
     requires_rework: bool = False
 
@@ -155,6 +158,7 @@ class ApprovalPolicy(BaseModel):
 # ---------------------------------------------------------------------------
 # Core action model
 # ---------------------------------------------------------------------------
+
 
 class Action(BaseModel):
     """Domain-agnostic action that traverses the lifecycle phases.

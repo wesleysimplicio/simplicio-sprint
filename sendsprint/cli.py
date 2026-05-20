@@ -42,6 +42,10 @@ from sendsprint.operators.base import Transport
 from sendsprint.policy import AutonomyPolicy, parse_autonomy_level
 from sendsprint.preflight import PreflightReport, run_preflight
 from sendsprint.reports import render_executive_report
+from sendsprint.runtime_readiness import (
+    build_cross_stack_runtime_readiness,
+    format_runtime_readiness_markdown,
+)
 from sendsprint.runtime_baseline import run_runtime_baseline
 from sendsprint.scaffolder import Scaffolder
 from sendsprint.scope import build_scope
@@ -199,6 +203,24 @@ def runtime_baseline_cmd(
     console.print(table)
     if report.evidence_path:
         console.print(f"[green]wrote baseline to {report.evidence_path}[/green]")
+
+
+@app.command(name="runtime-readiness")
+def runtime_readiness_cmd(
+    repo_path: Path = typer.Argument(Path("."), exists=True, file_okay=False),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Write readiness Markdown"),
+) -> None:
+    """Check cross-stack runtime readiness for the #105 epic."""
+    report = build_cross_stack_runtime_readiness(repo_path)
+    rendered = format_runtime_readiness_markdown(report)
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(rendered, encoding="utf-8")
+        console.print(f"[green]wrote runtime readiness to {output}[/green]")
+    else:
+        console.print(rendered, markup=False)
+    if report.status != "ready":
+        raise typer.Exit(code=1)
 
 
 action_app = typer.Typer(add_completion=False, help="Manage domain action playbooks.")
@@ -861,7 +883,8 @@ def logout(
 
 
 @sprint_app.callback(invoke_without_command=True)
-def sprint(ctx: typer.Context, 
+def sprint(
+    ctx: typer.Context,
     provider: str | None = typer.Option(
         None, "--provider", help="jira | azuredevops (defaults to profile)"
     ),
@@ -1458,7 +1481,6 @@ def catalog_show(
             "tuple": entry.tuple,
         }
     )
-
 
 
 @app.command(name="web")

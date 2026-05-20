@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -58,8 +58,7 @@ def run_runtime_baseline(
         cases=cases,
         thresholds={
             "go_worker": (
-                "consider only after queue/watchdog/fanout paths exceed "
-                "local responsiveness budget"
+                "consider only after queue/watchdog/fanout paths exceed local responsiveness budget"
             ),
             "rust_accelerator": (
                 "consider only after scan/dedupe/cache paths have benchmark evidence"
@@ -77,12 +76,12 @@ def run_runtime_baseline(
 
 def _time_case(
     name: str,
-    fn: Callable[[], dict[str, str | int | float | bool | None]],
+    fn: Callable[[], Mapping[str, str | int | float | bool | None]],
     *,
     operations: int,
 ) -> RuntimeBenchmarkCase:
     started = time.perf_counter()
-    metadata = fn()
+    metadata = dict(fn())
     elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
     return RuntimeBenchmarkCase(
         name=name,

@@ -18,7 +18,7 @@ import subprocess
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, Field
 
@@ -652,9 +652,7 @@ class SprintFlow:
         )
         self._step11_deploy(item, pr_report, local, payload.get("run_id"))
         state_status = (
-            "completed"
-            if pr_report.status == "ok" and pr_validation.status == "ok"
-            else "failed"
+            "completed" if pr_report.status == "ok" and pr_validation.status == "ok" else "failed"
         )
         return self._runtime_output(
             payload,
@@ -691,9 +689,11 @@ class SprintFlow:
         return worktree_dir if worktree_dir.exists() else repo_path
 
     def _runtime_report_template(self, payload: dict[str, Any]) -> RunReport:
+        raw_scope = payload.get("scope_mode") or self.scope.mode
+        scope_mode = cast(Literal["all", "mine"], "mine" if raw_scope == "mine" else "all")
         return RunReport(
             workspace=str(payload.get("workspace_name") or "single-repo"),
-            scope_mode=str(payload.get("scope_mode") or self.scope.mode),
+            scope_mode=scope_mode,
             autonomy_level=self.autonomy_policy.level,
         )
 

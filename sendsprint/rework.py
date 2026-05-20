@@ -10,27 +10,26 @@ Issue: #95
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from datetime import UTC, datetime
-from enum import Enum
-from typing import Any, Callable
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from sendsprint.evidence import BundleManager, EvidenceBundle, EvidenceItemType
 from sendsprint.quality_gate import (
-    CheckSeverity,
     DeliveryQualityGate,
     GateReport,
     GateVerdict,
 )
-
 
 # ---------------------------------------------------------------------------
 # Failure classification
 # ---------------------------------------------------------------------------
 
 
-class FailureClass(str, Enum):
+class FailureClass(StrEnum):
     """How a quality-gate failure should be handled."""
 
     correctable = "correctable"
@@ -61,7 +60,7 @@ class ReworkAttempt(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class ReworkOutcome(str, Enum):
+class ReworkOutcome(StrEnum):
     """Final outcome of the rework loop."""
 
     fixed = "fixed"
@@ -273,8 +272,12 @@ class ReworkLoop:
         manager: BundleManager,
     ) -> None:
         """Persist rework attempt history into an evidence bundle."""
+        if rework_result.outcome is None:
+            raise ValueError("rework_result.outcome is required before persisting evidence")
+
+        outcome = rework_result.outcome
         lines = [
-            f"rework outcome: {rework_result.outcome.value}",
+            f"rework outcome: {outcome.value}",
             f"attempts: {len(rework_result.attempts)}",
         ]
         for att in rework_result.attempts:
@@ -284,7 +287,7 @@ class ReworkLoop:
             )
 
         metadata: dict[str, Any] = {
-            "rework_outcome": rework_result.outcome.value,
+            "rework_outcome": outcome.value,
             "total_attempts": len(rework_result.attempts),
             "attempts": [a.model_dump(mode="json") for a in rework_result.attempts],
         }
