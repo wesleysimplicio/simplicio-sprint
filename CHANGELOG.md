@@ -8,6 +8,18 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Localhost web control plane API at `/api/runs` with enriched run listing
+  (status, autonomy level, task, branch, readiness score), run detail with
+  quality gate reports, evidence bundles, and logs (#102).
+  New route module `sendsprint/api/routes/control_plane.py` with five endpoints:
+  `GET /api/runs`, `POST /api/runs`, `GET /api/runs/{run_id}`,
+  `GET /api/runs/{run_id}/evidence`, `GET /api/runs/{run_id}/quality`.
+- CLI command `sendsprint web --port 5173` to start the web control plane
+  locally via uvicorn (#102).
+- 13 tests in `tests/test_api_control_plane.py` covering all control-plane
+  endpoints, readiness score integration, 404 handling, and CLI command
+  registration (#102).
+
 - Optional Rust accelerator boundary `sendsprint/accelerators/` with Python
   fallback for hot-path operations: `fast_scan()`, `fast_diff()`,
   `fast_dedupe()`, `fast_receipt_hash()` (#108).

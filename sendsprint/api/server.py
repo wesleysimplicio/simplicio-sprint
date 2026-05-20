@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sendsprint import __version__
 from sendsprint.api.routes import auth as auth_routes
+from sendsprint.api.routes import control_plane as cp_routes
 from sendsprint.api.routes import runs as run_routes
 from sendsprint.api.routes import sprints as sprint_routes
 from sendsprint.api.runs import events
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_routes.router)
     app.include_router(sprint_routes.router)
     app.include_router(run_routes.router)
+    app.include_router(cp_routes.router)
     return app
 
 

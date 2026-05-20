@@ -1386,5 +1386,29 @@ def catalog_show(
 
 
 
+@app.command(name="web")
+def web_cmd(
+    port: int = typer.Option(5173, "--port", "-p", help="Port for the web control plane"),
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind address"),
+    reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for development"),
+) -> None:
+    """Start the localhost web control plane (API + UI)."""
+    try:
+        import uvicorn
+    except ImportError:
+        console.print("[red]uvicorn is required: pip install uvicorn[/red]")
+        raise typer.Exit(1)
+
+    console.print(f"[green]SendSprint web control plane v{__version__}[/green]")
+    console.print(f"  listening on http://{host}:{port}")
+    console.print(f"  docs at http://{host}:{port}/docs")
+    uvicorn.run(
+        "sendsprint.api.server:app",
+        host=host,
+        port=port,
+        reload=reload,
+    )
+
+
 if __name__ == "__main__":
     app()
