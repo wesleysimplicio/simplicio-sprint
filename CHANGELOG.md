@@ -8,6 +8,25 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Audited control-command queue module `sendsprint/command_queue.py` with
+  `CommandStatus` enum (queued, accepted, rejected, applied, failed),
+  `RunControlCommand` Pydantic model (command_id, command_type, run_id,
+  params, issued_by, status, reason, created_at/accepted_at/applied_at/
+  resolved_at timestamps), `CommandQueue` class (enqueue, poll, accept,
+  apply, reject, fail, get, history), `COMMAND_AUTONOMY_REQUIREMENTS`
+  mapping control actions to minimum autonomy levels, and four typed
+  exceptions (CommandPolicyError, DuplicateCommandError,
+  CommandNotFoundError, InvalidCommandTransition). Autonomy policy is
+  enforced at enqueue time; workers poll at safe checkpoints without
+  blocking status reads; command IDs provide idempotency protection (#115).
+- 40 tests in `tests/test_command_queue.py` covering model validation,
+  serialization, allowed/denied policy checks across autonomy levels,
+  duplicate command rejection, full lifecycle transitions (queued ->
+  accepted -> applied, queued -> rejected, accepted -> failed), invalid
+  transition guards, poll filtering by run and status, history ordering,
+  autonomy requirements mapping, default policy behavior, concurrent
+  enqueue thread safety, and fake worker consumption simulation (#115).
+
 - Non-code domain quality gates module `sendsprint/domain_quality.py` with
   `DomainCheckType` enum (checklist, review, source, risk),
   `DomainQualityCheck` model, `ChecklistItem`, `ReviewGateInput`,
