@@ -8,6 +8,17 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Live dashboard API endpoints under `/api/dashboard/` with yool stats
+  (cache hits/misses, retries, cost, duration per yool), agent provider
+  status, validation lane status (dev, lint, test, security, pr), and
+  tuple/run status with drill-down to individual yool and tuple detail.
+  SSE stream endpoint at `GET /runs/{run_id}/events/stream` with typed
+  event frames (hello, step, log, evidence, done, error) and 30 s
+  keepalive for live dashboard updates. 16 tests in
+  `tests/test_dashboard_api.py` (#103).
+
+### Added
+
 - Operator action endpoints at `/api/runs/{run_id}/actions/{action}` for
   pause, resume, cancel, rerun failed step, and approve publish, with
   autonomy-level gating, confirmation requirement for destructive actions

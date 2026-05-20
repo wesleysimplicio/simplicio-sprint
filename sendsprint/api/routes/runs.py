@@ -88,6 +88,34 @@ async def run_events(run_id: str) -> StreamingResponse:
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
+@router.get("/{run_id}/events/stream")
+async def run_event_stream(run_id: str) -> StreamingResponse:
+    """SSE stream for live dashboard updates — richer than /events.
+
+    Emits ``hello``, ``step``, ``log``, ``evidence``, ``done``, and ``error``
+    frames.  Keepalive every 30 s.  Issue #103.
+    """
+    if manager.get_run(run_id) is None:
+        raise HTTPException(status_code=404, detail="run not found")
+
+    async def _generate():
+        yield f'event: hello\ndata: {json.dumps({"run_id": run_id})}\n\n'
+        while True:
+            try:
+                event = await asyncio.wait_for(events.drain(run_id), timeout=30.0)
+            except TimeoutError:
+                yield ": keepalive\n\n"
+                continue
+            event_type = event.get("type", "message")
+            payload = json.dumps({**event, "run_id": run_id})
+            yield f"event: {event_type}\ndata: {payload}\n\n"
+            if event_type in {"done", "error"}:
+                events.close(run_id)
+                break
+
+    return StreamingResponse(_generate(), media_type="text/event-stream")
+
+
 @router.get("/{run_id}/evidence/{name}")
 def get_evidence(run_id: str, name: str) -> FileResponse:
     """Serve a captured evidence file (screenshot/log) for the web UI."""
