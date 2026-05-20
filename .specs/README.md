@@ -11,13 +11,14 @@ Tanto humano novo no time quanto agente devem percorrer nessa ordem:
 3. **`product/DOMAIN.md`** — vocabulário e entidades de negócio.
 4. **`architecture/DESIGN.md`** — diagrama macro, boundaries, stack.
 5. **`architecture/PATTERNS.md`** — como escrever código aqui. Naming, estrutura, error handling.
-6. **`architecture/ADR-001-example.md`** (e demais ADRs) — decisões arquiteturais e suas razões.
-7. **`workflow/WORKFLOW.md`** — branch strategy, PR, deploy, hotfix.
-8. **`workflow/CONTRIBUTING.md`** — como adicionar uma feature passo a passo.
-9. **`workflow/RELEASE.md`** — versionamento e release.
-10. **`sprints/BACKLOG.md`** — lista priorizada do que falta.
-11. **`sprints/sprint-XX/SPRINT.md`** — sprint corrente.
-12. **`sprints/sprint-XX/NN-*.task.md`** — tasks ativas.
+6. **`architecture/ROADMAP.md`** — active roadmap, phase priorities (P0/P1/P2), and dependency map for #92-#124.
+7. **`architecture/ADR-001-example.md`** (e demais ADRs) — decisões arquiteturais e suas razões.
+8. **`workflow/WORKFLOW.md`** — branch strategy, PR, deploy, hotfix.
+9. **`workflow/CONTRIBUTING.md`** — como adicionar uma feature passo a passo.
+10. **`workflow/RELEASE.md`** — versionamento e release.
+11. **`sprints/BACKLOG.md`** — lista priorizada do que falta.
+12. **`sprints/sprint-XX/SPRINT.md`** — sprint corrente.
+13. **`sprints/sprint-XX/NN-*.task.md`** — tasks ativas.
 
 ## Estrutura
 
@@ -31,6 +32,7 @@ Tanto humano novo no time quanto agente devem percorrer nessa ordem:
 ├── architecture/            # o como técnico
 │   ├── DESIGN.md
 │   ├── PATTERNS.md
+│   ├── ROADMAP.md
 │   ├── ADR-template.md
 │   └── ADR-001-example.md
 ├── workflow/                # o processo

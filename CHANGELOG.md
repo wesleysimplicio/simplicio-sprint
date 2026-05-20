@@ -6,6 +6,15 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.17.2] - 2026-05-20
+
+### Added
+
+- Active roadmap and dependency map at `.specs/architecture/ROADMAP.md` covering
+  issues #92 through #124, grouped into P0/P1/P2 phases with Mermaid dependency
+  graph (#113).
+- `.specs/README.md` navigation index updated to reference ROADMAP.md.
+
 ## [0.17.1] - 2026-05-20
 
 ### Added
