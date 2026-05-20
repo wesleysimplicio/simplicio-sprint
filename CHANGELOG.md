@@ -8,6 +8,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tri-agent status relay module `sendsprint/status_relay.py` with
+  `RunEventEmitter` (thread-safe structured event emitter),
+  `RunSnapshot` (read-only point-in-time run state model),
+  `ControlCommand` (queued operator mutations: pause/resume/cancel/etc.),
+  and `StatusRelay` orchestrator exposing `get_snapshot()`,
+  `format_for_claude()` (Markdown), `format_for_codex()` (structured JSON),
+  `format_for_hermes()` (concise plain text). All operations are thread-safe
+  and non-blocking so the worker loop remains responsive under repeated
+  status queries (#111).
+- 34 tests in `tests/test_status_relay.py` covering event emission,
+  snapshot CRUD, command queue, all three agent formatters (Claude Markdown,
+  Codex JSON, Hermes concise), evidence truncation, thread safety, and
+  concurrent read/write integration (#111).
+
 - Deeper GitHub integration module `sendsprint/github_integration.py` with four
   classes for the full issue/PR/CI/review lifecycle (#100):
   `DuplicateDetector` (search for duplicate issues, PRs, and concurrent work),
