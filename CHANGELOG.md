@@ -8,6 +8,18 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Verifiable planning phase module `sendsprint/plan_verifier.py` with
+  `VerifiablePlan` Pydantic model (task_summary, target_files, expected_tests,
+  risks, done_criteria, approved_by, approved_at), `PlanVerifier` class
+  (create_plan, persist_to_evidence, persist_to_run_state, check_duplicate_work,
+  requires_approval, approve, assert_approved), `DuplicateWorkError` and
+  `PlanNotApprovedError` exceptions. Integrates with autonomy policy for
+  approval gating at execute+ levels and with `BundleManager` for evidence
+  persistence (#97).
+- 31 tests in `tests/test_plan_verifier.py` covering model validation,
+  serialization, plan creation, approval gating across autonomy levels,
+  duplicate work detection, run state persistence, evidence persistence,
+  and full lifecycle integration (#97).
 - Stack-specific validation recipes in `sendsprint/validation_recipes.py`:
   `ValidationRecipe` Pydantic model, built-in recipes for Python (pytest, ruff),
   Go (go test, go vet), Rust (cargo test, cargo clippy), Node (npm test, npm
