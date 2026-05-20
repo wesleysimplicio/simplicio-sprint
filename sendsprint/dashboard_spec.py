@@ -10,17 +10,17 @@ See: https://github.com/wesleysimplicio/SendSprint/issues/109
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, Literal
+from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # ---------------------------------------------------------------------------
 # SSE event protocol
 # ---------------------------------------------------------------------------
 
-class SSEEventType(str, Enum):
+
+class SSEEventType(StrEnum):
     """Event types the Python API pushes over the SSE /runs/{run_id}/events
     stream.  The Node dashboard subscribes and renders — it never produces
     these events itself."""
@@ -71,6 +71,7 @@ class SSEEventPayload(BaseModel):
 # Dashboard event protocol
 # ---------------------------------------------------------------------------
 
+
 class DashboardEventProtocol(BaseModel):
     """Documents the full set of SSE event types, payload schemas, and
     delivery guarantees the Node dashboard can rely on."""
@@ -99,7 +100,8 @@ class DashboardEventProtocol(BaseModel):
 # Node dashboard scope
 # ---------------------------------------------------------------------------
 
-class NodeDashboardScope(str, Enum):
+
+class NodeDashboardScope(StrEnum):
     """Capabilities the Node dashboard is allowed to exercise."""
 
     render_run_state = "render_run_state"
@@ -216,7 +218,8 @@ class NodeDashboardSpec(BaseModel):
 # Playwright lane isolation
 # ---------------------------------------------------------------------------
 
-class PlaywrightEvidenceKind(str, Enum):
+
+class PlaywrightEvidenceKind(StrEnum):
     """Types of evidence the Playwright lane can capture."""
 
     screenshot = "screenshot"

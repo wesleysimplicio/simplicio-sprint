@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import threading
-from datetime import UTC, datetime
 
 import pytest
 
@@ -15,7 +14,6 @@ from sendsprint.status_relay import (
     RunSnapshot,
     StatusRelay,
 )
-
 
 # ---------------------------------------------------------------------------
 # RunEventEmitter
@@ -126,7 +124,7 @@ class TestRunSnapshot:
         assert restored.current_action == "building"
 
     def test_extra_fields_rejected(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             RunSnapshot(run_id="run-z", unknown_field="bad")
 
 
@@ -239,13 +237,15 @@ class TestFormatForClaude:
 
     def test_basic_fields(self) -> None:
         relay = StatusRelay()
-        relay.update_snapshot(RunSnapshot(
-            run_id="run-md",
-            current_action="testing",
-            next_step="publish PR",
-            active_agents=["codex-1", "claude-main"],
-            event_count=7,
-        ))
+        relay.update_snapshot(
+            RunSnapshot(
+                run_id="run-md",
+                current_action="testing",
+                next_step="publish PR",
+                active_agents=["codex-1", "claude-main"],
+                event_count=7,
+            )
+        )
         md = relay.format_for_claude("run-md")
         assert "## Run `run-md`" in md
         assert "**Current action:** testing" in md
@@ -254,10 +254,12 @@ class TestFormatForClaude:
 
     def test_blockers_section(self) -> None:
         relay = StatusRelay()
-        relay.update_snapshot(RunSnapshot(
-            run_id="run-b",
-            blockers=["review pending", "CI timeout"],
-        ))
+        relay.update_snapshot(
+            RunSnapshot(
+                run_id="run-b",
+                blockers=["review pending", "CI timeout"],
+            )
+        )
         md = relay.format_for_claude("run-b")
         assert "### Blockers" in md
         assert "- review pending" in md
@@ -284,13 +286,15 @@ class TestFormatForCodex:
 
     def test_valid_json(self) -> None:
         relay = StatusRelay()
-        relay.update_snapshot(RunSnapshot(
-            run_id="run-j",
-            current_action="building",
-            failures=["lint"],
-            pr_links=["https://github.com/o/r/pull/1"],
-            evidence_refs=[f"e{i}" for i in range(15)],
-        ))
+        relay.update_snapshot(
+            RunSnapshot(
+                run_id="run-j",
+                current_action="building",
+                failures=["lint"],
+                pr_links=["https://github.com/o/r/pull/1"],
+                evidence_refs=[f"e{i}" for i in range(15)],
+            )
+        )
         out = relay.format_for_codex("run-j")
         data = json.loads(out)
         assert data["run_id"] == "run-j"
@@ -311,16 +315,18 @@ class TestFormatForHermes:
     def test_missing_run(self) -> None:
         relay = StatusRelay()
         out = relay.format_for_hermes("nope")
-        assert "[nope] no active run" == out
+        assert out == "[nope] no active run"
 
     def test_concise_format(self) -> None:
         relay = StatusRelay()
-        relay.update_snapshot(RunSnapshot(
-            run_id="run-h",
-            current_action="deploying",
-            next_step="smoke test",
-            active_agents=["hermes-1"],
-        ))
+        relay.update_snapshot(
+            RunSnapshot(
+                run_id="run-h",
+                current_action="deploying",
+                next_step="smoke test",
+                active_agents=["hermes-1"],
+            )
+        )
         out = relay.format_for_hermes("run-h")
         assert "[run-h] deploying" in out
         assert "next: smoke test" in out
@@ -328,31 +334,37 @@ class TestFormatForHermes:
 
     def test_blocker_highlighted(self) -> None:
         relay = StatusRelay()
-        relay.update_snapshot(RunSnapshot(
-            run_id="run-hb",
-            current_action="blocked",
-            blockers=["human approval needed"],
-        ))
+        relay.update_snapshot(
+            RunSnapshot(
+                run_id="run-hb",
+                current_action="blocked",
+                blockers=["human approval needed"],
+            )
+        )
         out = relay.format_for_hermes("run-hb")
         assert "BLOCKED:" in out
 
     def test_failure_count(self) -> None:
         relay = StatusRelay()
-        relay.update_snapshot(RunSnapshot(
-            run_id="run-hf",
-            current_action="retrying",
-            failures=["lint", "test", "build"],
-        ))
+        relay.update_snapshot(
+            RunSnapshot(
+                run_id="run-hf",
+                current_action="retrying",
+                failures=["lint", "test", "build"],
+            )
+        )
         out = relay.format_for_hermes("run-hf")
         assert "failures: 3" in out
 
     def test_pr_count(self) -> None:
         relay = StatusRelay()
-        relay.update_snapshot(RunSnapshot(
-            run_id="run-hp",
-            current_action="reviewing",
-            pr_links=["pr1", "pr2"],
-        ))
+        relay.update_snapshot(
+            RunSnapshot(
+                run_id="run-hp",
+                current_action="reviewing",
+                pr_links=["pr1", "pr2"],
+            )
+        )
         out = relay.format_for_hermes("run-hp")
         assert "PRs: 2" in out
 
@@ -404,9 +416,7 @@ class TestEmitterRelayIntegration:
         def updater() -> None:
             try:
                 for i in range(100):
-                    relay.update_snapshot(
-                        RunSnapshot(run_id="run-c", current_action=f"step-{i}")
-                    )
+                    relay.update_snapshot(RunSnapshot(run_id="run-c", current_action=f"step-{i}"))
             except Exception as exc:
                 errors.append(str(exc))
 

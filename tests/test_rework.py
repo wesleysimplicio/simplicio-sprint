@@ -28,13 +28,14 @@ from sendsprint.rework import (
     diagnose,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _check(name: str, passed: bool, severity: str = "error", details: str = "") -> QualityCheckResult:
+def _check(
+    name: str, passed: bool, severity: str = "error", details: str = ""
+) -> QualityCheckResult:
     return QualityCheckResult(
         check_name=name,
         passed=passed,
@@ -101,7 +102,7 @@ class TestReworkAttempt:
         assert restored.failure_class == att.failure_class
 
     def test_extra_fields_forbidden(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ReworkAttempt(
                 attempt_num=1,
                 failure_class=FailureClass.correctable,
@@ -186,7 +187,9 @@ class TestDiagnose:
         assert diagnose(report) == "no failures detected"
 
     def test_single_failure(self) -> None:
-        report = _report("needs_rework", [_check("lint", False, details="E302 expected 2 blank lines")])
+        report = _report(
+            "needs_rework", [_check("lint", False, details="E302 expected 2 blank lines")]
+        )
         result = diagnose(report)
         assert "1 check(s) failed" in result
         assert "lint" in result

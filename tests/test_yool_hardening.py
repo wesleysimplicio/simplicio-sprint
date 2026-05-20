@@ -9,7 +9,6 @@ import pytest
 from sendsprint.yool.contracts import (
     BudgetEnforcer,
     BudgetEnforcerExceeded,
-    CacheEntry,
     ContractRegistry,
     ContractViolation,
     InputCache,
@@ -19,7 +18,6 @@ from sendsprint.yool.contracts import (
     YoolContract,
     validate_payload,
 )
-
 
 # ---------------------------------------------------------------------------
 # YoolContract
@@ -53,7 +51,7 @@ class TestYoolContract:
         assert c.has_budget_limits() is False
 
     def test_extra_fields_rejected(self) -> None:
-        with pytest.raises(Exception):  # ValidationError
+        with pytest.raises(ValueError):  # ValidationError
             YoolContract(yool_id="x", unknown_field=True)
 
     def test_custom_schemas(self) -> None:

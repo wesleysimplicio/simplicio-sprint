@@ -18,7 +18,7 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, cast
 
 try:
     import resource
@@ -266,11 +266,12 @@ class PythonWorker:
             return
 
         try:
-            soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+            resource_module = cast(Any, resource)
+            soft, hard = resource_module.getrlimit(resource_module.RLIMIT_AS)
             new_soft = self.mem_limit_mb * 1024 * 1024
-            if hard != resource.RLIM_INFINITY and new_soft > hard:
+            if hard != resource_module.RLIM_INFINITY and new_soft > hard:
                 new_soft = hard
-            resource.setrlimit(resource.RLIMIT_AS, (new_soft, hard))
+            resource_module.setrlimit(resource_module.RLIMIT_AS, (new_soft, hard))
         except (ValueError, OSError):
             logger.debug("RLIMIT_AS skipped (platform may not support it)")
 

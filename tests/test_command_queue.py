@@ -14,6 +14,7 @@ import threading
 import pytest
 
 from sendsprint.command_queue import (
+    COMMAND_AUTONOMY_REQUIREMENTS,
     CommandNotFoundError,
     CommandPolicyError,
     CommandQueue,
@@ -21,14 +22,13 @@ from sendsprint.command_queue import (
     DuplicateCommandError,
     InvalidCommandTransition,
     RunControlCommand,
-    COMMAND_AUTONOMY_REQUIREMENTS,
 )
 from sendsprint.policy import AutonomyPolicy
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def execute_queue() -> CommandQueue:
@@ -51,6 +51,7 @@ def pr_queue() -> CommandQueue:
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
+
 
 class TestRunControlCommand:
     def test_defaults(self) -> None:
@@ -78,10 +79,8 @@ class TestRunControlCommand:
         assert cmd.params == {"priority": 1}
 
     def test_extra_fields_forbidden(self) -> None:
-        with pytest.raises(Exception):
-            RunControlCommand(
-                command_type="pause", run_id="run-1", bogus="nope"
-            )
+        with pytest.raises(ValueError):
+            RunControlCommand(command_type="pause", run_id="run-1", bogus="nope")
 
     def test_serialization_roundtrip(self) -> None:
         cmd = RunControlCommand(command_type="resume", run_id="run-3")
@@ -106,6 +105,7 @@ class TestCommandStatus:
 # Enqueue + policy tests
 # ---------------------------------------------------------------------------
 
+
 class TestEnqueue:
     def test_allowed_pause(self, execute_queue: CommandQueue) -> None:
         cmd = execute_queue.enqueue(command_type="pause", run_id="run-1")
@@ -129,18 +129,12 @@ class TestEnqueue:
         assert cmd.status == CommandStatus.queued
 
     def test_duplicate_command_id(self, execute_queue: CommandQueue) -> None:
-        execute_queue.enqueue(
-            command_type="pause", run_id="run-1", command_id="dup-1"
-        )
+        execute_queue.enqueue(command_type="pause", run_id="run-1", command_id="dup-1")
         with pytest.raises(DuplicateCommandError, match="dup-1"):
-            execute_queue.enqueue(
-                command_type="resume", run_id="run-1", command_id="dup-1"
-            )
+            execute_queue.enqueue(command_type="resume", run_id="run-1", command_id="dup-1")
 
     def test_custom_issued_by(self, execute_queue: CommandQueue) -> None:
-        cmd = execute_queue.enqueue(
-            command_type="pause", run_id="run-1", issued_by="hermes"
-        )
+        cmd = execute_queue.enqueue(command_type="pause", run_id="run-1", issued_by="hermes")
         assert cmd.issued_by == "hermes"
 
     def test_params_forwarded(self, execute_queue: CommandQueue) -> None:
@@ -155,6 +149,7 @@ class TestEnqueue:
 # ---------------------------------------------------------------------------
 # Poll tests
 # ---------------------------------------------------------------------------
+
 
 class TestPoll:
     def test_poll_returns_queued_only(self, execute_queue: CommandQueue) -> None:
@@ -179,6 +174,7 @@ class TestPoll:
 # ---------------------------------------------------------------------------
 # Lifecycle transition tests
 # ---------------------------------------------------------------------------
+
 
 class TestLifecycle:
     def test_full_happy_path(self, execute_queue: CommandQueue) -> None:
@@ -236,6 +232,7 @@ class TestLifecycle:
 # Query tests
 # ---------------------------------------------------------------------------
 
+
 class TestQueries:
     def test_get_existing(self, execute_queue: CommandQueue) -> None:
         cmd = execute_queue.enqueue(command_type="pause", run_id="run-1")
@@ -252,7 +249,9 @@ class TestQueries:
 
         hist = execute_queue.history("run-1")
         assert [c.command_id for c in hist] == [
-            c1.command_id, c2.command_id, c3.command_id,
+            c1.command_id,
+            c2.command_id,
+            c3.command_id,
         ]
 
     def test_history_empty_run(self, execute_queue: CommandQueue) -> None:
@@ -269,11 +268,17 @@ class TestQueries:
 # Autonomy requirements mapping
 # ---------------------------------------------------------------------------
 
+
 class TestAutonomyRequirements:
     def test_all_actions_mapped(self) -> None:
         expected_actions = {
-            "pause", "resume", "cancel", "change_autonomy",
-            "reprioritize", "approve", "reject",
+            "pause",
+            "resume",
+            "cancel",
+            "change_autonomy",
+            "reprioritize",
+            "approve",
+            "reject",
         }
         assert set(COMMAND_AUTONOMY_REQUIREMENTS.keys()) == expected_actions
 
@@ -291,6 +296,7 @@ class TestAutonomyRequirements:
 # ---------------------------------------------------------------------------
 # Default policy
 # ---------------------------------------------------------------------------
+
 
 class TestDefaultPolicy:
     def test_default_is_plan(self) -> None:
@@ -311,6 +317,7 @@ class TestDefaultPolicy:
 # ---------------------------------------------------------------------------
 # Concurrency
 # ---------------------------------------------------------------------------
+
 
 class TestConcurrency:
     def test_concurrent_enqueue(self, pr_queue: CommandQueue) -> None:
@@ -363,12 +370,13 @@ class TestConcurrency:
 # Worker consumption simulation
 # ---------------------------------------------------------------------------
 
+
 class TestWorkerConsumption:
     """Simulates a fake worker consuming commands without blocking reads."""
 
     def test_worker_drains_commands(self, execute_queue: CommandQueue) -> None:
-        c1 = execute_queue.enqueue(command_type="pause", run_id="run-1")
-        c2 = execute_queue.enqueue(command_type="resume", run_id="run-1")
+        execute_queue.enqueue(command_type="pause", run_id="run-1")
+        execute_queue.enqueue(command_type="resume", run_id="run-1")
 
         pending = execute_queue.poll("run-1")
         assert len(pending) == 2
@@ -383,9 +391,7 @@ class TestWorkerConsumption:
         assert all(c.status == CommandStatus.applied for c in hist)
 
     def test_worker_rejects_unsupported(self, execute_queue: CommandQueue) -> None:
-        cmd = execute_queue.enqueue(
-            command_type="reprioritize", run_id="run-1"
-        )
+        cmd = execute_queue.enqueue(command_type="reprioritize", run_id="run-1")
         execute_queue.reject(cmd.command_id, reason="unsupported by this worker")
         assert execute_queue.get(cmd.command_id).status == CommandStatus.rejected
 

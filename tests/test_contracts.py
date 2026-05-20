@@ -19,7 +19,6 @@ from sendsprint.contracts import (
     to_json,
 )
 
-
 # ── RunCommand ─────────────────────────────────────────────────────────────
 
 
@@ -244,10 +243,10 @@ class TestFromJsonEdgeCases:
         raw = json.dumps(
             {"command_type": "nonexistent", "run_id": "run-bad", "version": CONTRACT_VERSION}
         )
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             from_json(raw, RunCommand)
 
     def test_missing_required_field_raises(self) -> None:
         raw = json.dumps({"command_type": "plan", "version": CONTRACT_VERSION})
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             from_json(raw, RunCommand)

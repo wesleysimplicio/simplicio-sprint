@@ -14,7 +14,6 @@ from sendsprint.readiness_score import (
     build_default_components,
 )
 
-
 # ---------------------------------------------------------------------------
 # ScoreComponent model
 # ---------------------------------------------------------------------------
@@ -34,19 +33,19 @@ class TestScoreComponent:
 
     def test_frozen(self) -> None:
         c = ScoreComponent(name="x", weight=0.1, raw_score=50)
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             c.raw_score = 99  # type: ignore[misc]
 
     def test_weight_bounds(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ScoreComponent(name="x", weight=1.5, raw_score=50)
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ScoreComponent(name="x", weight=-0.1, raw_score=50)
 
     def test_raw_score_bounds(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ScoreComponent(name="x", weight=0.1, raw_score=101)
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ScoreComponent(name="x", weight=0.1, raw_score=-1)
 
     def test_default_details_empty(self) -> None:
@@ -153,9 +152,7 @@ class TestGetVerdict:
         assert drs.get_verdict(0.0) == ReadinessVerdict.blocked
 
     def test_custom_thresholds(self) -> None:
-        drs = DeliveryReadinessScore(
-            auto_publish_threshold=90, human_approval_threshold=60
-        )
+        drs = DeliveryReadinessScore(auto_publish_threshold=90, human_approval_threshold=60)
         assert drs.get_verdict(90.0) == ReadinessVerdict.auto_publish
         assert drs.get_verdict(89.9) == ReadinessVerdict.needs_human_approval
         assert drs.get_verdict(60.0) == ReadinessVerdict.needs_human_approval
@@ -163,13 +160,9 @@ class TestGetVerdict:
 
     def test_invalid_thresholds(self) -> None:
         with pytest.raises(ValueError, match="must be less than"):
-            DeliveryReadinessScore(
-                auto_publish_threshold=50, human_approval_threshold=50
-            )
+            DeliveryReadinessScore(auto_publish_threshold=50, human_approval_threshold=50)
         with pytest.raises(ValueError, match="must be less than"):
-            DeliveryReadinessScore(
-                auto_publish_threshold=50, human_approval_threshold=60
-            )
+            DeliveryReadinessScore(auto_publish_threshold=50, human_approval_threshold=60)
 
 
 # ---------------------------------------------------------------------------
@@ -189,9 +182,7 @@ class TestFormatSummary:
 
     def test_contains_all_component_names(self) -> None:
         components = build_default_components()
-        summary = DeliveryReadinessScore.format_summary(
-            components, 0.0, ReadinessVerdict.blocked
-        )
+        summary = DeliveryReadinessScore.format_summary(components, 0.0, ReadinessVerdict.blocked)
         for name in DEFAULT_WEIGHTS:
             assert name in summary
 
@@ -201,17 +192,13 @@ class TestFormatSummary:
             quality_gate_details="all checks passed",
         )
         score = DeliveryReadinessScore.calculate(components)
-        summary = DeliveryReadinessScore.format_summary(
-            components, score, ReadinessVerdict.blocked
-        )
+        summary = DeliveryReadinessScore.format_summary(components, score, ReadinessVerdict.blocked)
         assert "### Details" in summary
         assert "all checks passed" in summary
 
     def test_no_details_section_when_empty(self) -> None:
         components = build_default_components()
-        summary = DeliveryReadinessScore.format_summary(
-            components, 0.0, ReadinessVerdict.blocked
-        )
+        summary = DeliveryReadinessScore.format_summary(components, 0.0, ReadinessVerdict.blocked)
         assert "### Details" not in summary
 
 
@@ -290,9 +277,7 @@ class TestBuildDefaultComponents:
         assert names == set(DEFAULT_WEIGHTS.keys())
 
     def test_custom_scores_applied(self) -> None:
-        components = build_default_components(
-            quality_gate_score=95, ci_status_score=88
-        )
+        components = build_default_components(quality_gate_score=95, ci_status_score=88)
         by_name = {c.name: c for c in components}
         assert by_name["quality_gate"].raw_score == 95
         assert by_name["ci_status"].raw_score == 88

@@ -113,8 +113,8 @@ def test_worker_consumes_lane_and_emits_child_tuple(tmp_path: Path) -> None:
 
         review_task = asyncio.create_task(drain_review())
         await bus.publish(parent)
-        await review_task
-        await bus.drain()
+        await asyncio.wait_for(review_task, timeout=5)
+        await bus.close()
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task
@@ -138,12 +138,8 @@ def test_tuple_bus_preserves_order_within_lane() -> None:
                     return
 
         task = asyncio.create_task(consumer())
-        first = emit_tuple(
-            yool_id="agent.codex.plan", lane="dev", payload={"n": 1}, run_id="r"
-        )
-        second = emit_tuple(
-            yool_id="agent.codex.plan", lane="dev", payload={"n": 2}, run_id="r"
-        )
+        first = emit_tuple(yool_id="agent.codex.plan", lane="dev", payload={"n": 1}, run_id="r")
+        second = emit_tuple(yool_id="agent.codex.plan", lane="dev", payload={"n": 2}, run_id="r")
         await bus.publish(first)
         await bus.publish(second)
         await task
@@ -260,7 +256,7 @@ def test_resume_after_kill_replays_pending_tuple(tmp_path: Path) -> None:
             "import time\n"
             "from pathlib import Path\n"
             "from sendsprint.yool.tuples import TupleLog, emit_tuple\n\n"
-            f"tuple_root = Path(r\"{tuple_root}\")\n"
+            f'tuple_root = Path(r"{tuple_root}")\n'
             "log = TupleLog('run-kill', tuple_root)\n"
             "tup = emit_tuple(\n"
             "    yool_id='agent.codex.plan',\n"

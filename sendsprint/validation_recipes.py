@@ -13,10 +13,10 @@ from pydantic import BaseModel, Field
 
 from sendsprint.tech.detector import TechFingerprint, detect_tech
 
-
 # ---------------------------------------------------------------------------
 # Model
 # ---------------------------------------------------------------------------
+
 
 class ValidationRecipe(BaseModel):
     """A single stack validation recipe."""
@@ -130,6 +130,7 @@ _TECH_TO_RECIPE: dict[str, str] = {
 # Recipe selector
 # ---------------------------------------------------------------------------
 
+
 class RecipeSelector:
     """Select validation recipes from a workspace fingerprint."""
 
@@ -161,6 +162,7 @@ class RecipeSelector:
 # ---------------------------------------------------------------------------
 # PR body formatting
 # ---------------------------------------------------------------------------
+
 
 def format_for_pr_body(recipes: list[ValidationRecipe]) -> str:
     """Render recipes as a Markdown section suitable for PR body inclusion."""

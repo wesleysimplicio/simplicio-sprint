@@ -6,14 +6,13 @@ Priority: Go worker (if binary on PATH) > Python fallback (always).
 from __future__ import annotations
 
 import logging
-from typing import Union
 
 from sendsprint.workers.go_spec import GoWorkerProxy, detect_go_worker
 from sendsprint.workers.python_worker import PythonWorker
 
 logger = logging.getLogger(__name__)
 
-Worker = Union[PythonWorker, GoWorkerProxy]
+Worker = PythonWorker | GoWorkerProxy
 
 
 def resolve_worker(
@@ -27,8 +26,8 @@ def resolve_worker(
     GoWorkerProxy.  Otherwise returns a PythonWorker (always available).
     """
     if prefer_go and detect_go_worker():
-        logger.info("Go worker detected — using GoWorkerProxy")
+        logger.debug("Go worker detected — using GoWorkerProxy")
         return GoWorkerProxy()
 
-    logger.info("Using PythonWorker fallback (concurrency=%d)", max_concurrency)
+    logger.debug("Using PythonWorker fallback (concurrency=%d)", max_concurrency)
     return PythonWorker(max_concurrency=max_concurrency)

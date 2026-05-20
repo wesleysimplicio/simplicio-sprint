@@ -17,7 +17,6 @@ from sendsprint.event_store import (
     RunSnapshotData,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -56,11 +55,11 @@ class TestRetentionPolicy:
         assert p.max_events == 500
 
     def test_min_bound(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             RetentionPolicy(max_events=0)
 
     def test_extra_field_rejected(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             RetentionPolicy(unknown_field="x")  # type: ignore[call-arg]
 
     def test_serialization_roundtrip(self) -> None:
@@ -88,7 +87,7 @@ class TestReplayCursor:
         assert c.timestamp == ts
 
     def test_extra_field_rejected(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             ReplayCursor(bad="x")  # type: ignore[call-arg]
 
 
@@ -234,7 +233,7 @@ class TestEventStoreReload:
         assert store2.event_count() == 3
 
     def test_empty_store_reload(self, tmp_path: Path) -> None:
-        store1 = EventStore(root=tmp_path, run_id="run-r4")
+        EventStore(root=tmp_path, run_id="run-r4")
         store2 = EventStore(root=tmp_path, run_id="run-r4")
         assert store2.event_count() == 0
         assert store2.current_seq() == 0
@@ -363,7 +362,7 @@ class TestEventStoreCompaction:
     def test_compact_respects_max_events(self, tmp_path: Path) -> None:
         store = EventStore(root=tmp_path, run_id="run-c2")
         now = datetime.now(UTC)
-        for i in range(10):
+        for _i in range(10):
             store.append(_make_event(run_id="run-c2", timestamp=now))
 
         policy = RetentionPolicy(max_events=3, compact_after_days=999)

@@ -11,11 +11,7 @@ from sendsprint.actions.lifecycle import (
     Action,
     ActionPhase,
     ActionStatus,
-    DomainDescriptor,
-    EvidenceRecord,
-    ExecutionStep,
     Objective,
-    ValidationResult,
 )
 from sendsprint.actions.marketing_adapter import (
     CAMPAIGN_BRIEF,
@@ -26,11 +22,10 @@ from sendsprint.actions.marketing_adapter import (
     LAUNCH_CHECKLIST,
     MARKETING_DOMAIN,
     MARKETING_TEMPLATES,
+    SOCIAL_POSTS,
     MarketingActionTemplate,
     MarketingDomainAdapter,
-    SOCIAL_POSTS,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -68,7 +63,7 @@ class TestMarketingDomain:
         assert MARKETING_DOMAIN.version == "1.0"
 
     def test_domain_frozen(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             MARKETING_DOMAIN.name = "other"  # type: ignore[misc]
 
 
@@ -113,7 +108,7 @@ class TestMarketingTemplates:
     @pytest.mark.parametrize("name", EXPECTED_TEMPLATES)
     def test_template_is_frozen(self, name: str) -> None:
         t = MARKETING_TEMPLATES[name]
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             t.name = "hacked"  # type: ignore[misc]
 
     def test_campaign_brief_inputs(self) -> None:
@@ -152,7 +147,7 @@ class TestMarketingTemplates:
 
 class TestMarketingActionTemplateModel:
     def test_extra_fields_forbidden(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             MarketingActionTemplate(name="x", label="X", bogus="y")  # type: ignore[call-arg]
 
     def test_minimal_construction(self) -> None:
@@ -421,7 +416,7 @@ class TestLearnPhase:
         action = _make_marketing_action()
         action.mark_failed("Brand review rejected")
         lessons = adapter.learn(action)
-        assert any("Brand review rejected" in l.lesson for l in lessons)
+        assert any("Brand review rejected" in lesson.lesson for lesson in lessons)
 
 
 # ---------------------------------------------------------------------------
@@ -488,7 +483,7 @@ class TestFullLifecycle:
 
         steps = adapter.plan(action)
         exec_steps = adapter.execute(action)
-        validation = adapter.validate(action)
+        adapter.validate(action)
 
         # No step references git, PR, or GitHub
         all_descriptions = [s.description or "" for s in steps + exec_steps]

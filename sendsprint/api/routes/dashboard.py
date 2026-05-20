@@ -169,9 +169,7 @@ def _build_yool_stats() -> YoolDashboardResponse:
         total = stat.cache_hits + stat.cache_misses
         stat.cache_hit_rate = stat.cache_hits / total if total > 0 else 0.0
         stat.avg_duration_ms = (
-            stat.total_duration_ms / stat.total_invocations
-            if stat.total_invocations > 0
-            else 0.0
+            stat.total_duration_ms / stat.total_invocations if stat.total_invocations > 0 else 0.0
         )
 
     return YoolDashboardResponse(
@@ -238,9 +236,8 @@ def _build_validation_dashboard() -> ValidationDashboardResponse:
                 lane_entry.last_result = status
 
             error = ev.get("error") or ev.get("message", "")
-            if ev.get("status") in ("failed", "error") and error:
-                if error not in lane_entry.errors:
-                    lane_entry.errors.append(error)
+            if ev.get("status") in ("failed", "error") and error and error not in lane_entry.errors:
+                lane_entry.errors.append(error)
 
     return ValidationDashboardResponse(
         lanes=list(lane_map.values()),

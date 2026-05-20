@@ -167,9 +167,7 @@ def test_dispatcher_marks_budget_exceeded_as_err_budget(tmp_path: Path) -> None:
     store = ReceiptStore(tmp_path)
     entry = make_entry()
 
-    def executor(
-        _entry: YoolEntry, payload: dict[str, int]
-    ) -> tuple[dict[str, int], ReceiptCost]:
+    def executor(_entry: YoolEntry, payload: dict[str, int]) -> tuple[dict[str, int], ReceiptCost]:
         return {"echo": payload["value"]}, ReceiptCost(
             tokens_in=8, tokens_out=8, wall_ms=10, usd=0.25
         )

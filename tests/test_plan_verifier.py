@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import tempfile
-from datetime import UTC, datetime
-from pathlib import Path
+from datetime import datetime
 
 import pytest
 
@@ -17,7 +16,6 @@ from sendsprint.plan_verifier import (
 )
 from sendsprint.policy import AutonomyPolicy
 from sendsprint.run_state import RunState
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -81,7 +79,7 @@ class TestVerifiablePlanModel:
         assert restored.target_files == plan.target_files
 
     def test_extra_fields_rejected(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             VerifiablePlan(task_summary="x", unknown_field="boom")
 
 

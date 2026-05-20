@@ -8,7 +8,6 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
-import pytest
 
 from sendsprint.github_integration import (
     CIMonitor,
@@ -27,6 +26,7 @@ REPO = "acme/widgets"
 # httpx mock transport helper
 # ---------------------------------------------------------------------------
 
+
 class _MockTransport(httpx.BaseTransport):
     """Return canned JSON for any request, recording calls for assertions."""
 
@@ -36,10 +36,7 @@ class _MockTransport(httpx.BaseTransport):
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(request)
-        if self._responses:
-            payload = self._responses.pop(0)
-        else:
-            payload = {}
+        payload = self._responses.pop(0) if self._responses else {}
         return httpx.Response(200, json=payload)
 
 
@@ -52,6 +49,7 @@ def _client(responses: list[dict[str, Any]] | None = None) -> tuple[httpx.Client
 # ---------------------------------------------------------------------------
 # DuplicateDetector
 # ---------------------------------------------------------------------------
+
 
 class TestDuplicateDetector:
     def test_check_duplicate_issues_returns_items(self) -> None:
@@ -104,6 +102,7 @@ class TestDuplicateDetector:
 # DuplicateResult dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestDuplicateResult:
     def test_has_duplicates_true(self) -> None:
         r = DuplicateResult(duplicates=[{"number": 1}])
@@ -124,6 +123,7 @@ class TestDuplicateResult:
 # CIStatus dataclass
 # ---------------------------------------------------------------------------
 
+
 class TestCIStatus:
     def test_is_green(self) -> None:
         assert CIStatus(state="success").is_green
@@ -139,6 +139,7 @@ class TestCIStatus:
 # ---------------------------------------------------------------------------
 # ProgressReporter
 # ---------------------------------------------------------------------------
+
 
 class TestProgressReporter:
     def test_post_progress_comment(self) -> None:
@@ -160,6 +161,7 @@ class TestProgressReporter:
         assert result["id"] == 1000
         # Verify the body was structured
         import json
+
         body = json.loads(t.calls[0].content)["body"]
         assert "## SendSprint Progress (done)" in body
         assert "- [x] lint" in body
@@ -170,6 +172,7 @@ class TestProgressReporter:
         c, t = _client([{"id": 1001, "body": "..."}])
         ProgressReporter(REPO, client=c).attach_evidence_summary(11)
         import json
+
         body = json.loads(t.calls[0].content)["body"]
         assert "## SendSprint Progress (in_progress)" in body
 
@@ -177,6 +180,7 @@ class TestProgressReporter:
 # ---------------------------------------------------------------------------
 # CIMonitor
 # ---------------------------------------------------------------------------
+
 
 class TestCIMonitor:
     def test_check_ci_status_success(self) -> None:
@@ -236,7 +240,8 @@ class TestCIMonitor:
         c, _ = _client([pending, success])
         sleeps: list[float] = []
         status = CIMonitor(REPO, client=c, sleep_fn=sleeps.append).wait_for_ci(
-            "abc", poll_interval_s=5,
+            "abc",
+            poll_interval_s=5,
         )
         assert status.is_green
         assert len(sleeps) == 1
@@ -248,7 +253,9 @@ class TestCIMonitor:
         # Provide enough responses for multiple polls
         c, _ = _client([pending, pending, pending, pending, pending])
         status = CIMonitor(REPO, client=c, sleep_fn=lambda _: None).wait_for_ci(
-            "abc", timeout_s=0, poll_interval_s=1,
+            "abc",
+            timeout_s=0,
+            poll_interval_s=1,
         )
         assert not status.is_green
         assert status.state == "pending"
@@ -257,6 +264,7 @@ class TestCIMonitor:
 # ---------------------------------------------------------------------------
 # ReviewReader
 # ---------------------------------------------------------------------------
+
 
 class TestReviewReader:
     def test_read_reviews(self) -> None:
@@ -267,7 +275,9 @@ class TestReviewReader:
         assert "/pulls/42/reviews" in str(t.calls[0].url)
 
     def test_read_review_comments(self) -> None:
-        comments = [{"id": 2, "body": "nit: rename", "path": "foo.py", "line": 10, "user": {"login": "bob"}}]
+        comments = [
+            {"id": 2, "body": "nit: rename", "path": "foo.py", "line": 10, "user": {"login": "bob"}}
+        ]
         c, t = _client([comments])
         result = ReviewReader(REPO, client=c).read_review_comments(42)
         assert result == comments
@@ -275,7 +285,11 @@ class TestReviewReader:
 
     def test_extract_actionable_feedback_changes_requested(self) -> None:
         reviews = [
-            {"state": "CHANGES_REQUESTED", "body": "Please fix the typo", "user": {"login": "carol"}},
+            {
+                "state": "CHANGES_REQUESTED",
+                "body": "Please fix the typo",
+                "user": {"login": "carol"},
+            },
             {"state": "APPROVED", "body": "Looks good", "user": {"login": "dave"}},
         ]
         comments: list[dict[str, Any]] = []
@@ -289,8 +303,18 @@ class TestReviewReader:
     def test_extract_actionable_feedback_inline_comments(self) -> None:
         reviews: list[dict[str, Any]] = []
         comments = [
-            {"body": "Use snake_case here", "path": "main.py", "line": 42, "user": {"login": "eve"}},
-            {"body": "", "path": "main.py", "line": 43, "user": {"login": "frank"}},  # empty body -> skipped
+            {
+                "body": "Use snake_case here",
+                "path": "main.py",
+                "line": 42,
+                "user": {"login": "eve"},
+            },
+            {
+                "body": "",
+                "path": "main.py",
+                "line": 43,
+                "user": {"login": "frank"},
+            },  # empty body -> skipped
         ]
         c, _ = _client([reviews, comments])
         feedback = ReviewReader(REPO, client=c).extract_actionable_feedback(60)
@@ -330,6 +354,7 @@ class TestReviewReader:
 # ---------------------------------------------------------------------------
 # ReviewFeedback dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestReviewFeedback:
     def test_defaults(self) -> None:

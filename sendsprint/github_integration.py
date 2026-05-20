@@ -12,8 +12,9 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
@@ -25,6 +26,7 @@ API_BASE = "https://api.github.com"
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
+
 
 def _default_headers(token: str | None = None) -> dict[str, str]:
     tok = token or os.getenv("GITHUB_TOKEN", "")
@@ -48,6 +50,7 @@ def _get_json(
 # ---------------------------------------------------------------------------
 # Data classes
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class DuplicateResult:
@@ -100,10 +103,13 @@ class ReviewFeedback:
 # DuplicateDetector
 # ---------------------------------------------------------------------------
 
+
 class DuplicateDetector:
     """Check for duplicate issues, PRs, or concurrent work on the same topic."""
 
-    def __init__(self, repo: str, *, client: httpx.Client | None = None, token: str | None = None) -> None:
+    def __init__(
+        self, repo: str, *, client: httpx.Client | None = None, token: str | None = None
+    ) -> None:
         self.repo = repo
         self._client = client
         self._token = token
@@ -118,7 +124,9 @@ class DuplicateDetector:
         query = f"repo:{self.repo} is:issue is:{state} {title} in:title"
         client = self._get_client()
         try:
-            data = _get_json(client, f"{API_BASE}/search/issues", params={"q": query, "per_page": 10})
+            data = _get_json(
+                client, f"{API_BASE}/search/issues", params={"q": query, "per_page": 10}
+            )
             return data.get("items", [])
         finally:
             if self._client is None:
@@ -129,7 +137,9 @@ class DuplicateDetector:
         query = f"repo:{self.repo} is:pr is:{state} {title} in:title"
         client = self._get_client()
         try:
-            data = _get_json(client, f"{API_BASE}/search/issues", params={"q": query, "per_page": 10})
+            data = _get_json(
+                client, f"{API_BASE}/search/issues", params={"q": query, "per_page": 10}
+            )
             return data.get("items", [])
         finally:
             if self._client is None:
@@ -139,11 +149,12 @@ class DuplicateDetector:
         """Look for open PRs targeting the same branch or with similar names."""
         client = self._get_client()
         try:
-            prs = _get_json(client, f"{API_BASE}/repos/{self.repo}/pulls", params={"state": "open", "per_page": 50})
-            concurrent = [
-                pr for pr in prs
-                if pr.get("head", {}).get("ref") == branch
-            ]
+            prs = _get_json(
+                client,
+                f"{API_BASE}/repos/{self.repo}/pulls",
+                params={"state": "open", "per_page": 50},
+            )
+            concurrent = [pr for pr in prs if pr.get("head", {}).get("ref") == branch]
             return DuplicateResult(concurrent_prs=concurrent)
         finally:
             if self._client is None:
@@ -154,10 +165,13 @@ class DuplicateDetector:
 # ProgressReporter
 # ---------------------------------------------------------------------------
 
+
 class ProgressReporter:
     """Post progress comments with evidence to GitHub issues/PRs."""
 
-    def __init__(self, repo: str, *, client: httpx.Client | None = None, token: str | None = None) -> None:
+    def __init__(
+        self, repo: str, *, client: httpx.Client | None = None, token: str | None = None
+    ) -> None:
         self.repo = repo
         self._client = client
         self._token = token
@@ -206,6 +220,7 @@ class ProgressReporter:
 # ---------------------------------------------------------------------------
 # CIMonitor
 # ---------------------------------------------------------------------------
+
 
 class CIMonitor:
     """Monitor CI check status for a given ref (branch or SHA)."""
@@ -272,10 +287,13 @@ class CIMonitor:
 # ReviewReader
 # ---------------------------------------------------------------------------
 
+
 class ReviewReader:
     """Read PR review comments and extract actionable feedback."""
 
-    def __init__(self, repo: str, *, client: httpx.Client | None = None, token: str | None = None) -> None:
+    def __init__(
+        self, repo: str, *, client: httpx.Client | None = None, token: str | None = None
+    ) -> None:
         self.repo = repo
         self._client = client
         self._token = token

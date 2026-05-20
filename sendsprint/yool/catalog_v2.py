@@ -64,8 +64,7 @@ def load_catalog(path: str | Path = DEFAULT_AGENT_CATALOG_PATH) -> dict[str, Any
     target = Path(path)
     if not target.exists():
         raise CatalogError(
-            f"catalog not found at {target}; run "
-            "`python scripts/build_agent_catalog.py` first"
+            f"catalog not found at {target}; run `python scripts/build_agent_catalog.py` first"
         )
     return json.loads(target.read_text(encoding="utf-8"))
 

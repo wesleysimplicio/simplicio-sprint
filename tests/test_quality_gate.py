@@ -18,7 +18,6 @@ from sendsprint.quality_gate import (
     _scan_diff_hygiene,
 )
 
-
 # ---------------------------------------------------------------------------
 # QualityCheckResult model
 # ---------------------------------------------------------------------------
@@ -42,7 +41,7 @@ class TestQualityCheckResult:
 
     def test_frozen(self) -> None:
         r = QualityCheckResult(check_name="x", passed=True)
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             r.passed = False  # type: ignore[misc]
 
 

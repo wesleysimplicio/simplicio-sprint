@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import subprocess
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,13 +17,12 @@ from pydantic import BaseModel, ConfigDict, Field
 from sendsprint.evidence import BundleManager, EvidenceBundle, EvidenceItemType
 from sendsprint.policy import AutonomyPolicy
 
-
 # ---------------------------------------------------------------------------
 # Models
 # ---------------------------------------------------------------------------
 
 
-class CheckSeverity(str, Enum):
+class CheckSeverity(StrEnum):
     """How critical a failing check is."""
 
     info = "info"
@@ -44,7 +43,7 @@ class QualityCheckResult(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-class GateVerdict(str, Enum):
+class GateVerdict(StrEnum):
     """Outcome produced by the delivery quality gate."""
 
     passed = "pass"

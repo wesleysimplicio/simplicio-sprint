@@ -18,7 +18,6 @@ from sendsprint.diff_verifier import (
 )
 from sendsprint.plan_verifier import VerifiablePlan
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -108,7 +107,7 @@ class TestModels:
             severity=FindingSeverity.warning,
             message="big",
         )
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             f.file_path = "b.py"  # type: ignore[misc]
 
     def test_diff_report_serialization(self):
@@ -195,15 +194,11 @@ class TestCheckUnexpectedFiles:
             target_files=["sendsprint/foo.py", "tests/test_foo.py"],
         )
         v = DiffVerifier()
-        findings = v.check_unexpected_files(
-            ["sendsprint/foo.py", "tests/test_foo.py"], plan=plan
-        )
+        findings = v.check_unexpected_files(["sendsprint/foo.py", "tests/test_foo.py"], plan=plan)
         assert findings == []
 
     def test_unexpected_file_flagged(self):
-        plan = VerifiablePlan(
-            task_summary="t", target_files=["sendsprint/foo.py"]
-        )
+        plan = VerifiablePlan(task_summary="t", target_files=["sendsprint/foo.py"])
         v = DiffVerifier()
         findings = v.check_unexpected_files(
             ["sendsprint/foo.py", "sendsprint/surprise.py"], plan=plan
@@ -215,9 +210,7 @@ class TestCheckUnexpectedFiles:
 
     def test_partial_path_match(self):
         """Plan says 'sendsprint/' and actual file is 'sendsprint/foo.py'."""
-        plan = VerifiablePlan(
-            task_summary="t", target_files=["sendsprint/"]
-        )
+        plan = VerifiablePlan(task_summary="t", target_files=["sendsprint/"])
         v = DiffVerifier()
         findings = v.check_unexpected_files(["sendsprint/foo.py"], plan=plan)
         assert findings == []
@@ -245,9 +238,7 @@ class TestCheckLargeChanges:
 class TestCheckMissingTests:
     def test_source_with_test_ok(self):
         v = DiffVerifier()
-        findings = v.check_missing_tests(
-            ["sendsprint/foo.py", "tests/test_foo.py"]
-        )
+        findings = v.check_missing_tests(["sendsprint/foo.py", "tests/test_foo.py"])
         assert findings == []
 
     def test_source_without_test_blocked(self):
@@ -322,25 +313,25 @@ class TestVerify:
         v = DiffVerifier()
         report = v.verify(NO_TEST_DIFF)
         assert report.verdict == DiffVerdict.block
-        assert any(
-            f.finding_type == FindingType.missing_test for f in report.findings
-        )
+        assert any(f.finding_type == FindingType.missing_test for f in report.findings)
 
     def test_large_change_warns(self):
         # Use a diff with large changes but include a test file to avoid block
-        large_with_test = LARGE_DIFF_LINES + "\n" + """\
+        large_with_test = (
+            LARGE_DIFF_LINES
+            + "\n"
+            + """\
 diff --git a/tests/test_big.py b/tests/test_big.py
 --- /dev/null
 +++ b/tests/test_big.py
 @@ -0,0 +1 @@
 +def test_big(): pass
 """
+        )
         v = DiffVerifier(large_change_threshold=300)
         report = v.verify(large_with_test)
         assert report.verdict == DiffVerdict.warn
-        assert any(
-            f.finding_type == FindingType.large_change for f in report.findings
-        )
+        assert any(f.finding_type == FindingType.large_change for f in report.findings)
 
     def test_generated_artifact_warns(self):
         v = DiffVerifier()
@@ -348,10 +339,7 @@ diff --git a/tests/test_big.py b/tests/test_big.py
         # generated artifact = warn, source without test = block
         # block wins over warn
         assert report.verdict in (DiffVerdict.warn, DiffVerdict.block)
-        assert any(
-            f.finding_type == FindingType.generated_artifact
-            for f in report.findings
-        )
+        assert any(f.finding_type == FindingType.generated_artifact for f in report.findings)
 
     def test_unexpected_file_with_plan_warns(self):
         plan = VerifiablePlan(
@@ -362,9 +350,7 @@ diff --git a/tests/test_big.py b/tests/test_big.py
         report = v.verify(CLEAN_DIFF, plan=plan)
         # tests/test_foo.py is unexpected per plan -> warn
         assert report.verdict == DiffVerdict.warn
-        assert any(
-            f.finding_type == FindingType.unexpected_file for f in report.findings
-        )
+        assert any(f.finding_type == FindingType.unexpected_file for f in report.findings)
 
     def test_empty_diff_passes(self):
         v = DiffVerifier()
@@ -379,9 +365,7 @@ diff --git a/tests/test_big.py b/tests/test_big.py
 
     def test_block_beats_warn(self):
         """When both blocking and warning findings exist, verdict is block."""
-        plan = VerifiablePlan(
-            task_summary="t", target_files=["nonexistent.py"]
-        )
+        plan = VerifiablePlan(task_summary="t", target_files=["nonexistent.py"])
         v = DiffVerifier()
         report = v.verify(NO_TEST_DIFF, plan=plan)
         # unexpected_file (warn) + missing_test (block) -> block

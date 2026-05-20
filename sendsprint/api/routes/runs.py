@@ -118,7 +118,7 @@ async def run_event_stream(run_id: str) -> StreamingResponse:
         raise HTTPException(status_code=404, detail="run not found")
 
     async def _generate():
-        yield f'event: hello\ndata: {json.dumps({"run_id": run_id})}\n\n'
+        yield f"event: hello\ndata: {json.dumps({'run_id': run_id})}\n\n"
         while True:
             try:
                 event = await asyncio.wait_for(events.drain(run_id), timeout=30.0)

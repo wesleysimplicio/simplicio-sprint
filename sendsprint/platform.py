@@ -16,7 +16,6 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ---------------------------------------------------------------------------
 # Model
 # ---------------------------------------------------------------------------
@@ -30,7 +29,9 @@ class PlatformInfo(BaseModel):
     os_name: str = Field(description="Normalised OS: 'windows', 'darwin', 'linux', or raw value.")
     shell: str = Field(description="Default shell binary name: 'pwsh', 'cmd', 'bash', 'zsh', etc.")
     path_separator: str = Field(description="OS path separator (';' on Windows, ':' elsewhere).")
-    dir_separator: str = Field(description="Directory separator ('\\\\' on Windows, '/' elsewhere).")
+    dir_separator: str = Field(
+        description="Directory separator ('\\\\' on Windows, '/' elsewhere)."
+    )
     venv_activate: str = Field(description="Relative path to venv activate script.")
     python_cmd: str = Field(description="'python' on Windows, 'python3' elsewhere (if found).")
     line_ending: str = Field(description="'\\r\\n' on Windows, '\\n' elsewhere.")
@@ -118,10 +119,7 @@ def shell_command(cmd: str | list[str]) -> list[str]:
 
     On Unix, commands are returned as-is (list form).
     """
-    if isinstance(cmd, str):
-        parts = cmd.split()
-    else:
-        parts = list(cmd)
+    parts = cmd.split() if isinstance(cmd, str) else list(cmd)
 
     if not parts:
         return parts

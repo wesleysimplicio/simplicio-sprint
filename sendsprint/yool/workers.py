@@ -153,9 +153,7 @@ class WorkerPool:
         for lane, worker in self._workers.items():
             self._tasks[lane] = asyncio.create_task(worker.run(), name=f"worker:{lane}")
 
-    async def run_until_idle(
-        self, *, bus: TupleBus, seed: Iterable[Tuple] | None = None
-    ) -> None:
+    async def run_until_idle(self, *, bus: TupleBus, seed: Iterable[Tuple] | None = None) -> None:
         seed = list(seed or ())
         self.start()
         try:

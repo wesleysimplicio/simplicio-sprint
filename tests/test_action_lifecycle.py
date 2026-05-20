@@ -3,27 +3,21 @@
 from __future__ import annotations
 
 import json
-from typing import Any
 
 import pytest
 
 from sendsprint.actions.adapter import DomainAdapter
-from sendsprint.actions.code_adapter import CODE_DOMAIN, CodeDomainAdapter, _SPRINT_STEP_MAP
+from sendsprint.actions.code_adapter import _SPRINT_STEP_MAP, CODE_DOMAIN, CodeDomainAdapter
 from sendsprint.actions.lifecycle import (
     Action,
     ActionPhase,
     ActionStatus,
     ApprovalPolicy,
     DomainDescriptor,
-    EvidenceRecord,
     ExecutionStep,
-    LearningRecord,
-    MonitorEntry,
     Objective,
-    PublicationRecord,
     ValidationResult,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -52,7 +46,16 @@ def _make_code_action() -> Action:
 
 class TestActionPhase:
     def test_all_phases_present(self) -> None:
-        expected = {"plan", "execute", "validate", "evidence", "publish", "monitor", "rework", "learn"}
+        expected = {
+            "plan",
+            "execute",
+            "validate",
+            "evidence",
+            "publish",
+            "monitor",
+            "rework",
+            "learn",
+        }
         assert {p.value for p in ActionPhase} == expected
 
     def test_phase_is_str_enum(self) -> None:
@@ -79,7 +82,7 @@ class TestActionStatus:
 class TestDomainDescriptor:
     def test_frozen(self) -> None:
         d = DomainDescriptor(name="ops", label="Operations")
-        with pytest.raises(Exception):  # ValidationError on frozen model
+        with pytest.raises(ValueError):  # ValidationError on frozen model
             d.name = "changed"  # type: ignore[misc]
 
     def test_default_version(self) -> None:
@@ -238,7 +241,7 @@ class TestApprovalPolicy:
 
     def test_frozen(self) -> None:
         p = ApprovalPolicy(auto_approve=True)
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             p.auto_approve = False  # type: ignore[misc]
 
 

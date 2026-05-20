@@ -29,7 +29,6 @@ from sendsprint.quality_gate import (
     QualityCheckResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -477,46 +476,52 @@ class TestMarketingValidation:
             require_explicit_approval_for_external=True,
         )
         gate = DomainQualityGate(domain="marketing", approval_policy=policy)
-        gate.register_checks([
-            DomainQualityCheck(
-                domain="marketing",
-                check_name="brand-review",
-                check_type=DomainCheckType.checklist,
-                required=True,
-            ),
-            DomainQualityCheck(
-                domain="marketing",
-                check_name="lead-approval",
-                check_type=DomainCheckType.review,
-                required=True,
-            ),
-            DomainQualityCheck(
-                domain="marketing",
-                check_name="campaign-evidence",
-                check_type=DomainCheckType.source,
-                required=True,
-            ),
-            DomainQualityCheck(
-                domain="marketing",
-                check_name="claims-risk-score",
-                check_type=DomainCheckType.risk,
-                required=True,
-            ),
-        ])
+        gate.register_checks(
+            [
+                DomainQualityCheck(
+                    domain="marketing",
+                    check_name="brand-review",
+                    check_type=DomainCheckType.checklist,
+                    required=True,
+                ),
+                DomainQualityCheck(
+                    domain="marketing",
+                    check_name="lead-approval",
+                    check_type=DomainCheckType.review,
+                    required=True,
+                ),
+                DomainQualityCheck(
+                    domain="marketing",
+                    check_name="campaign-evidence",
+                    check_type=DomainCheckType.source,
+                    required=True,
+                ),
+                DomainQualityCheck(
+                    domain="marketing",
+                    check_name="claims-risk-score",
+                    check_type=DomainCheckType.risk,
+                    required=True,
+                ),
+            ]
+        )
         return gate
 
     def test_marketing_all_pass_internal(self) -> None:
         gate = self._marketing_gate()
         report = gate.evaluate(
-            checklists={"brand-review": [
-                ChecklistItem(name="logo", completed=True),
-                ChecklistItem(name="colors", completed=True),
-            ]},
+            checklists={
+                "brand-review": [
+                    ChecklistItem(name="logo", completed=True),
+                    ChecklistItem(name="colors", completed=True),
+                ]
+            },
             reviews={"lead-approval": ReviewGateInput(approvals=1, reviewers=["alice"])},
-            sources={"campaign-evidence": [
-                SourceEvidence(kind="brief", present=True),
-                SourceEvidence(kind="screenshot", present=True),
-            ]},
+            sources={
+                "campaign-evidence": [
+                    SourceEvidence(kind="brief", present=True),
+                    SourceEvidence(kind="screenshot", present=True),
+                ]
+            },
             risks={"claims-risk-score": RiskAssessment(score=15.0, factors=["low-risk-claim"])},
             is_external_facing=False,
         )
@@ -538,10 +543,12 @@ class TestMarketingValidation:
         report = gate.evaluate(
             checklists={"brand-review": [ChecklistItem(name="logo", completed=True)]},
             reviews={"lead-approval": ReviewGateInput(approvals=1, reviewers=["alice"])},
-            sources={"campaign-evidence": [
-                SourceEvidence(kind="brief", present=True),
-                SourceEvidence(kind="approval-notes", present=False),
-            ]},
+            sources={
+                "campaign-evidence": [
+                    SourceEvidence(kind="brief", present=True),
+                    SourceEvidence(kind="approval-notes", present=False),
+                ]
+            },
             risks={"claims-risk-score": RiskAssessment(score=10.0)},
         )
         assert report.verdict == GateVerdict.needs_rework
@@ -553,10 +560,12 @@ class TestMarketingValidation:
             checklists={"brand-review": [ChecklistItem(name="logo", completed=True)]},
             reviews={"lead-approval": ReviewGateInput(approvals=1, reviewers=["alice"])},
             sources={"campaign-evidence": [SourceEvidence(kind="brief", present=True)]},
-            risks={"claims-risk-score": RiskAssessment(
-                score=80.0,
-                factors=["unverified-health-claim", "regulatory-risk"],
-            )},
+            risks={
+                "claims-risk-score": RiskAssessment(
+                    score=80.0,
+                    factors=["unverified-health-claim", "regulatory-risk"],
+                )
+            },
         )
         assert report.verdict == GateVerdict.needs_rework
         assert any("80.0" in r for r in report.reasons)
@@ -635,12 +644,14 @@ class TestMessageSnapshots:
         gate = DomainQualityGate(domain="marketing")
         gate.register_checks([_brand_checklist_check()])
         results = gate.run_domain_checks(
-            checklists={"brand-checklist": [
-                ChecklistItem(name="logo-usage", completed=False),
-                ChecklistItem(name="color-palette", completed=False),
-            ]},
+            checklists={
+                "brand-checklist": [
+                    ChecklistItem(name="logo-usage", completed=False),
+                    ChecklistItem(name="color-palette", completed=False),
+                ]
+            },
         )
-        assert "Incomplete items: logo-usage, color-palette" == results[0].details
+        assert results[0].details == "Incomplete items: logo-usage, color-palette"
 
     def test_insufficient_approvals_message(self) -> None:
         gate = DomainQualityGate(domain="marketing")
@@ -648,17 +659,19 @@ class TestMessageSnapshots:
         results = gate.run_domain_checks(
             reviews={"marketing-lead-review": ReviewGateInput(approvals=0)},
         )
-        assert "Need 1 approval(s), got 0" == results[0].details
+        assert results[0].details == "Need 1 approval(s), got 0"
 
     def test_missing_evidence_message(self) -> None:
         gate = DomainQualityGate(domain="marketing")
         gate.register_checks([_source_check()])
         results = gate.run_domain_checks(
-            sources={"evidence-package": [
-                SourceEvidence(kind="brief-document", present=False),
-            ]},
+            sources={
+                "evidence-package": [
+                    SourceEvidence(kind="brief-document", present=False),
+                ]
+            },
         )
-        assert "Missing evidence: brief-document" == results[0].details
+        assert results[0].details == "Missing evidence: brief-document"
 
     def test_high_risk_message(self) -> None:
         gate = DomainQualityGate(domain="marketing")

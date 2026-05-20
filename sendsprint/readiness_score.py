@@ -7,10 +7,9 @@ Issue: #101
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # ---------------------------------------------------------------------------
 # Models
@@ -32,7 +31,7 @@ class ScoreComponent(BaseModel):
         return self.weight * self.raw_score
 
 
-class ReadinessVerdict(str, Enum):
+class ReadinessVerdict(StrEnum):
     """Outcome derived from the aggregate readiness score."""
 
     auto_publish = "auto_publish"
@@ -85,9 +84,7 @@ class DeliveryReadinessScore:
         human_approval_threshold: int = DEFAULT_HUMAN_APPROVAL_THRESHOLD,
     ) -> None:
         if human_approval_threshold >= auto_publish_threshold:
-            raise ValueError(
-                "human_approval_threshold must be less than auto_publish_threshold"
-            )
+            raise ValueError("human_approval_threshold must be less than auto_publish_threshold")
         self.auto_publish_threshold = auto_publish_threshold
         self.human_approval_threshold = human_approval_threshold
 
@@ -105,9 +102,7 @@ class DeliveryReadinessScore:
 
         total_weight = sum(c.weight for c in components)
         if abs(total_weight - 1.0) > 1e-6:
-            raise ValueError(
-                f"Component weights must sum to 1.0, got {total_weight:.6f}"
-            )
+            raise ValueError(f"Component weights must sum to 1.0, got {total_weight:.6f}")
 
         return sum(c.weighted_score for c in components)
 
@@ -138,9 +133,7 @@ class DeliveryReadinessScore:
             "|-----------|--------|-----|----------|",
         ]
         for c in components:
-            lines.append(
-                f"| {c.name} | {c.weight:.0%} | {c.raw_score} | {c.weighted_score:.1f} |"
-            )
+            lines.append(f"| {c.name} | {c.weight:.0%} | {c.raw_score} | {c.weighted_score:.1f} |")
         lines.append("")
 
         details = [c for c in components if c.details]
@@ -153,9 +146,7 @@ class DeliveryReadinessScore:
 
     # -- convenience --------------------------------------------------------
 
-    def evaluate(
-        self, components: list[ScoreComponent]
-    ) -> tuple[float, ReadinessVerdict, str]:
+    def evaluate(self, components: list[ScoreComponent]) -> tuple[float, ReadinessVerdict, str]:
         """One-shot: calculate score, derive verdict, format summary."""
         score = self.calculate(components)
         verdict = self.get_verdict(score)

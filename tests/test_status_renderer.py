@@ -16,18 +16,17 @@ import pytest
 
 from sendsprint.status_relay import RunSnapshot
 from sendsprint.status_renderer import (
+    _MAX_HISTORY_SUMMARY,
     StatusAnswer,
     StatusRenderer,
-    _MAX_EVIDENCE_DISPLAY,
-    _MAX_HISTORY_SUMMARY,
     format_human_readable,
     format_machine_readable,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 def _ts() -> datetime:
     """Fixed timestamp for deterministic assertions."""
@@ -127,7 +126,7 @@ class TestStatusAnswerModel:
         assert answer.pr_links == []
 
     def test_extra_fields_forbidden(self) -> None:
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             StatusAnswer(bogus_field="nope")  # type: ignore[call-arg]
 
     def test_serialization_roundtrip(self) -> None:
@@ -144,6 +143,7 @@ class TestStatusAnswerModel:
 # ---------------------------------------------------------------------------
 # Renderer tests
 # ---------------------------------------------------------------------------
+
 
 class TestStatusRenderer:
     def setup_method(self) -> None:
@@ -222,6 +222,7 @@ class TestStatusRenderer:
 # Human-readable formatter tests
 # ---------------------------------------------------------------------------
 
+
 class TestFormatHumanReadable:
     def setup_method(self) -> None:
         self.renderer = StatusRenderer()
@@ -292,6 +293,7 @@ class TestFormatHumanReadable:
 # Machine-readable formatter tests
 # ---------------------------------------------------------------------------
 
+
 class TestFormatMachineReadable:
     def setup_method(self) -> None:
         self.renderer = StatusRenderer()
@@ -351,6 +353,7 @@ class TestFormatMachineReadable:
 # ---------------------------------------------------------------------------
 # Cross-adapter usage test
 # ---------------------------------------------------------------------------
+
 
 class TestCrossAdapterUsage:
     """All three adapters can use the same renderer and get consistent data."""

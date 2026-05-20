@@ -15,14 +15,12 @@ from __future__ import annotations
 import json
 import os
 import platform
-import time
 from datetime import UTC, datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # ---------------------------------------------------------------------------
 # Models
@@ -42,7 +40,7 @@ class ResourceSnapshot(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
-class LimitingFactor(str, Enum):
+class LimitingFactor(StrEnum):
     """Why the fan-out was capped."""
 
     memory = "memory"
@@ -68,8 +66,7 @@ class FanOutDecision(BaseModel):
         """Human-readable one-liner for CLI/log output."""
         if self.limiting_factor == LimitingFactor.none:
             return (
-                f"fan-out: {self.allowed_agents}/{self.requested_agents} agents "
-                f"(no limit applied)"
+                f"fan-out: {self.allowed_agents}/{self.requested_agents} agents (no limit applied)"
             )
         return (
             f"fan-out: {self.allowed_agents}/{self.requested_agents} agents "
@@ -120,9 +117,7 @@ def _read_memory() -> tuple[int, int]:
         try:
             import subprocess
 
-            out = subprocess.check_output(
-                ["sysctl", "-n", "hw.memsize"], text=True, timeout=5
-            )
+            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True, timeout=5)
             total_mb = int(out.strip()) // (1024 * 1024)
             # No reliable free-memory sysctl; report total as available
             return total_mb, total_mb
@@ -149,7 +144,7 @@ def _read_cpu_pressure() -> tuple[float | None, str | None]:
 
     # Unix loadavg (Linux, macOS, BSDs)
     try:
-        load1, _, _ = os.getloadavg()
+        load1, _, _ = cast(Any, os).getloadavg()
         cpus = os.cpu_count() or 1
         return round(min(load1 / cpus, 1.0), 4), "loadavg"
     except (OSError, AttributeError):

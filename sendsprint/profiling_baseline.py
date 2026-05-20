@@ -20,7 +20,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ---------------------------------------------------------------------------
 # Result model
 # ---------------------------------------------------------------------------
@@ -34,9 +33,7 @@ class ProfileResult(BaseModel):
     operation: str
     duration_ms: float
     iterations: int
-    throughput: float = Field(
-        default=0.0, description="ops/sec (iterations / duration_s)"
-    )
+    throughput: float = Field(default=0.0, description="ops/sec (iterations / duration_s)")
     memory_delta_mb: float = Field(
         default=0.0, description="Peak RSS delta in MiB during profiling"
     )
@@ -200,18 +197,14 @@ class ProfilingBaseline:
         """Profile ``fast_scan`` — extract file paths from a diff."""
         from sendsprint.accelerators.python_impl import fast_scan
 
-        total, per_call, mem = _time_iterations(
-            lambda: fast_scan(_SAMPLE_DIFF), self.iterations
-        )
+        total, per_call, mem = _time_iterations(lambda: fast_scan(_SAMPLE_DIFF), self.iterations)
         return _build_result("scan", self.iterations, total, per_call, mem)
 
     def profile_dedupe(self) -> ProfileResult:
         """Profile ``fast_dedupe`` — deduplicate items."""
         from sendsprint.accelerators.python_impl import fast_dedupe
 
-        total, per_call, mem = _time_iterations(
-            lambda: fast_dedupe(_SAMPLE_ITEMS), self.iterations
-        )
+        total, per_call, mem = _time_iterations(lambda: fast_dedupe(_SAMPLE_ITEMS), self.iterations)
         return _build_result("dedupe", self.iterations, total, per_call, mem)
 
     def profile_events(self) -> ProfileResult:
@@ -228,7 +221,7 @@ class ProfilingBaseline:
         def _persist_cycle() -> None:
             store = EventStore(root=self._tmp_dir, run_id=run_id)
             ev = RunEvent(
-                event_type=EventType.step,
+                event_type=EventType.progress,
                 run_id=run_id,
                 data={"step": 1, "status": "ok"},
             )
@@ -248,8 +241,7 @@ class ProfilingBaseline:
         """Profile task scheduling heuristic (sort + priority assignment)."""
 
         items = [
-            {"key": f"PROJ-{i}", "priority": (i % 5) + 1, "points": (i % 8) + 1}
-            for i in range(100)
+            {"key": f"PROJ-{i}", "priority": (i % 5) + 1, "points": (i % 8) + 1} for i in range(100)
         ]
 
         def _schedule() -> list[dict[str, Any]]:
@@ -260,19 +252,18 @@ class ProfilingBaseline:
 
     def profile_validation(self) -> ProfileResult:
         """Profile validation recipe selection from a tech fingerprint."""
+        from sendsprint.tech import TechFingerprint
         from sendsprint.validation_recipes import RecipeSelector
 
-        selector = RecipeSelector()
-
-        from sendsprint.tech import TechFingerprint
-
         fp = TechFingerprint(
+            repo_path=str(self._tmp_dir),
             techs=["python", "node", "react", "docker"],
-            manifests={"pyproject.toml": True, "package.json": True},
+            signals={"pyproject.toml": "python", "package.json": "node"},
         )
+        selector = RecipeSelector(fp)
 
         def _validate() -> None:
-            selector.select(fp)
+            selector.select()
 
         total, per_call, mem = _time_iterations(_validate, self.iterations)
         return _build_result("validation", self.iterations, total, per_call, mem)

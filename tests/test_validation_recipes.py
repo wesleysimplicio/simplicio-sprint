@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from sendsprint.tech.detector import TechFingerprint
 from sendsprint.validation_recipes import (
     COPILOT_RECIPE,
@@ -18,14 +16,16 @@ from sendsprint.validation_recipes import (
     format_for_pr_body,
 )
 
-
 # ---------------------------------------------------------------------------
 # Model basics
 # ---------------------------------------------------------------------------
 
+
 class TestValidationRecipeModel:
     def test_recipe_fields(self):
-        r = ValidationRecipe(stack="demo", commands=["echo ok"], windows_notes="n/a", required_tools=["echo"])
+        r = ValidationRecipe(
+            stack="demo", commands=["echo ok"], windows_notes="n/a", required_tools=["echo"]
+        )
         assert r.stack == "demo"
         assert r.commands == ["echo ok"]
         assert r.windows_notes == "n/a"
@@ -41,6 +41,7 @@ class TestValidationRecipeModel:
 # ---------------------------------------------------------------------------
 # Built-in recipe constants
 # ---------------------------------------------------------------------------
+
 
 class TestBuiltinRecipes:
     def test_python_recipe_has_pytest_and_ruff(self):
@@ -78,6 +79,7 @@ class TestBuiltinRecipes:
 # ---------------------------------------------------------------------------
 # RecipeSelector
 # ---------------------------------------------------------------------------
+
 
 def _fp(techs: list[str], repo_path: str = "/fake") -> TechFingerprint:
     return TechFingerprint(repo_path=repo_path, techs=techs)
@@ -165,6 +167,7 @@ class TestRecipeSelector:
 # ---------------------------------------------------------------------------
 # PR body formatting (snapshot-style)
 # ---------------------------------------------------------------------------
+
 
 class TestFormatForPrBody:
     def test_empty_recipes_returns_empty(self):
