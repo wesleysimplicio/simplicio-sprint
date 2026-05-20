@@ -84,7 +84,7 @@ Veja [`web/README.md`](./web/README.md) pro passo-a-passo e
 
 Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.16.0 — Watcher do Sprint Autopilot. `sendsprint watch` monitora Jira/Azure DevOps por tasks elegiveis atribuidas ao operador, deduplica por revision/estado, respeita policy de autonomia, roda em modo conservador de planejamento por padrao e persiste watch-state/evidencias locais. `sendsprint doctor`, templates de validacao por stack, dry-run completo, worktrees deterministicas por task, evidence bundles, helpers de GitHub Issues, contratos Ralph Wiggum / Codex Goal, ingestao de transcricoes para tasks, dashboard, relatorios executivos e workflow PyPI Trusted Publishing inclusos. O fluxo principal ainda inclui `sendsprint sprint`, leitura Jira/Azure DevOps, codegen/deploy opt-in, estado resumivel, PRs, validacao pos-PR, badge de coverage e promocao automatica do changelog.
+> **Status:** v0.20.0 — Metadados de release alinhados para task understanding e roteamento de portfolio: entendimento deterministico dos itens da sprint, roteamento multi-repo com confidence gate, workspace com portfolio/projetos, route preview read-only na API/control plane, setup web de projetos e feedback de auth Azure, e plugins para Windsurf, Kiro e Antigravity. O fluxo principal ainda inclui `sendsprint sprint` local-first, leitura Jira/Azure DevOps, dry-run/resume, evidence bundles, previews no dashboard, criacao de PR, validacao pos-PR, modo OSS contribution e runtime yool/tuple.
 
 ---
 

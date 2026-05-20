@@ -13,10 +13,13 @@ def test_install_plugins_writes_all_agent_host_files_and_manifest(tmp_path: Path
     result = install_plugins(tmp_path)
 
     assert (tmp_path / ".claude/skills/sendsprint/SKILL.md").is_file()
-    assert (tmp_path / ".codex/skills/sendsprint/SKILL.md").is_file()
+    assert (tmp_path / "AGENTS.md").is_file()
     assert (tmp_path / ".hermes/skills/sendsprint.md").is_file()
     assert (tmp_path / ".openclaw/skills/sendsprint.md").is_file()
     assert (tmp_path / ".cursor/rules/sendsprint.mdc").is_file()
+    assert (tmp_path / ".windsurf/rules/sendsprint.md").is_file()
+    assert (tmp_path / ".kiro/steering/sendsprint.md").is_file()
+    assert (tmp_path / ".antigravity/rules/sendsprint.md").is_file()
     assert (tmp_path / ".github/copilot-instructions.md").is_file()
 
     manifest = json.loads((tmp_path / ".sendsprint/plugins/manifest.json").read_text())
@@ -28,20 +31,22 @@ def test_install_plugins_writes_all_agent_host_files_and_manifest(tmp_path: Path
         "hermes",
         "openclaw",
         "cursor",
+        "windsurf",
+        "kiro",
+        "antigravity",
         "github-copilot",
     }
     assert "manifest_path" in result_to_json(result)
 
 
 def test_install_plugins_preserves_existing_plugin_without_force(tmp_path: Path) -> None:
-    target = tmp_path / ".codex/skills/sendsprint/SKILL.md"
-    target.parent.mkdir(parents=True)
+    target = tmp_path / "AGENTS.md"
     target.write_text("local override\n", encoding="utf-8")
 
     result = install_plugins(tmp_path, platforms=["codex"])
 
     assert target.read_text(encoding="utf-8") == "local override\n"
-    assert result_to_json(result)["skipped"] == [".codex/skills/sendsprint/SKILL.md"]
+    assert result_to_json(result)["skipped"] == ["AGENTS.md"]
 
 
 def test_install_plugins_dry_run_reports_without_writing(tmp_path: Path) -> None:
@@ -60,7 +65,14 @@ def test_plugins_cli_lists_profiles() -> None:
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
-    assert {item["platform"] for item in payload} >= {"codex", "hermes", "github-copilot"}
+    assert {item["platform"] for item in payload} >= {
+        "codex",
+        "hermes",
+        "github-copilot",
+        "windsurf",
+        "kiro",
+        "antigravity",
+    }
 
 
 def test_plugins_cli_installs_selected_platforms(tmp_path: Path) -> None:
@@ -82,9 +94,9 @@ def test_plugins_cli_installs_selected_platforms(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
     assert sorted(payload["created"]) == [
-        ".codex/skills/sendsprint/SKILL.md",
         ".cursor/rules/sendsprint.mdc",
         ".sendsprint/plugins/manifest.json",
+        "AGENTS.md",
     ]
 
 

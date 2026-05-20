@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 Provider = Literal["jira", "azuredevops"]
 RunMode = Literal["all", "mine", "selected"]
+RouteConfidence = Literal["high", "medium", "low"]
 
 
 class HealthResponse(BaseModel):
@@ -74,12 +75,79 @@ class StartRunRequest(BaseModel):
     workspace_path: str | None = None
     dry_run: bool = False
     resume: bool = True
+    no_cache: bool = False
+    autonomy_level: str = "plan"
     run_id: str | None = None
 
 
 class StartRunResponse(BaseModel):
     run_id: str
     status: Literal["started"] = "started"
+
+
+class RoutePreviewSummary(BaseModel):
+    text: str
+    task_count: int
+    planned_delivery_count: int
+    selected_repo_count: int
+    low_confidence_count: int
+    warning_count: int
+
+
+class RoutePreviewTaskUnderstanding(BaseModel):
+    item_key: str
+    item_type: str
+    title: str
+    status: str
+    scopes: list[str] = Field(default_factory=list)
+    scope_source: Literal["label", "inferred", "none"] = "none"
+    relationship: str = "none"
+    selected_repos: list[str] = Field(default_factory=list)
+    confidence: RouteConfidence | None = None
+    reasons: list[str] = Field(default_factory=list)
+
+
+class RoutePreviewSelectedRepo(BaseModel):
+    item_key: str
+    item_type: str
+    title: str
+    repo: str
+    repo_name: str
+    repo_role: str | None = None
+    branch: str
+    target_branch: str
+    confidence: RouteConfidence
+    reasons: list[str] = Field(default_factory=list)
+    relationship: str = "none"
+    worktree_path: str | None = None
+    validation_template: str | None = None
+    validation_commands: list[str] = Field(default_factory=list)
+
+
+class RoutePreviewLowConfidenceItem(BaseModel):
+    item_key: str
+    title: str
+    repo: str | None = None
+    repo_name: str | None = None
+    confidence: RouteConfidence = "low"
+    reason: str
+    recommended_action: str
+
+
+class RoutePreviewResponse(BaseModel):
+    schema_version: str = "1.0"
+    provider: Provider
+    sprint_id: str
+    sprint_name: str
+    mode: RunMode
+    item_keys: list[str] = Field(default_factory=list)
+    autonomy_level: str = "plan"
+    side_effects: dict[str, bool] = Field(default_factory=dict)
+    summary: RoutePreviewSummary
+    task_understanding: list[RoutePreviewTaskUnderstanding] = Field(default_factory=list)
+    selected_repos: list[RoutePreviewSelectedRepo] = Field(default_factory=list)
+    low_confidence_items: list[RoutePreviewLowConfidenceItem] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class RunStepEvent(BaseModel):

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from sendsprint.llm.client import Provider as LlmProvider
 
@@ -19,14 +19,22 @@ class RepoConfig(BaseModel):
 
     name: str
     path: str
+    project: str | None = None
     role: RepoRole = "other"
     tech: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
+    components: list[str] = Field(default_factory=list)
+    owners: list[str] = Field(default_factory=list)
+    routing_hints: dict[str, Any] = Field(default_factory=dict)
     default_branch: str = "main"
     pr_target_branch: str | None = None
     branch_name_template: str | None = None
+    branch_pattern: str | None = None
+    commit_pattern: str | None = None
     pr_reviewers: list[str] = Field(default_factory=list)
     required_pr_reviewers: list[str] = Field(default_factory=list)
     package_manager: str | None = None
+    validation_commands: list[str] = Field(default_factory=list)
     test_command: str | None = None
     build_command: str | None = None
     lint_command: str | None = None
@@ -76,6 +84,42 @@ class WatchConfig(BaseModel):
     state_path: str = ".sendsprint/runs/watch-state.json"
 
 
+class PortfolioConfig(BaseModel):
+    """Optional portfolio-level metadata for a workspace."""
+
+    name: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
+    components: list[str] = Field(default_factory=list)
+    owners: list[str] = Field(default_factory=list)
+    routing_hints: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProjectConfig(BaseModel):
+    """Project grouping for one or more repositories in the workspace."""
+
+    name: str
+    key: str | None = None
+    description: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
+    components: list[str] = Field(default_factory=list)
+    owners: list[str] = Field(default_factory=list)
+    routing_hints: dict[str, Any] = Field(default_factory=dict)
+    branch_pattern: str | None = None
+    commit_pattern: str | None = None
+    validation_commands: list[str] = Field(default_factory=list)
+    repos: list[RepoConfig] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def apply_project_ref_to_repos(self) -> ProjectConfig:
+        """Let nested repos inherit the project key/name while preserving explicit values."""
+        project_ref = self.key or self.name
+        self.repos = [
+            repo if repo.project else repo.model_copy(update={"project": project_ref})
+            for repo in self.repos
+        ]
+        return self
+
+
 class WorkspaceConfig(BaseModel):
     """Multi-repo workspace declared by the user (workspace.yaml)."""
 
@@ -85,6 +129,8 @@ class WorkspaceConfig(BaseModel):
     user_display_name: str | None = None
     user_account_id: str | None = None
     user_descriptor: str | None = None
+    portfolio: PortfolioConfig | None = None
+    projects: list[ProjectConfig] = Field(default_factory=list)
     repos: list[RepoConfig] = Field(default_factory=list)
     new_projects_dir: str = "Projetos/novos"
     pr_provider: Literal["github", "azuredevops"] = "github"
@@ -95,6 +141,24 @@ class WorkspaceConfig(BaseModel):
     code_generation: CodeGenerationConfig = Field(default_factory=CodeGenerationConfig)
     deploy: DeployWorkflowConfig = Field(default_factory=DeployWorkflowConfig)
     watch: WatchConfig = Field(default_factory=WatchConfig)
+
+    @model_validator(mode="after")
+    def flatten_project_repos(self) -> WorkspaceConfig:
+        """Keep existing flat workspace consumers working with project-mode configs."""
+        project_repos = [repo for project in self.projects for repo in project.repos]
+        if not project_repos:
+            return self
+
+        seen = {(repo.project, repo.name, repo.path) for repo in self.repos}
+        repos = list(self.repos)
+        for repo in project_repos:
+            key = (repo.project, repo.name, repo.path)
+            if key in seen:
+                continue
+            repos.append(repo)
+            seen.add(key)
+        self.repos = repos
+        return self
 
 
 DEFAULT_DEVELOPABLE_STATUSES = (

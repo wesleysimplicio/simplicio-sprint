@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import pytest
 
@@ -215,6 +216,74 @@ def test_start_run_returns_run_id_and_emits_events():
     assert status["state"] in {"running", "done"}
 
 
+def test_route_preview_exposes_task_understanding_and_low_confidence(
+    monkeypatch, tmp_path: Path
+) -> None:
+    from sendsprint.models import Sprint, SprintItem
+
+    class FakeJiraOperator:
+        source = "jira"
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def read_sprint(self, **kwargs):
+            assert kwargs["sprint_id"] == "131"
+            return Sprint(
+                id="131",
+                name="Preview Sprint",
+                source="jira",
+                items=[
+                    SprintItem(
+                        id="1",
+                        key="WEB-1",
+                        type="Task",
+                        title="Criar tela de login",
+                        status="New",
+                        labels=["scope:front"],
+                    ),
+                    SprintItem(
+                        id="2",
+                        key="OPS-2",
+                        type="Task",
+                        title="Organize rollout notes",
+                        status="New",
+                    ),
+                ],
+            )
+
+    workspace_path = _preview_workspace(tmp_path)
+    monkeypatch.setattr("sendsprint.operators.JiraOperator", FakeJiraOperator)
+
+    resp = client.post(
+        "/runs/preview",
+        json={
+            "provider": "jira",
+            "sprint_id": "131",
+            "mode": "all",
+            "workspace_path": str(workspace_path),
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["summary"]["task_count"] == 2
+    assert body["summary"]["selected_repo_count"] == 2
+    assert body["summary"]["low_confidence_count"] == 2
+    assert body["side_effects"]["push"] is False
+
+    web_task = [t for t in body["task_understanding"] if t["item_key"] == "WEB-1"][0]
+    assert web_task["scopes"] == ["front"]
+    assert web_task["scope_source"] == "label"
+    assert web_task["selected_repos"] == ["frontend"]
+    assert web_task["confidence"] == "high"
+
+    low_items = body["low_confidence_items"]
+    assert {item["repo_name"] for item in low_items} == {"frontend", "api"}
+    assert all(item["recommended_action"] for item in low_items)
+    assert any(repo["reasons"] for repo in body["selected_repos"])
+
+
 def test_get_run_404_for_missing():
     resp = client.get("/runs/does-not-exist")
     assert resp.status_code == 404
@@ -284,3 +353,36 @@ def test_agent_status_404_for_missing():
 def test_evidence_404_when_missing():
     resp = client.get("/runs/anything/evidence/missing.png")
     assert resp.status_code == 404
+
+
+def _preview_workspace(tmp_path: Path) -> Path:
+    frontend = tmp_path / "frontend"
+    api = tmp_path / "api"
+    frontend.mkdir()
+    api.mkdir()
+    (frontend / "package.json").write_text(
+        '{"dependencies":{"react":"latest"}}',
+        encoding="utf-8",
+    )
+    (api / "pyproject.toml").write_text(
+        "[project]\ndependencies = ['fastapi']\n",
+        encoding="utf-8",
+    )
+    workspace_path = tmp_path / "workspace.yaml"
+    workspace_path.write_text(
+        "\n".join(
+            [
+                "name: preview",
+                f"root_path: {tmp_path.as_posix()}",
+                "repos:",
+                "  - name: frontend",
+                "    path: frontend",
+                "    role: front",
+                "  - name: api",
+                "    path: api",
+                "    role: api",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return workspace_path

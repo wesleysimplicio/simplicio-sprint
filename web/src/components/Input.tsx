@@ -27,6 +27,7 @@ export const Input: React.FC<Props> = ({
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        accessibilityLabel={label}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}

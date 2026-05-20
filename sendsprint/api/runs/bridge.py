@@ -32,7 +32,7 @@ FAILING_TESTS_FIRST_RUN = [
 
 def run_with_events(run_id: str, req: StartRunRequest) -> dict[str, Any]:
     """Try the real SprintFlow; fall back to a mock progression."""
-    if req.repo_path:
+    if req.repo_path or req.workspace_path:
         try:
             return _run_real(run_id, req)
         except Exception as exc:
@@ -49,6 +49,7 @@ def run_with_events(run_id: str, req: StartRunRequest) -> dict[str, Any]:
 def _run_real(run_id: str, req: StartRunRequest) -> dict[str, Any]:
     from sendsprint.flow import SprintFlow
     from sendsprint.operators import AzureDevopsOperator, JiraOperator
+    from sendsprint.policy import AutonomyPolicy, parse_autonomy_level
     from sendsprint.scope import build_scope
     from sendsprint.workspace import load_workspace
 
@@ -64,7 +65,12 @@ def _run_real(run_id: str, req: StartRunRequest) -> dict[str, Any]:
         task_keys=req.item_keys or None,
     )
 
-    flow = SprintFlow(operator=op, workspace=ws, scope=scope)
+    flow = SprintFlow(
+        operator=op,
+        workspace=ws,
+        scope=scope,
+        autonomy_policy=AutonomyPolicy(level=parse_autonomy_level(req.autonomy_level)),
+    )
     events.publish_threadsafe(
         run_id, {"type": "step", "step": 1, "name": "read-sprint", "status": "running"}
     )
@@ -75,6 +81,7 @@ def _run_real(run_id: str, req: StartRunRequest) -> dict[str, Any]:
             dry_run=req.dry_run,
             resume=req.resume,
             run_id=run_id,
+            no_cache=req.no_cache,
         )
     else:
         result = flow.bootstrap(
@@ -83,6 +90,7 @@ def _run_real(run_id: str, req: StartRunRequest) -> dict[str, Any]:
             dry_run=req.dry_run,
             resume=req.resume,
             run_id=run_id,
+            no_cache=req.no_cache,
         )
 
     report = result.run_report

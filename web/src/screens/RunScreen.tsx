@@ -70,11 +70,16 @@ export const RunScreen: React.FC = () => {
   useEffect(() => {
     (async () => {
       try {
+        const primaryRepo =
+          session.projectSetup.mode === "single"
+            ? session.projectSetup.repositories[0]?.repoPath.trim()
+            : null;
         const res = await api.startRun({
           provider: session.provider ?? "jira",
           sprint_id: route.params.sprintId,
           mode: route.params.mode,
           item_keys: route.params.itemKeys,
+          repo_path: primaryRepo || undefined,
         });
         setRunId(res.run_id);
         subRef.current = subscribeToRun(api.eventsUrl(res.run_id), {

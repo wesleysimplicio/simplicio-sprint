@@ -354,7 +354,7 @@ def plugin_install_cmd(
     for column in ("status", "path"):
         table.add_column(column, style="cyan" if column == "status" else "")
     for status in ("created", "updated", "skipped"):
-        for path in payload[status]:
+        for path in cast(list[str], payload[status]):
             table.add_row(status, str(path))
     if result.manifest_path:
         table.add_row("manifest", str(result.manifest_path.relative_to(result.repo_path)))

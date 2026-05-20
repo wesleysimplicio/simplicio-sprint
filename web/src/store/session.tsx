@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import Constants from "expo-constants";
 import { ApiClient } from "../api/client";
-import type { Provider } from "../api/types";
+import type { ProjectSetup, Provider, RepositoryRegistration } from "../api/types";
 
 const STORAGE_KEY = "sendsprint.session.v1";
 
@@ -18,6 +18,7 @@ type Session = {
   account: string | null;
   jiraBoardId?: string | null;
   adoTeamPath?: string | null;
+  projectSetup: ProjectSetup;
 };
 
 type Ctx = {
@@ -28,6 +29,7 @@ type Ctx = {
   setAccount: (account: string | null) => Promise<void>;
   setJiraBoardId: (id: string | null) => Promise<void>;
   setAdoTeamPath: (path: string | null) => Promise<void>;
+  setProjectSetup: (setup: ProjectSetup) => Promise<void>;
   reset: () => Promise<void>;
 };
 
@@ -35,12 +37,19 @@ const defaultBackend =
   ((Constants.expoConfig?.extra as { defaultBackend?: string } | undefined) ?.defaultBackend) ??
   "http://localhost:8765";
 
+const defaultProjectSetup: ProjectSetup = {
+  mode: "single",
+  repositories: [],
+  updatedAt: null,
+};
+
 const initial: Session = {
   backendUrl: defaultBackend,
   provider: null,
   account: null,
   jiraBoardId: null,
   adoTeamPath: null,
+  projectSetup: defaultProjectSetup,
 };
 
 const SessionContext = createContext<Ctx | null>(null);
@@ -55,7 +64,7 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) setSession({ ...initial, ...JSON.parse(raw) });
+        if (raw) setSession(normalizeSession(JSON.parse(raw) as Partial<Session>));
       } finally {
         setHydrated(true);
       }
@@ -77,6 +86,15 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({
     setAccount: (a) => persist({ ...session, account: a }),
     setJiraBoardId: (id) => persist({ ...session, jiraBoardId: id }),
     setAdoTeamPath: (p) => persist({ ...session, adoTeamPath: p }),
+    setProjectSetup: (setup) =>
+      persist({
+        ...session,
+        projectSetup: {
+          ...setup,
+          repositories: setup.repositories.map(normalizeRepository),
+          updatedAt: new Date().toISOString(),
+        },
+      }),
     reset: () => persist(initial),
   };
 
@@ -89,3 +107,34 @@ export const useSession = (): Ctx => {
   if (!ctx) throw new Error("useSession must be inside SessionProvider");
   return ctx;
 };
+
+const normalizeSession = (stored: Partial<Session>): Session => ({
+  ...initial,
+  ...stored,
+  provider:
+    stored.provider === "jira" || stored.provider === "azuredevops"
+      ? stored.provider
+      : initial.provider,
+  projectSetup: normalizeProjectSetup(stored.projectSetup),
+});
+
+const normalizeProjectSetup = (setup?: ProjectSetup | null): ProjectSetup => ({
+  mode: setup?.mode === "portfolio" ? "portfolio" : "single",
+  repositories: Array.isArray(setup?.repositories)
+    ? setup.repositories.map(normalizeRepository)
+    : [],
+  updatedAt: setup?.updatedAt ?? null,
+});
+
+const normalizeRepository = (repo: RepositoryRegistration): RepositoryRegistration => ({
+  id: repo.id || `repo-${Date.now().toString(36)}`,
+  name: repo.name ?? "",
+  repoPath: repo.repoPath ?? "",
+  role: repo.role ?? "fullstack",
+  project: repo.project ?? "",
+  branchPattern: repo.branchPattern ?? "feature/{item_key}-{slug}",
+  commitPattern: repo.commitPattern ?? "{type}: {summary}",
+  validationCommands: Array.isArray(repo.validationCommands)
+    ? repo.validationCommands.filter(Boolean)
+    : [],
+});

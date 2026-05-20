@@ -1,6 +1,42 @@
 export type Provider = "jira" | "azuredevops";
 export type RunMode = "all" | "mine" | "selected";
 
+export type ApiErrorPayload = {
+  detail?: unknown;
+  message?: unknown;
+  error?: unknown;
+  [key: string]: unknown;
+};
+
+export type ProjectMode = "single" | "portfolio";
+
+export type RepositoryRole =
+  | "frontend"
+  | "backend"
+  | "fullstack"
+  | "mobile"
+  | "infra"
+  | "docs"
+  | "shared"
+  | "other";
+
+export type RepositoryRegistration = {
+  id: string;
+  name: string;
+  repoPath: string;
+  role: RepositoryRole;
+  project: string;
+  branchPattern: string;
+  commitPattern: string;
+  validationCommands: string[];
+};
+
+export type ProjectSetup = {
+  mode: ProjectMode;
+  repositories: RepositoryRegistration[];
+  updatedAt?: string | null;
+};
+
 export type Health = {
   ok: boolean;
   version: string;
@@ -66,9 +102,81 @@ export type StartRunRequest = {
   item_keys?: string[];
   repo_path?: string | null;
   workspace_path?: string | null;
+  dry_run?: boolean;
+  resume?: boolean;
+  no_cache?: boolean;
+  autonomy_level?: string;
+  run_id?: string | null;
 };
 
 export type StartRunResponse = { run_id: string; status: "started" };
+
+export type RouteConfidence = "high" | "medium" | "low";
+
+export type RoutePreviewSummary = {
+  text: string;
+  task_count: number;
+  planned_delivery_count: number;
+  selected_repo_count: number;
+  low_confidence_count: number;
+  warning_count: number;
+};
+
+export type RoutePreviewTaskUnderstanding = {
+  item_key: string;
+  item_type: string;
+  title: string;
+  status: string;
+  scopes: string[];
+  scope_source: "label" | "inferred" | "none";
+  relationship: string;
+  selected_repos: string[];
+  confidence?: RouteConfidence | null;
+  reasons: string[];
+};
+
+export type RoutePreviewSelectedRepo = {
+  item_key: string;
+  item_type: string;
+  title: string;
+  repo: string;
+  repo_name: string;
+  repo_role?: string | null;
+  branch: string;
+  target_branch: string;
+  confidence: RouteConfidence;
+  reasons: string[];
+  relationship: string;
+  worktree_path?: string | null;
+  validation_template?: string | null;
+  validation_commands: string[];
+};
+
+export type RoutePreviewLowConfidenceItem = {
+  item_key: string;
+  title: string;
+  repo?: string | null;
+  repo_name?: string | null;
+  confidence: RouteConfidence;
+  reason: string;
+  recommended_action: string;
+};
+
+export type RoutePreviewResponse = {
+  schema_version: string;
+  provider: Provider;
+  sprint_id: string;
+  sprint_name: string;
+  mode: RunMode;
+  item_keys: string[];
+  autonomy_level: string;
+  side_effects: Record<string, boolean>;
+  summary: RoutePreviewSummary;
+  task_understanding: RoutePreviewTaskUnderstanding[];
+  selected_repos: RoutePreviewSelectedRepo[];
+  low_confidence_items: RoutePreviewLowConfidenceItem[];
+  warnings: string[];
+};
 
 export type RunStatus = {
   run_id: string;

@@ -154,21 +154,30 @@ def _spawn_background_process(
     child_env = os.environ.copy()
     if env:
         child_env.update(env)
-    kwargs: dict[str, object] = {
-        "cwd": str(cwd),
-        "env": child_env,
-        "stdin": subprocess.DEVNULL,
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-        "text": True,
-    }
     if os.name == "nt":
-        kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+        creationflags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
             subprocess, "CREATE_NEW_PROCESS_GROUP", 0
         )
-    else:
-        kwargs["start_new_session"] = True
-    return subprocess.Popen(command, **kwargs)
+        return subprocess.Popen(
+            command,
+            cwd=str(cwd),
+            env=child_env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            creationflags=creationflags,
+        )
+    return subprocess.Popen(
+        command,
+        cwd=str(cwd),
+        env=child_env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        start_new_session=True,
+    )
 
 
 def _is_listening(host: str, port: int) -> bool:

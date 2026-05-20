@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from sendsprint.models.workspace import RepoConfig, WorkspaceConfig
+from sendsprint.models.workspace import ProjectConfig, RepoConfig, WorkspaceConfig
 from sendsprint.workspace.loader import load_workspace, new_project_dir, resolve_repo_path
 
 # ---------------------------------------------------------------------------
@@ -63,6 +63,155 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
     assert ws.code_generation.max_usd == 2.5
     assert ws.deploy.enabled is True
     assert ws.deploy.url == "https://deploy.example/hook"
+    assert ws.projects == []
+    assert ws.repos[0].project is None
+    assert ws.repos[0].capabilities == []
+    assert ws.repos[0].validation_commands == []
+
+
+def test_workspace_model_flattens_project_repos(tmp_path: Path) -> None:
+    root = tmp_path / "projects"
+    root.mkdir()
+
+    ws = WorkspaceConfig(
+        root_path=str(root),
+        projects=[
+            ProjectConfig(
+                key="payments",
+                name="Payments",
+                repos=[RepoConfig(name="api", path="apps/payments-api", role="api")],
+            )
+        ],
+    )
+
+    assert len(ws.projects) == 1
+    assert len(ws.repos) == 1
+    assert ws.projects[0].repos[0].project == "payments"
+    assert ws.repos[0].project == "payments"
+
+
+def test_load_workspace_single_project_config(tmp_path: Path) -> None:
+    root = tmp_path / "portfolio"
+    root.mkdir()
+
+    cfg = {
+        "name": "payments-portfolio",
+        "root_path": str(root),
+        "portfolio": {
+            "name": "Commerce",
+            "owners": ["platform-office"],
+            "capabilities": ["checkout"],
+        },
+        "projects": [
+            {
+                "key": "payments",
+                "name": "Payments",
+                "owners": ["team-payments"],
+                "capabilities": ["payment-processing"],
+                "components": ["checkout", "ledger"],
+                "routing_hints": {"labels": ["payments"], "areas": ["Checkout"]},
+                "branch_pattern": "feature/payments/{number}-{title}",
+                "commit_pattern": "feat(payments): {title}",
+                "validation_commands": ["pytest tests/payments -q"],
+                "repos": [
+                    {
+                        "name": "payments-api",
+                        "path": "apps/payments-api",
+                        "role": "api",
+                        "tech": "python",
+                        "capabilities": ["capture", "refund"],
+                        "components": ["api", "worker"],
+                        "owners": ["api-owner@example.com"],
+                        "routing_hints": {
+                            "labels": ["scope:back"],
+                            "paths": ["apps/payments-api/**"],
+                        },
+                        "branch_pattern": "feature/pay-api/{number}-{title}",
+                        "commit_pattern": "fix(payments-api): {title}",
+                        "validation_commands": ["ruff check sendsprint", "pytest tests -q"],
+                    }
+                ],
+            }
+        ],
+    }
+    ws_file = tmp_path / "workspace.yaml"
+    ws_file.write_text(yaml.dump(cfg), encoding="utf-8")
+
+    ws = load_workspace(ws_file)
+
+    assert ws.portfolio is not None
+    assert ws.portfolio.name == "Commerce"
+    assert ws.portfolio.owners == ["platform-office"]
+    assert ws.projects[0].key == "payments"
+    assert ws.projects[0].capabilities == ["payment-processing"]
+    assert ws.projects[0].validation_commands == ["pytest tests/payments -q"]
+    assert len(ws.repos) == 1
+
+    repo = ws.repos[0]
+    assert repo.project == "payments"
+    assert repo.capabilities == ["capture", "refund"]
+    assert repo.components == ["api", "worker"]
+    assert repo.owners == ["api-owner@example.com"]
+    assert repo.routing_hints == {
+        "labels": ["scope:back"],
+        "paths": ["apps/payments-api/**"],
+    }
+    assert repo.branch_pattern == "feature/pay-api/{number}-{title}"
+    assert repo.commit_pattern == "fix(payments-api): {title}"
+    assert repo.validation_commands == ["ruff check sendsprint", "pytest tests -q"]
+
+
+def test_load_workspace_multi_project_config_preserves_flat_repos(tmp_path: Path) -> None:
+    root = tmp_path / "portfolio"
+    root.mkdir()
+
+    cfg = {
+        "name": "multi-project",
+        "root_path": str(root),
+        "repos": [
+            {
+                "name": "shared-lib",
+                "path": "packages/shared-lib",
+                "role": "lib",
+                "project": "platform",
+            }
+        ],
+        "projects": [
+            {
+                "key": "checkout",
+                "name": "Checkout",
+                "repos": [
+                    {
+                        "name": "checkout-api",
+                        "path": "services/checkout-api",
+                        "role": "api",
+                    }
+                ],
+            },
+            {
+                "name": "Backoffice",
+                "repos": [
+                    {
+                        "name": "admin-web",
+                        "path": "apps/admin-web",
+                        "role": "front",
+                        "project": "admin",
+                    }
+                ],
+            },
+        ],
+    }
+    ws_file = tmp_path / "workspace.yaml"
+    ws_file.write_text(yaml.dump(cfg), encoding="utf-8")
+
+    ws = load_workspace(ws_file)
+
+    assert [project.name for project in ws.projects] == ["Checkout", "Backoffice"]
+    assert [(repo.name, repo.project) for repo in ws.repos] == [
+        ("shared-lib", "platform"),
+        ("checkout-api", "checkout"),
+        ("admin-web", "admin"),
+    ]
 
 
 def test_load_workspace_valid_json(tmp_path: Path) -> None:

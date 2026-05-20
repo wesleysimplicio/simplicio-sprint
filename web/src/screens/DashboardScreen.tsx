@@ -107,6 +107,7 @@ export const DashboardScreen: React.FC = () => {
       subtitle="Kanban operacional, relatorios por task e lanes de validacao em um layout leve."
       footer={
         <View style={{ gap: 10 }}>
+          <Button title="Setup" variant="secondary" onPress={() => nav.navigate("ProjectSetup")} />
           <Button title="Ver sprints" variant="secondary" onPress={() => nav.navigate("Sprints")} />
           <Button
             title="Parametros e conexoes"

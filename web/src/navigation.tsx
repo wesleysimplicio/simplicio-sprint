@@ -4,11 +4,13 @@ import {
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { theme } from "./theme";
 import { ConnectScreen } from "./screens/ConnectScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { ProviderScreen } from "./screens/ProviderScreen";
 import { AuthScreen } from "./screens/AuthScreen";
+import { ProjectSetupScreen } from "./screens/ProjectSetupScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { SprintsScreen } from "./screens/SprintsScreen";
 import { SprintDetailScreen } from "./screens/SprintDetailScreen";
@@ -21,6 +23,7 @@ export type RootStackParamList = {
   Dashboard: undefined;
   Provider: undefined;
   Auth: undefined;
+  ProjectSetup: undefined;
   Settings: undefined;
   Sprints: undefined;
   SprintDetail: { sprintId: string };
@@ -46,17 +49,33 @@ export const Navigation: React.FC = () => (
   <NavigationContainer theme={navTheme}>
     <Stack.Navigator
       initialRouteName="Connect"
-      screenOptions={{
+      screenOptions={({ navigation, route }) => ({
         headerStyle: { backgroundColor: theme.bg },
         headerTitleStyle: { color: theme.text, fontWeight: "700" },
         headerTintColor: theme.primary,
         contentStyle: { backgroundColor: theme.bg },
-      }}
+        headerRight:
+          route.name === "ProjectSetup"
+            ? undefined
+            : () => (
+                <Pressable
+                  onPress={() => navigation.navigate("ProjectSetup")}
+                  style={({ pressed }) => [styles.setupLink, pressed && { opacity: 0.75 }]}
+                >
+                  <Text style={styles.setupLinkText}>Setup</Text>
+                </Pressable>
+              ),
+      })}
     >
       <Stack.Screen name="Connect" component={ConnectScreen} options={{ title: "SendSprint" }} />
       <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Dashboard" }} />
       <Stack.Screen name="Provider" component={ProviderScreen} options={{ title: "Conectar" }} />
       <Stack.Screen name="Auth" component={AuthScreen} options={{ title: "Autenticar" }} />
+      <Stack.Screen
+        name="ProjectSetup"
+        component={ProjectSetupScreen}
+        options={{ title: "Project setup" }}
+      />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: "Configurações" }} />
       <Stack.Screen name="Sprints" component={SprintsScreen} options={{ title: "Sprints ativas" }} />
       <Stack.Screen
@@ -69,3 +88,19 @@ export const Navigation: React.FC = () => (
     </Stack.Navigator>
   </NavigationContainer>
 );
+
+const styles = StyleSheet.create({
+  setupLink: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  setupLinkText: {
+    color: theme.primary,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+});

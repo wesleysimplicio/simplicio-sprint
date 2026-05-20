@@ -213,6 +213,7 @@ class SprintFlow:
                 "url": self._deploy_config().url,
                 "final_status": self._deploy_config().final_status,
             },
+            workspace=self.workspace,
         )
 
         if dry_run:

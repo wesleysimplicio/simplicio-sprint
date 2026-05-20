@@ -120,6 +120,7 @@ export const ConnectScreen: React.FC = () => {
       />
 
       <Button title="Conectar" onPress={handleConnect} loading={busy} disabled={booting} />
+      <Button title="Setup" variant="secondary" onPress={() => nav.navigate("ProjectSetup")} />
 
       {booting ? (
         <View style={styles.bootRow}>

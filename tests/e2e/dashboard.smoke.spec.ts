@@ -12,9 +12,41 @@
  * provider picker, no JS console errors block render.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 
 const baseUrl = process.env.BASE_URL;
+
+const mockUnconfiguredBackend = async (page: Page) => {
+  await page.route(/\/health$/, async (route) => {
+    await route.fulfill({
+      json: {
+        ok: true,
+        version: 'test',
+        providers_configured: { jira: false, azuredevops: false },
+      },
+    });
+  });
+
+  await page.route(/\/auth\/status$/, async (route) => {
+    await route.fulfill({
+      json: {
+        default_provider: null,
+        jira_configured: false,
+        azuredevops_configured: false,
+        providers: {
+          jira: { configured: false, account: null },
+          azuredevops: {
+            configured: false,
+            account: null,
+            team_path: null,
+            iteration_path: null,
+          },
+          github: { configured: false },
+        },
+      },
+    });
+  });
+};
 
 test.describe('SendSprint web dashboard smoke', () => {
   test.skip(!baseUrl, 'BASE_URL not set — skipping E2E smoke (run with web dev server).');
@@ -43,5 +75,71 @@ test.describe('SendSprint web dashboard smoke', () => {
     // picker depending on the persisted token. Either is acceptable.
     const anchorRegex = /(connect|provider|sprint|jira|azure|sign in|login)/i;
     await expect(page.locator('body')).toContainText(anchorRegex, { timeout: 15_000 });
+  });
+
+  test('azure auth flow keeps operator feedback visible', async ({ page }) => {
+    await mockUnconfiguredBackend(page);
+    await page.goto('/');
+
+    const body = page.locator('body');
+    await expect(body).not.toBeEmpty({ timeout: 15_000 });
+    await expect(body).toContainText(/backend vtest ok/i);
+
+    const providerLink = page.getByText(/azure devops/i).first();
+    if (!(await providerLink.isVisible().catch(() => false))) {
+      const connect = page.getByText(/^conectar$|^connect$/i).first();
+      if (await connect.isVisible().catch(() => false)) {
+        await connect.click();
+      }
+    }
+
+    await page.getByText(/azure devops/i).first().click();
+    await expect(body).toContainText(/sprint url|url da sprint|personal access token|pat/i);
+
+    await page
+      .getByLabel(/sprint url|url da sprint/i)
+      .or(page.getByPlaceholder(/dev\.azure\.com/i))
+      .first()
+      .fill('https://dev.azure.com/example/project/_sprints/taskboard/team/project/sprint-1');
+    await page.locator('input[type="password"]').fill('example-token');
+
+    await expect(page.getByText(/o pat fica no keyring do so/i)).toBeVisible();
+  });
+
+  test('project setup keeps repository routing choices usable', async ({ page }) => {
+    await page.goto('/');
+
+    const body = page.locator('body');
+    await expect(body).not.toBeEmpty({ timeout: 15_000 });
+
+    const setupLink = page.getByText(/^setup$/i).first();
+    await expect(setupLink).toBeVisible();
+
+    await setupLink.click();
+    await expect(body).toContainText(/project setup/i);
+    await expect(page.getByText(/^single project$/i)).toBeVisible();
+    await expect(page.getByText(/^portfolio$/i)).toBeVisible();
+
+    await page.getByLabel(/repository name/i).fill('web-dashboard');
+    await page.getByLabel(/local path or remote url/i).fill('C:/workspace/web-dashboard');
+    await page.getByLabel(/^project$/i).fill('Dashboard');
+    await page.getByLabel(/branch pattern/i).fill('feature/{item_key}-{slug}');
+    await page.getByLabel(/commit pattern/i).fill('test: {summary}');
+    await page.getByPlaceholder(/npm run typecheck/i).fill('npm run typecheck\nnpm test');
+
+    await expect(body).toContainText(/current routing/i);
+    await expect(body).toContainText(/mode: single/i);
+    await expect(body).toContainText(/repos active: 1/i);
+
+    await page.getByText(/^portfolio$/i).click();
+    await expect(page.getByText(/portfolio mode permite/i)).toBeVisible();
+    await page.getByText(/^add repo$/i).click();
+    await expect(body).toContainText(/repository 2/i);
+    await expect(body).toContainText(/repos active: 2/i);
+
+    await page.getByText(/^single project$/i).click();
+    await expect(body).toContainText(/single-project mode usa somente o primeiro repositorio/i);
+    await expect(body).toContainText(/repos active: 1/i);
+    await expect(body).not.toContainText(/repository 2/i);
   });
 });

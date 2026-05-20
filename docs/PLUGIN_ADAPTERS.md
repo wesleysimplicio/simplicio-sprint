@@ -6,7 +6,7 @@ SendSprint keeps Python as the canonical runtime and installs thin assistant-hos
 
 ```mermaid
 flowchart LR
-    User["Operator"] --> Host["Claude / Codex / Hermes / OpenClaw / Cursor / Copilot"]
+    User["Operator"] --> Host["Claude / Codex / Hermes / OpenClaw / Cursor / Windsurf / Kiro / Antigravity / Copilot"]
     Host --> Adapter["Repo-local SendSprint plugin file"]
     Adapter --> CLI["Python CLI: sendsprint"]
     CLI --> API["Local API: python -m sendsprint.api"]
@@ -30,10 +30,13 @@ sendsprint plugins install --repo . --all --dry-run --json
 | Platform | Target | Purpose |
 | --- | --- | --- |
 | Claude Code | `.claude/skills/sendsprint/SKILL.md` | Skill entrypoint for Claude/Ralph-style repair loops. |
-| Codex | `.codex/skills/sendsprint/SKILL.md` | Skill entrypoint for Codex and `/goal` wrapping when requested. |
+| Codex | `AGENTS.md` | Repository instruction entrypoint for Codex and `/goal` wrapping when requested. |
 | Hermes Agent | `.hermes/skills/sendsprint.md` | Hermes module contract for local SendSprint control-plane delegation. |
 | OpenClaw | `.openclaw/skills/sendsprint.md` | Review/security wrapper around SendSprint reports and diffs. |
 | Cursor | `.cursor/rules/sendsprint.mdc` | Always-on repo rule for Cursor workspaces. |
+| Windsurf | `.windsurf/rules/sendsprint.md` | Always-on Windsurf rule that delegates sprint work to SendSprint. |
+| Kiro | `.kiro/steering/sendsprint.md` | Steering file that keeps SendSprint as the canonical sprint executor. |
+| Antigravity | `.antigravity/rules/sendsprint.md` | Local delivery-control-plane rule for Antigravity. |
 | GitHub Copilot | `.github/copilot-instructions.md` | Repository instructions for Copilot Chat and agent flows. |
 
 Every install also writes `.sendsprint/plugins/manifest.json` with the Python runtime, common entrypoints, and the active adapter targets.
@@ -43,9 +46,11 @@ Every install also writes `.sendsprint/plugins/manifest.json` with the Python ru
 1. Run `sendsprint doctor` when dependency readiness is unknown.
 2. Run `sendsprint web` when the operator wants localhost monitoring.
 3. Run `sendsprint sprint` for the profile-driven default delivery path.
-4. Run `sendsprint full --workspace workspace.yaml` for watch/full looping.
-5. Inspect SendSprint artifacts before making host-native edits.
-6. Report exact commands, tests, blockers, PR URLs, and next actions.
+4. Run `sendsprint run ... --dry-run` or call `/runs/preview` when route
+   confidence, selected repos, or validation gates need review before execution.
+5. Run `sendsprint full --workspace workspace.yaml` for watch/full looping.
+6. Inspect SendSprint artifacts before making host-native edits.
+7. Report exact commands, tests, blockers, PR URLs, and next actions.
 
 ## Extension rules
 

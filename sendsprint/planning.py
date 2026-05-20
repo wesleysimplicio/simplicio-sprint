@@ -4,25 +4,27 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from sendsprint.agents.story_task_planner import (
-    BACK_REPO_ROLES,
-    FRONT_REPO_ROLES,
     delivery_items,
-    infer_item_scopes,
-    item_matches_repo,
 )
 from sendsprint.models import Sprint
 from sendsprint.models.sprint import SprintItem
-from sendsprint.models.workspace import RepoConfig
+from sendsprint.models.workspace import RepoConfig, WorkspaceConfig
 from sendsprint.policy import AutonomyPolicy
+from sendsprint.routing import (
+    Confidence,
+    confidence_gate_warnings,
+    route_item_to_repo,
+)
+from sendsprint.routing import (
+    confidence_for_item as routing_confidence_for_item,
+)
+from sendsprint.task_understanding import TaskUnderstandingReport, understand_sprint_item
 from sendsprint.tech import TechFingerprint
 from sendsprint.templates import select_validation_template
-
-Confidence = Literal["high", "medium", "low"]
 
 
 class PlannedDelivery(BaseModel):
@@ -41,6 +43,7 @@ class PlannedDelivery(BaseModel):
     worktree_path: str | None = None
     validation_template: str | None = None
     validation_commands: list[str] = Field(default_factory=list)
+    task_understanding: TaskUnderstandingReport | None = None
 
 
 class DeliveryPlan(BaseModel):
@@ -80,6 +83,7 @@ def build_delivery_plan(
     llm: dict[str, str | int | float | bool | None] | None = None,
     deploy_callback: dict[str, str | bool | None] | None = None,
     release: dict[str, str | bool | None] | None = None,
+    workspace: WorkspaceConfig | None = None,
 ) -> DeliveryPlan:
     """Build a read-only plan for item/repo delivery."""
     policy = autonomy_policy or AutonomyPolicy()
@@ -95,19 +99,29 @@ def build_delivery_plan(
     )
     for item in delivery_items(sprint):
         matched = False
+        repo_count = len(repos)
+        understanding = understand_sprint_item(item, workspace)
         for repo_cfg, repo_path in repos:
             repo_role = repo_cfg.role if repo_cfg else None
-            if not item_matches_repo(item, repo_role):
-                continue
-            matched = True
             fp = detect_fingerprint(repo_path)
+            decision = route_item_to_repo(
+                item,
+                repo_cfg,
+                fp,
+                repo_path=repo_path,
+                task_understanding=understanding.model_dump(),
+                single_repo=repo_count == 1,
+            )
+            if not decision.match:
+                continue
+            plan.warnings.extend(confidence_gate_warnings([decision], policy))
+            matched = True
             branch = branch_for_task(item, fp, repo_cfg)
             target = (
                 repo_cfg.pr_target_branch
                 if repo_cfg and repo_cfg.pr_target_branch
                 else default_target_branch
             )
-            confidence, reason = confidence_for_item(item, repo_role, fp)
             relationship = "parent" if item.parent_key else "related" if item.links else "none"
             template = select_validation_template(fp, repo_path)
             worktree_path = str(
@@ -122,12 +136,13 @@ def build_delivery_plan(
                     repo_role=repo_role,
                     branch=branch,
                     target_branch=target,
-                    confidence=confidence,
-                    reason=reason,
+                    confidence=decision.confidence,
+                    reason=decision.reason,
                     relationship=relationship,
                     worktree_path=worktree_path,
                     validation_template=template.name,
                     validation_commands=template.commands(),
+                    task_understanding=understanding,
                 )
             )
         if not matched:
@@ -141,18 +156,4 @@ def confidence_for_item(
     fp: TechFingerprint,
 ) -> tuple[Confidence, str]:
     """Score how safely an item can be routed to a repo."""
-    label_scopes = {label.split(":", 1)[1] for label in item.labels if label.startswith("scope:")}
-    if label_scopes:
-        return "high", f"explicit scope label: {', '.join(sorted(label_scopes))}"
-
-    inferred = infer_item_scopes(item)
-    if inferred:
-        return "medium", f"inferred from item text: {', '.join(sorted(inferred))}"
-
-    if repo_role in FRONT_REPO_ROLES | BACK_REPO_ROLES:
-        return "low", "repo role is known but item text has no clear front/back signal"
-
-    if fp.techs or fp.roles:
-        return "low", "repo tech detected but item route is not explicit"
-
-    return "low", "no scope, role, or tech signal"
+    return routing_confidence_for_item(item, repo_role, fp)

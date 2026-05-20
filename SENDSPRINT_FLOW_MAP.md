@@ -115,8 +115,10 @@ flowchart TD
 
     CLI --> FLOW["SprintFlow"]
     FLOW --> OP["Operators: Jira / Azure DevOps / GitHub"]
-    FLOW --> PLAN["planning.py / scope.py / workspace.loader.py"]
+    FLOW --> PLAN["planning.py / task_understanding.py / routing.py"]
+    PLAN --> WORKSPACE["workspace.loader.py / portfolio projects"]
     FLOW --> TUPLE["yool tuple runtime"]
+    TUPLE --> DAG["tuple DAG + receipts"]
     TUPLE --> AGENTS["dev / lint / tests / security / PR / review"]
     AGENTS --> EVID["evidence.py / event_store.py / quality_gate.py"]
     EVID --> DASH["dashboard.py / control_plane.py"]
@@ -136,12 +138,20 @@ O SendSprint continua sendo executado pelo CLI Python. A nova camada
 - `.hermes/skills/sendsprint.md`
 - `.openclaw/skills/sendsprint.md`
 - `.cursor/rules/sendsprint.mdc`
+- `.windsurf/rules/sendsprint.md`
+- `.kiro/steering/sendsprint.md`
+- `.antigravity/rules/sendsprint.md`
 - `.github/copilot-instructions.md`
 - `.sendsprint/plugins/manifest.json`
 
 Esses arquivos ensinam o host a delegar para `sendsprint doctor`,
 `sendsprint web`, `sendsprint sprint`, `sendsprint watch` e
 `sendsprint full`, sem duplicar a esteira interna.
+
+Perfis instalaveis atuais em `sendsprint/plugins.py`: Claude, Codex,
+Hermes, OpenClaw, Cursor, Windsurf, Kiro, Antigravity e GitHub Copilot.
+Os demais manifests em `skills/` continuam como referencia manual para hosts
+que ainda nao tem instalador repo-local.
 
 ## 5. Fluxo operacional principal
 
@@ -261,15 +271,69 @@ Depois da leitura:
    - allowed statuses
 2. expande histórias sem tasks em tarefas entregáveis;
 3. valida ligações/hierarquia;
-4. resolve repos do `workspace.yaml`;
-5. cria `DeliveryPlan`;
-6. decide branch, target repo, target branch, stack, confiança e políticas.
+4. normaliza entendimento de cada item em `TaskUnderstandingReport`;
+5. resolve repos do `workspace.yaml`, incluindo `portfolio.projects[].repos`;
+6. cria `DeliveryPlan`;
+7. decide branch, target repo, target branch, stack, confianca e politicas.
+
+### Task understanding
+
+`sendsprint/task_understanding.py` faz uma leitura deterministica do item de
+sprint antes do roteamento. Ele combina titulo, descricao, acceptance criteria,
+labels, comentarios, anexos e `parent_key` para inferir:
+
+- projeto provavel;
+- superficies (`front`, `back`, `full-stack`, `docs`, `infra`, `mobile`, `cli`);
+- capabilities (`frontend-ui`, `backend-api`, `data`, `auth`, `testing`, etc.);
+- repos provaveis quando ha workspace;
+- necessidades de validacao;
+- score de confianca e `requires_confirmation`.
+
+Itens abaixo do limiar de confianca recebem `manual-confirmation` em
+`validation_needs` e aparecem como risco no plano/preview.
+
+### Portfolio/project routing
+
+`sendsprint/models/workspace.py` aceita metadados de `portfolio`, `projects`
+e `repos`. Cada `ProjectConfig` pode carregar capabilities, components,
+owners, routing hints, branch/commit patterns e comandos de validacao. Repos
+aninhados herdam `project` de `project.key` ou `project.name`; o validador
+de `WorkspaceConfig` achata esses repos em `WorkspaceConfig.repos` para manter
+compatibilidade com o fluxo existente.
+
+`sendsprint/routing.py` aplica a ordem:
+
+1. labels/regras explicitas (`repo:`, `repository:`, `project:`, `scope:`,
+   `role:`, `surface:`, `capability:`, `component:`, `area:`);
+2. entendimento estruturado do item;
+3. perfil do repo a partir de workspace, tech fingerprint e memoria operacional;
+4. fallback legado de front/back por escopo inferido;
+5. fallback de baixa confianca em multi-repo.
+
+`confidence_gate_warnings(...)` apenas avisa em autonomia `plan`, mas bloqueia
+execucao com efeitos colaterais quando uma rota `low` tentaria escrever arquivos.
+
+### Route preview
+
+O preview usa exatamente o mesmo caminho de planejamento read-only:
+
+- CLI: `sendsprint run ... --dry-run` e `sendsprint sprint ... --dry-run`;
+- artifact CLI: `sendsprint run ... --dry-run --plan-output route-plan.json`;
+- API: `POST /runs/preview`;
+- control plane: `POST /api/runs/preview`.
+
+A resposta `RoutePreviewResponse` inclui `task_understanding`,
+`selected_repos`, `low_confidence_items`, warnings, side effects e resumo.
+O endpoint nao cria run, nao escreve worktree, nao grava receipts e nao atualiza
+watch-state.
 
 ### Módulos envolvidos
 
 - `sendsprint/scope.py`
 - `sendsprint/workspace/loader.py`
 - `sendsprint/models/workspace.py`
+- `sendsprint/task_understanding.py`
+- `sendsprint/routing.py`
 - `sendsprint/planning.py`
 - `sendsprint/agents/story_task_planner.py`
 - `sendsprint/post_validation.py`
@@ -305,6 +369,7 @@ sequenceDiagram
     participant CLI as sendsprint.cli
     participant Flow as SprintFlow
     participant Op as Operator
+    participant Plan as Understanding/Route Plan
     participant Runtime as yool/tuple runtime
     participant Agents as Dev/Lint/Test/Sec/PR
     participant Store as Evidência + estado
@@ -314,9 +379,11 @@ sequenceDiagram
     CLI->>Flow: bootstrap(...)
     Flow->>Op: read_sprint(...)
     Op-->>Flow: Sprint + items
-    Flow->>Flow: scope + planning + architecture
-    Flow->>Runtime: emitir tuples de entrega
-    Runtime->>Agents: executar lanes
+    Flow->>Plan: scope + task understanding + routing
+    Plan-->>Flow: DeliveryPlan + warnings
+    Flow->>Flow: architecture + branch/worktree prep
+    Flow->>Runtime: emitir root tuples de entrega
+    Runtime->>Agents: executar lanes e follow-up tuples
     Agents-->>Runtime: step outputs + receipts
     Runtime-->>Flow: resultados agregados
     Flow->>Store: run state + evidence + quality + summary
@@ -330,6 +397,7 @@ sequenceDiagram
 |---|---|---|---|
 | 1 | Ler sprint/iteração | `operators/*`, `api/routes/sprints.py` | REST, MCP, Playwright |
 | 1.25 | Expandir stories em tasks | `agents/story_task_planner.py` | regras internas |
+| 1.4 | Entender tarefa + rotear repo | `task_understanding.py`, `routing.py`, `planning.py` | regras deterministicas |
 | 1.5 | Importar specs para agentic-starter | `agents/sprint_importer.py` | escrita local |
 | 2 | Mapear arquitetura | `architecture/mapper.py`, `builder.py` | inspeção de repo |
 | 3 | Build/dev | `agents/dev.py` | npm, pnpm, yarn, pip, cargo, dotnet etc. |
@@ -345,11 +413,15 @@ sequenceDiagram
 
 O fluxo moderno não é só sequencial; ele já usa runtime de tuples:
 
-- tuples são emitidas para lanes;
-- workers consomem lanes;
-- dispatcher usa cache;
-- receipts viram trilha imutável;
-- catalog/HAMT descreve capacidades.
+- `SprintFlow` emite uma root tuple por rota item/repo selecionada;
+- workers consomem lanes (`dev`, `lint`, `test`, `security`, `pr`);
+- cada lane pode anexar follow-up tuples, formando um DAG operacional;
+- dispatcher usa cache de receipts para evitar reexecucao desnecessaria;
+- receipts viram trilha imutavel e permitem `resume`;
+- catalog/HAMT descreve capacidades e guardrails de cada yool.
+
+`sendsprint sprint inspect <run_id> --cost` e `sendsprint sprint resume
+<run_id|tuple_id>` sao as superficies CLI para observar/reprocessar esse DAG.
 
 ### Componentes
 
@@ -445,14 +517,34 @@ Hoje o painel local se divide em:
    - Jira
    - ADO
    - GitHub CLI
-6. **Sprints**
+6. **ProjectSetup**
+   - modo `single` ou `portfolio`
+   - repositorios, papeis, projeto, branch/commit patterns e comandos de validacao
+   - salva apenas metadados nao secretos no AsyncStorage
+7. **Sprints**
    - lista sprints ativas
-7. **SprintDetail**
+8. **SprintDetail**
    - itens da sprint
-8. **Run**
-   - dispara execução
-9. **Result**
+9. **Run**
+   - dispara execucao
+10. **Result**
    - apresenta fechamento
+
+### Paridade Web/CLI
+
+O Web consome o mesmo backend local que a CLI prepara:
+
+- auth/status: `/auth/status`, `/auth/jira`, `/auth/azuredevops`;
+- sprints: `/sprints`, `/sprints/{id}`, `/sprints/import`;
+- run: `/runs` + SSE `/runs/{id}/events`;
+- route preview: `/runs/preview` e `/api/runs/preview`;
+- control plane: `/api/runs`, qualidade e evidencias por run.
+
+`web/src/api/types.ts` espelha `sendsprint/api/schemas.py` para
+`StartRunRequest`, `RoutePreviewResponse`, `RunStatus` e contratos do control
+plane. A tela `ProjectSetupScreen` modela single-project/portfolio no browser;
+o backend canonico continua sendo `workspace.yaml` quando `workspace_path` e
+`repo_path` sao passados para `/runs` ou `/runs/preview`.
 
 ### Componentes web principais
 
@@ -463,12 +555,14 @@ Hoje o painel local se divide em:
 - `web/src/screens/ConnectScreen.tsx`
 - `web/src/screens/ProviderScreen.tsx`
 - `web/src/screens/AuthScreen.tsx`
+- `web/src/screens/ProjectSetupScreen.tsx`
 - `web/src/screens/DashboardScreen.tsx`
 - `web/src/screens/SettingsScreen.tsx`
 - `web/src/screens/SprintsScreen.tsx`
 - `web/src/screens/SprintDetailScreen.tsx`
 - `web/src/screens/RunScreen.tsx`
 - `web/src/screens/ResultScreen.tsx`
+- `web/src/components/setup/*`
 - `web/src/components/*`
 - `web/src/theme.ts`
 
@@ -517,9 +611,11 @@ Essa sessão guarda apenas:
 - provider atual;
 - account;
 - board id Jira;
-- team path ADO.
+- team path ADO;
+- project setup local (`single`/`portfolio`, repositorios, papeis, projetos,
+  branch/commit patterns e comandos de validacao).
 
-Tokens não ficam no browser; ficam no backend/keyring.
+Tokens nao ficam no browser; ficam no backend/keyring.
 
 ## 7. Comandos operacionais mais importantes
 
@@ -546,6 +642,7 @@ python -m sendsprint.cli logout azuredevops
 python -m sendsprint.cli sprint
 python -m sendsprint.cli run jira 42 --workspace workspace.yaml --scope mine
 python -m sendsprint.cli run azuredevops "Project\\Team\\Sprint 12" --workspace workspace.yaml
+python -m sendsprint.cli run azuredevops "Project\\Team\\Sprint 12" --workspace workspace.yaml --dry-run --plan-output route-plan.json
 python -m sendsprint.cli watch --workspace workspace.yaml
 python -m sendsprint.cli full --workspace workspace.yaml
 python -m sendsprint.cli web
@@ -587,6 +684,7 @@ python -m sendsprint.api
 npm --prefix web run dev -- --port 8081 --non-interactive
 npm --prefix web run typecheck
 npm --prefix web run build
+curl -X POST http://127.0.0.1:8765/runs/preview -H "content-type: application/json" -d "{\"provider\":\"jira\",\"sprint_id\":\"42\",\"mode\":\"all\",\"workspace_path\":\"workspace.yaml\"}"
 ```
 
 ## 7.8 Testes e validação
@@ -642,6 +740,8 @@ npx playwright test
 - `sendsprint/scaffolder.py` — geração inicial `.specs/`.
 - `sendsprint/workspace/loader.py` — carrega `workspace.yaml`.
 - `sendsprint/models/workspace.py` — contratos do workspace.
+- `sendsprint/task_understanding.py` — normalizacao deterministica de item para roteamento.
+- `sendsprint/routing.py` — decisao item/repo com confianca e bloqueio de baixa confianca.
 - `sendsprint/scope.py` — filtros de escopo.
 - `sendsprint/tech/detector.py` — fingerprint de stack.
 - `sendsprint/templates.py` — catálogo de templates/validações.
@@ -668,8 +768,8 @@ npx playwright test
 - `sendsprint/api/schemas.py` — contratos HTTP.
 - `sendsprint/api/routes/auth.py` — auth/status.
 - `sendsprint/api/routes/sprints.py` — sprints/itens/import.
-- `sendsprint/api/routes/runs.py` — runs + SSE.
-- `sendsprint/api/routes/control_plane.py` — runs enriquecidas.
+- `sendsprint/api/routes/runs.py` — runs + SSE + route preview.
+- `sendsprint/api/routes/control_plane.py` — runs enriquecidas + preview web.
 - `sendsprint/api/routes/dashboard.py` — dashboards agregados.
 - `sendsprint/api/routes/operator.py` — ações do operador.
 - `sendsprint/api/runs/events.py` — broker de eventos.

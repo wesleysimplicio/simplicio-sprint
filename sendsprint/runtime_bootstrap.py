@@ -7,12 +7,10 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from sendsprint.doctor import DoctorReport, run_doctor
+from sendsprint.doctor import DoctorReport, Runner, run_doctor
 from sendsprint.models.workspace import CodeGenerationConfig
 from sendsprint.profile import RuntimeProfile
 from sendsprint.web_runtime import LocalhostRuntimeStatus, ensure_localhost_control_plane
-
-MapperRunner = subprocess.run
 
 
 @dataclass(slots=True)
@@ -38,7 +36,7 @@ def run_operational_bootstrap(
     workspace_file: str | Path | None = None,
     runtime: RuntimeProfile,
     code_generation: CodeGenerationConfig | None = None,
-    runner: MapperRunner = subprocess.run,
+    runner: Runner = subprocess.run,
 ) -> OperationalBootstrapReport:
     """Prepare the local runtime without blocking the main delivery loop."""
     repo = Path(repo_path).expanduser().resolve()
@@ -83,7 +81,7 @@ def run_operational_bootstrap(
     return report
 
 
-def _update_llm_project_mapper(report: OperationalBootstrapReport, *, runner: MapperRunner) -> None:
+def _update_llm_project_mapper(report: OperationalBootstrapReport, *, runner: Runner) -> None:
     if not shutil.which("npx"):
         report.notes.append(
             BootstrapNote(

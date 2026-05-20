@@ -13,8 +13,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from sendsprint.api.routes.runs import build_route_preview
 from sendsprint.api.runs import events, manager
-from sendsprint.api.schemas import StartRunRequest
+from sendsprint.api.schemas import RoutePreviewResponse, StartRunRequest
 
 router = APIRouter(prefix="/api/runs", tags=["control-plane"])
 
@@ -129,7 +130,7 @@ def _enrich_run(run_id: str) -> ControlPlaneRunSummary:
         state=status.state,
         sprint_id=status.sprint_id,
         provider=status.provider,
-        autonomy_level="plan",
+        autonomy_level=request.autonomy_level if request else "plan",
         task=task,
         branch=branch,
         readiness_score=score,
@@ -263,18 +264,15 @@ def list_control_plane_runs() -> list[ControlPlaneRunSummary]:
 @router.post("", response_model=StartControlPlaneRunResponse)
 def start_control_plane_run(req: StartControlPlaneRunRequest) -> StartControlPlaneRunResponse:
     """Start a new run from the web control plane."""
-    start_req = StartRunRequest(
-        provider=req.provider,  # type: ignore[arg-type]
-        sprint_id=req.sprint_id,
-        mode=req.mode,  # type: ignore[arg-type]
-        item_keys=req.item_keys,
-        repo_path=req.repo_path,
-        workspace_path=req.workspace_path,
-        dry_run=req.dry_run,
-        resume=req.resume,
-    )
+    start_req = _to_start_run_request(req)
     status = manager.start_run(start_req)
     return StartControlPlaneRunResponse(run_id=status.run_id)
+
+
+@router.post("/preview", response_model=RoutePreviewResponse)
+def preview_control_plane_run(req: StartControlPlaneRunRequest) -> RoutePreviewResponse:
+    """Read-only route preview for Web run preparation."""
+    return build_route_preview(_to_start_run_request(req))
 
 
 @router.get("/{run_id}", response_model=ControlPlaneRunDetail)
@@ -319,3 +317,18 @@ def get_run_quality(run_id: str) -> QualityGateResponse:
     if gate is None:
         return QualityGateResponse(run_id=run_id, verdict="pending")
     return gate
+
+
+def _to_start_run_request(req: StartControlPlaneRunRequest) -> StartRunRequest:
+    return StartRunRequest(
+        provider=req.provider,  # type: ignore[arg-type]
+        sprint_id=req.sprint_id,
+        mode=req.mode,  # type: ignore[arg-type]
+        item_keys=req.item_keys,
+        repo_path=req.repo_path,
+        workspace_path=req.workspace_path,
+        dry_run=req.dry_run,
+        resume=req.resume,
+        no_cache=req.no_cache,
+        autonomy_level=req.autonomy_level,  # type: ignore[arg-type]
+    )

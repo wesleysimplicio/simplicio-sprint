@@ -6,8 +6,33 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-05-20
+
 ### Added
 
+- Deterministic task-understanding reports in `sendsprint/task_understanding.py`
+  derive sprint item surfaces, capabilities, likely repositories, validation
+  needs, confidence, and confirmation requirements from titles, labels,
+  descriptions, acceptance criteria, comments, and attachments (#136).
+- Portfolio/project workspace metadata supports nested projects, repo
+  capabilities/components/owners/routing hints, branch and commit patterns,
+  validation commands, and backwards-compatible flattening into existing
+  `WorkspaceConfig.repos` consumers (#136).
+- Portfolio-aware task routing in `sendsprint/routing.py` matches explicit
+  repo/project/role/surface/capability rules, task-understanding signals,
+  operational-memory routing facts, and single-repo fallbacks while surfacing
+  high/medium/low confidence decisions (#136).
+- Read-only route preview APIs at `/runs/preview` and `/api/runs/preview`
+  expose task understanding, selected repositories, route confidence,
+  validation commands, warnings, and recommended low-confidence actions before
+  execution (#136).
+- Web project setup UX for single-project versus portfolio mode, repository
+  registration, branch/commit patterns, validation commands, local session
+  persistence, run preparation, route previews, and Azure DevOps auth feedback
+  (#136).
+- Plugin installer profiles and templates for Windsurf, Kiro, and Antigravity
+  extend SendSprint's AI-tool manifest coverage beyond the existing profiles
+  (#136).
 - Cross-stack runtime readiness closeout for epic #105 with ADR-009, a
   `sendsprint runtime-readiness` CLI command, and tests tying Python/Go/Rust/
   Node/Copilot boundaries to validation and rollback evidence.
@@ -302,6 +327,22 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 - 24 tests in `tests/test_contracts.py` covering serialization roundtrips,
   backwards compatibility with missing fields, extra-field preservation,
   enum completeness, and error cases (#106).
+
+### Changed
+
+- Delivery planning now routes through deterministic task understanding and
+  confidence-gated route decisions, warning in plan-only mode and blocking
+  low-confidence side effects when autonomy allows writes (#136).
+- Release metadata now aligns `pyproject.toml`, `sendsprint.__version__`, and
+  the English/Portuguese README status lines at `0.20.0` for GitHub release
+  and PyPI publishing preparation (#136).
+
+### Validation
+
+- Focused coverage added for task understanding, deterministic routing,
+  project/portfolio workspace flattening, plugin installation profiles,
+  route preview API/control-plane endpoints, and dashboard Azure auth feedback
+  (#136).
 
 ## [0.19.0] - 2026-05-20
 

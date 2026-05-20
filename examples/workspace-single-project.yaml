@@ -1,0 +1,59 @@
+# SendSprint single-project workspace example
+# Project repos are flattened into WorkspaceConfig.repos for existing flows.
+
+name: commerce-workspace
+root_path: .
+
+portfolio:
+  name: Commerce
+  owners:
+    - platform-office
+  capabilities:
+    - checkout
+    - payments
+
+projects:
+  - key: payments
+    name: Payments
+    owners:
+      - team-payments
+    capabilities:
+      - payment-processing
+    components:
+      - checkout
+      - ledger
+    routing_hints:
+      labels:
+        - payments
+      areas:
+        - Checkout
+    branch_pattern: feature/payments/{number}-{title}
+    commit_pattern: "feat(payments): {title}"
+    validation_commands:
+      - pytest tests/payments -q
+    repos:
+      - name: payments-api
+        path: apps/payments-api
+        role: api
+        tech: python
+        capabilities:
+          - capture
+          - refund
+        components:
+          - api
+          - worker
+        owners:
+          - api-owner@example.com
+        routing_hints:
+          labels:
+            - scope:back
+          paths:
+            - apps/payments-api/**
+        branch_pattern: feature/pay-api/{number}-{title}
+        commit_pattern: "fix(payments-api): {title}"
+        validation_commands:
+          - ruff check sendsprint
+          - pytest tests -q
+        lint_command: ruff check sendsprint
+        test_command: pytest tests -q
+

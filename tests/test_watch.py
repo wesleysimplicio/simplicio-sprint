@@ -245,6 +245,16 @@ def test_watch_cli_dry_run_lists_tasks(monkeypatch, tmp_path: Path) -> None:
             )
 
     monkeypatch.setattr("sendsprint.cli.Watcher", FakeWatcher)
+    monkeypatch.setattr(
+        "sendsprint.cli.run_operational_bootstrap",
+        lambda *args, **kwargs: SimpleNamespace(
+            doctor=None,
+            dashboard=None,
+            mapper_updated=False,
+            python_fallback_active=False,
+            notes=[],
+        ),
+    )
 
     result = CliRunner().invoke(app, ["watch", "--workspace", str(ws_file), "--dry-run"])
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import pytest
 
@@ -80,6 +81,66 @@ def test_start_run_with_autonomy_level():
     resp = client.post("/api/runs", json=payload)
     assert resp.status_code == 200
     assert resp.json()["run_id"]
+
+
+def test_control_plane_preview_is_read_only_and_filterable(monkeypatch, tmp_path: Path) -> None:
+    from sendsprint.api.runs import manager
+    from sendsprint.models import Sprint, SprintItem
+
+    class FakeJiraOperator:
+        source = "jira"
+
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def read_sprint(self, **kwargs):
+            assert kwargs["sprint_id"] == "131"
+            return Sprint(
+                id="131",
+                name="Preview Sprint",
+                source="jira",
+                items=[
+                    SprintItem(
+                        id="1",
+                        key="WEB-1",
+                        type="Task",
+                        title="Criar tela de login",
+                        status="New",
+                        labels=["scope:front"],
+                    ),
+                    SprintItem(
+                        id="2",
+                        key="API-2",
+                        type="Task",
+                        title="Implement backend endpoint",
+                        status="New",
+                    ),
+                ],
+            )
+
+    workspace_path = _preview_workspace(tmp_path)
+    monkeypatch.setattr("sendsprint.operators.JiraOperator", FakeJiraOperator)
+    before = len(manager.list_runs())
+
+    resp = client.post(
+        "/api/runs/preview",
+        json={
+            "provider": "jira",
+            "sprint_id": "131",
+            "mode": "selected",
+            "item_keys": ["API-2"],
+            "workspace_path": str(workspace_path),
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert len(manager.list_runs()) == before
+    assert body["item_keys"] == ["API-2"]
+    assert [task["item_key"] for task in body["task_understanding"]] == ["API-2"]
+    assert body["selected_repos"][0]["repo_name"] == "api"
+    assert body["selected_repos"][0]["confidence"] == "high"
+    assert body["low_confidence_items"] == []
 
 
 # ---------------------------------------------------------------------------
@@ -271,3 +332,36 @@ def _wait_for_state(run_id: str, target_states: set[str], timeout: float = 10.0)
                 return body
         time.sleep(0.15)
     return resp.json() if resp.status_code == 200 else {}
+
+
+def _preview_workspace(tmp_path: Path) -> Path:
+    frontend = tmp_path / "frontend"
+    api = tmp_path / "api"
+    frontend.mkdir()
+    api.mkdir()
+    (frontend / "package.json").write_text(
+        '{"dependencies":{"react":"latest"}}',
+        encoding="utf-8",
+    )
+    (api / "pyproject.toml").write_text(
+        "[project]\ndependencies = ['fastapi']\n",
+        encoding="utf-8",
+    )
+    workspace_path = tmp_path / "workspace.yaml"
+    workspace_path.write_text(
+        "\n".join(
+            [
+                "name: preview",
+                f"root_path: {tmp_path.as_posix()}",
+                "repos:",
+                "  - name: frontend",
+                "    path: frontend",
+                "    role: front",
+                "  - name: api",
+                "    path: api",
+                "    role: api",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return workspace_path

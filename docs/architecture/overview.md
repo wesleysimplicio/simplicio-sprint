@@ -5,7 +5,8 @@ summarizes where each feature should land and which tests usually guard it.
 
 ## Repository Mode
 
-- Mode: single project at repo root.
+- Mode: single project at repo root by default, with portfolio/project workspace
+  metadata available through `workspace.yaml`.
 - Product package: `sendsprint/`.
 - API package: `sendsprint/api/`.
 - Dashboard app: `web/`.
@@ -20,19 +21,33 @@ summarizes where each feature should land and which tests usually guard it.
 |---|---|---|
 | Add CLI command | `sendsprint/cli.py` | `tests/test_cli.py` |
 | Add tracker/source | `sendsprint/operators/`, `sendsprint/models/sprint.py` | `tests/test_*operator.py` |
+| Add task understanding | `sendsprint/task_understanding.py` | `tests/test_task_understanding.py` |
+| Add routing or portfolio behavior | `sendsprint/routing.py`, `sendsprint/planning.py`, `sendsprint/models/workspace.py`, `sendsprint/workspace/loader.py` | `tests/test_routing.py`, `tests/test_workspace.py`, `tests/test_sprint_flow.py` |
 | Add planning/dry-run behavior | `sendsprint/planning.py`, `sendsprint/flow/sprint_flow.py` | `tests/test_sprint_flow.py` |
+| Add route preview API | `sendsprint/api/schemas.py`, `sendsprint/api/routes/runs.py`, `sendsprint/api/routes/control_plane.py` | `tests/test_api.py`, `tests/test_api_control_plane.py` |
 | Add stack support | `sendsprint/tech/detector.py`, `agents/dev.py`, `lint_runner.py`, `test_runner.py` | `tests/test_tech_detector.py`, `tests/test_agents.py` |
 | Add safety/preflight check | `sendsprint/preflight.py` | `tests/test_preflight.py` |
 | Add evidence/report behavior | `sendsprint/models/reports.py`, `agents/pr_body_builder.py`, API run bridge | `tests/test_pr_body_builder.py`, `tests/test_api.py` |
-| Add dashboard data | `sendsprint/api/schemas.py`, `sendsprint/api/routes/`, `web/src/` | `tests/test_api.py`, `tests/e2e/dashboard.smoke.spec.ts` |
+| Add dashboard or Web setup data | `sendsprint/api/schemas.py`, `sendsprint/api/routes/`, `web/src/`, `web/src/components/setup/` | `tests/test_api.py`, `tests/e2e/dashboard.smoke.spec.ts` |
+| Add tuple/DAG execution behavior | `sendsprint/yool/`, `sendsprint/flow/sprint_flow.py`, `sendsprint/agent_registry.py` | `tests/test_yool_runtime.py`, `tests/test_yool_receipts_dispatcher.py`, `tests/test_sprint_flow.py` |
 | Add release automation | `.github/workflows/`, `scripts/` | workflow syntax + focused script tests |
 
 ## Data Model Map
 
 - `Sprint` and `SprintItem` represent tracker work from Jira/Azure DevOps.
-- `WorkspaceConfig` and `RepoConfig` describe target repositories, branches,
-  reviewers, codegen, deploy, and stack commands.
-- `DeliveryPlan` is the current dry-run artifact.
+- `WorkspaceConfig`, `PortfolioConfig`, `ProjectConfig`, and `RepoConfig`
+  describe target repositories, project grouping, branches, reviewers, codegen,
+  deploy, routing metadata, and stack commands. Project-owned repos are
+  flattened into `WorkspaceConfig.repos` for existing flow consumers.
+- `TaskUnderstandingReport` is the deterministic per-item normalization used
+  before routing.
+- `RouteDecision` records item/repo match status, confidence, reason, and route
+  signals.
+- `DeliveryPlan` is the shared CLI dry-run and API route-preview artifact.
+- `RoutePreviewResponse` is the read-only Web/control-plane projection of a
+  `DeliveryPlan`.
+- Tuple logs and receipts represent the mutable execution DAG after route
+  preview/plan approval.
 - `RunState` persists resumable progress under `.sendsprint/runs/`.
 - `RunReport`, `StepReport`, `TestEvidence`, `SecurityFinding`, and `PrInfo`
   are the common reporting surface for CLI, API, dashboard, PRs, and evidence.
@@ -55,6 +70,7 @@ summarizes where each feature should land and which tests usually guard it.
 | `#38` executive report | Markdown report generator from run report/evidence bundle |
 | `#39` control plane | Worker assignment/status model tied to worktree ownership and policy |
 | `#40` transcript ingest | Parser/deduper/redactor plus review/apply modes behind policy |
+| `#135` task understanding/routing docs | `README.md`, `SENDSPRINT_FLOW_MAP.md`, `docs/architecture/overview.md`, `docs/PLUGIN_ADAPTERS.md` |
 
 ## Regression Strategy
 
