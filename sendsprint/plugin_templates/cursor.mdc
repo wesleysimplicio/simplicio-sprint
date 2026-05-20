@@ -1,0 +1,29 @@
+---
+description: SendSprint plugin for Cursor. Runs the Python CLI as the canonical sprint delivery engine.
+globs:
+alwaysApply: true
+---
+
+# SendSprint Plugin
+
+When the user asks to run SendSprint, deliver a sprint, process Jira/Azure DevOps work, or open the local SendSprint dashboard, use the Python CLI.
+
+## Commands
+
+```bash
+sendsprint doctor
+sendsprint web
+sendsprint sprint
+sendsprint full --workspace workspace.yaml
+sendsprint run jira 42 --workspace workspace.yaml --scope mine
+sendsprint run azuredevops "Project\\Team\\Sprint 12" --workspace workspace.yaml
+```
+
+## Rules
+
+- Do not reimplement the SendSprint 10-step flow inside Cursor.
+- Use `sendsprint web` for localhost monitoring.
+- Use `sendsprint full --workspace workspace.yaml` for continuous mode.
+- Keep credentials in the OS keyring through SendSprint login/auth flows.
+- Report PR URL, run report, evidence, blockers, and next actions.
+

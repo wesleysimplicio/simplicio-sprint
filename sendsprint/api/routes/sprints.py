@@ -9,6 +9,8 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
+from sendsprint import credentials
+from sendsprint import profile as profile_mod
 from sendsprint.api.schemas import (
     ImportSprintsRequest,
     ImportSprintsResponse,
@@ -48,7 +50,10 @@ def get_sprint(
     else:
         op = AzureDevopsOperator(transport="auto")
     try:
-        sprint = op.read_sprint(sprint_id=sprint_id)
+        if provider == "jira":
+            sprint = op.read_sprint(sprint_id=sprint_id)
+        else:
+            sprint = op.read_sprint(iteration_path=sprint_id)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"failed to read sprint: {exc}") from exc
 
@@ -119,7 +124,10 @@ def _import_worker(job_id: str, req: ImportSprintsRequest) -> None:
         )
         for s in sprints:
             try:
-                op.read_sprint(sprint_id=s.id)
+                if req.provider == "jira":
+                    op.read_sprint(sprint_id=s.id)
+                else:
+                    op.read_sprint(iteration_path=s.id)
                 _imports[job_id]["fetched"] += 1
             except Exception:
                 continue
@@ -166,12 +174,10 @@ def _list_jira_active(board_id: str | None) -> list[SprintSummary]:
 
 
 def _list_ado_active(team_path: str | None) -> list[SprintSummary]:
-    org = os.getenv("AZURE_DEVOPS_ORG", "")
-    project = os.getenv("AZURE_DEVOPS_PROJECT", "")
-    pat = os.getenv("AZURE_DEVOPS_PAT", "")
+    org, project, pat, resolved_team_path = _resolve_ado_context(team_path)
     if not (org and project and pat):
         return _demo_sprints("azuredevops")
-    base = team_path or f"{org}/{project}"
+    base = resolved_team_path or f"{org}/{project}"
     url = (
         f"https://dev.azure.com/{base}/_apis/work/teamsettings/iterations"
         "?$timeframe=current&api-version=7.1"
@@ -187,9 +193,12 @@ def _list_ado_active(team_path: str | None) -> list[SprintSummary]:
     out: list[SprintSummary] = []
     for s in data.get("value", []):
         attrs = s.get("attributes", {})
+        sprint_id = s.get("path") or _infer_iteration_path(
+            project, resolved_team_path, s.get("name")
+        )
         out.append(
             SprintSummary(
-                id=s.get("id", ""),
+                id=sprint_id or s.get("id", ""),
                 name=s.get("name", ""),
                 state="active",
                 provider="azuredevops",
@@ -198,6 +207,30 @@ def _list_ado_active(team_path: str | None) -> list[SprintSummary]:
             )
         )
     return out
+
+
+def _resolve_ado_context(team_path: str | None) -> tuple[str, str, str, str | None]:
+    profile = profile_mod.load()
+    org = os.getenv("AZURE_DEVOPS_ORG", "") or (profile.azuredevops.organization or "")
+    project = os.getenv("AZURE_DEVOPS_PROJECT", "") or (profile.azuredevops.project or "")
+    pat = os.getenv("AZURE_DEVOPS_PAT", "")
+    if not pat and org:
+        pat = credentials.get_secret("azuredevops", org) or ""
+    resolved_team_path = team_path
+    if not resolved_team_path and profile.azuredevops.team:
+        resolved_team_path = f"{org}/{project}/{profile.azuredevops.team}"
+    elif not resolved_team_path and org and project:
+        resolved_team_path = f"{org}/{project}"
+    return org, project, pat, resolved_team_path
+
+
+def _infer_iteration_path(
+    project: str, team_path: str | None, sprint_name: str | None
+) -> str | None:
+    if not sprint_name:
+        return None
+    team = team_path.split("/")[-1] if team_path and "/" in team_path else None
+    return "\\".join(part for part in (project, team, sprint_name) if part)
 
 
 def _demo_sprints(provider: Provider) -> list[SprintSummary]:

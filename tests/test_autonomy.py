@@ -145,6 +145,7 @@ class TestParseAutonomyLevel:
     def test_case_insensitive(self) -> None:
         assert parse_autonomy_level("OBSERVE") == "observe"
         assert parse_autonomy_level("Deploy-Callback") == "deploy-callback"
+        assert parse_autonomy_level("FULL") == "deploy-callback"
 
     def test_invalid_raises_value_error(self) -> None:
         with pytest.raises(ValueError, match="unknown autonomy level"):

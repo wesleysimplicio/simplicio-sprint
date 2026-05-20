@@ -23,9 +23,10 @@ class JiraAuthRequest(BaseModel):
 
 
 class AzureAuthRequest(BaseModel):
-    organization: str
-    project: str
-    pat: str
+    organization: str | None = None
+    project: str | None = None
+    pat: str | None = None
+    sprint_url: str | None = None
 
 
 class AuthResponse(BaseModel):
@@ -33,6 +34,8 @@ class AuthResponse(BaseModel):
     account: str
     ok: bool
     user_display_name: str | None = None
+    ado_team_path: str | None = None
+    ado_iteration_path: str | None = None
 
 
 class SprintSummary(BaseModel):

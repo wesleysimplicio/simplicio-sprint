@@ -40,8 +40,16 @@ from sendsprint.models.workspace import CodeGenerationConfig, DeployWorkflowConf
 from sendsprint.operators import AzureDevopsOperator, JiraOperator
 from sendsprint.operators.base import Transport
 from sendsprint.policy import AutonomyPolicy, parse_autonomy_level
+from sendsprint.plugins import (
+    PLUGIN_PROFILES,
+    PluginPlatform,
+    install_plugins,
+    list_plugin_profiles,
+    result_to_json as plugin_result_to_json,
+)
 from sendsprint.preflight import PreflightReport, run_preflight
 from sendsprint.reports import render_executive_report
+from sendsprint.runtime_bootstrap import OperationalBootstrapReport, run_operational_bootstrap
 from sendsprint.runtime_readiness import (
     build_cross_stack_runtime_readiness,
     format_runtime_readiness_markdown,
@@ -54,6 +62,12 @@ from sendsprint.tech import detect_tech
 from sendsprint.trackers import GitHubIssuesTracker
 from sendsprint.watch import WatchCycleResult, Watcher
 from sendsprint.watch_config import parse_interval_minutes
+from sendsprint.web_runtime import (
+    DEFAULT_API_HOST,
+    DEFAULT_API_PORT,
+    DEFAULT_UI_PORT,
+    ensure_localhost_control_plane,
+)
 from sendsprint.workspace import load_workspace
 from sendsprint.credentials import Provider as CredentialProvider
 from sendsprint.yool.runtime import dispatch_yool, inspect_run, parse_payload, resume_run, snapshot
@@ -226,6 +240,12 @@ def runtime_readiness_cmd(
 action_app = typer.Typer(add_completion=False, help="Manage domain action playbooks.")
 app.add_typer(action_app, name="actions")
 
+plugins_app = typer.Typer(
+    add_completion=False,
+    help="Install SendSprint assistant plugins for agent hosts.",
+)
+app.add_typer(plugins_app, name="plugins")
+
 
 @action_app.command("list")
 def action_catalog_list(
@@ -267,6 +287,100 @@ def action_catalog_write_default(
     """Write the built-in action catalog to an editable repo-local JSON file."""
     target = write_action_catalog(output)
     console.print(f"[green]wrote action catalog to {target}[/green]")
+
+
+@plugins_app.command("list")
+def plugin_list_cmd(
+    json_output: bool = typer.Option(False, "--json", help="Print plugin profiles as JSON"),
+) -> None:
+    """List built-in SendSprint assistant plugin targets."""
+    profiles = list_plugin_profiles()
+    if json_output:
+        console.print_json(
+            data=[
+                {
+                    "platform": profile.platform,
+                    "display_name": profile.display_name,
+                    "target": profile.default_target,
+                    "runtime_command": profile.runtime_command,
+                    "notes": list(profile.notes),
+                }
+                for profile in profiles
+            ]
+        )
+        return
+
+    table = Table(title="SendSprint assistant plugins", show_lines=False)
+    for column in ("platform", "host", "target", "runtime"):
+        table.add_column(column, style="cyan" if column == "platform" else "")
+    for profile in profiles:
+        table.add_row(
+            profile.platform,
+            profile.display_name,
+            profile.default_target,
+            profile.runtime_command,
+        )
+    console.print(table)
+
+
+@plugins_app.command("install")
+def plugin_install_cmd(
+    repo_path: Path = typer.Option(Path("."), "--repo", "-r", exists=True, file_okay=False),
+    platform: list[str] | None = typer.Option(
+        None,
+        "--platform",
+        "-p",
+        help="Install one platform; repeat for multiple. Defaults to all platforms.",
+    ),
+    all_platforms: bool = typer.Option(
+        False,
+        "--all",
+        help="Install all built-in platforms explicitly.",
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite existing plugin files"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
+    json_output: bool = typer.Option(False, "--json", help="Print install result as JSON"),
+) -> None:
+    """Install repo-local plugins for Claude, Codex, Hermes, OpenClaw, Cursor and Copilot."""
+    selected = None if all_platforms or not platform else _parse_plugin_platforms(platform)
+    result = install_plugins(repo_path, platforms=selected, force=force, dry_run=dry_run)
+    payload = plugin_result_to_json(result)
+
+    if json_output:
+        console.print_json(data=payload)
+        return
+
+    table = Table(title="SendSprint plugin install", show_lines=False)
+    for column in ("status", "path"):
+        table.add_column(column, style="cyan" if column == "status" else "")
+    for status in ("created", "updated", "skipped"):
+        for path in payload[status]:
+            table.add_row(status, str(path))
+    if result.manifest_path:
+        table.add_row("manifest", str(result.manifest_path.relative_to(result.repo_path)))
+    console.print(table)
+    if dry_run:
+        console.print("[yellow]dry-run only; no files were written[/yellow]")
+
+
+def _parse_plugin_platforms(values: list[str]) -> list[PluginPlatform]:
+    aliases = {
+        "copilot": "github-copilot",
+        "githubcopilot": "github-copilot",
+        "github_copilot": "github-copilot",
+        "claude-code": "claude",
+    }
+    parsed: list[PluginPlatform] = []
+    valid = set(PLUGIN_PROFILES)
+    for value in values:
+        platform = aliases.get(value.strip().lower(), value.strip().lower())
+        if platform not in valid:
+            valid_values = ", ".join(sorted(valid | set(aliases)))
+            raise typer.BadParameter(
+                f"unknown plugin platform '{value}'. Valid values: {valid_values}"
+            )
+        parsed.append(cast(PluginPlatform, platform))
+    return parsed
 
 
 @app.command(name="doctor")
@@ -425,9 +539,22 @@ def run_flow(
         "--no-cache",
         help="Bypass receipt cache and force worker execution for this run.",
     ),
+    dashboard: bool = typer.Option(
+        True,
+        "--dashboard/--no-dashboard",
+        help="Ensure the localhost API/UI dashboard is running and open it once per day.",
+    ),
+    full_mode: bool = typer.Option(
+        False,
+        "--full-mode",
+        help="Shortcut for maximum autonomy (`deploy-callback`) with dashboard bootstrap.",
+    ),
 ) -> None:
     """Run the full SendSprint flow."""
-    ws = load_workspace(workspace_file) if workspace_file else None
+    profile_state = profile_mod.load()
+    resolved_workspace_file = _resolve_workspace_file(workspace_file, profile_state)
+    resolved_repo_path = _resolve_repo_path(repo_path, profile_state)
+    ws = load_workspace(resolved_workspace_file) if resolved_workspace_file else None
     code_generation = _resolve_codegen_config(
         ws,
         enabled=llm_codegen,
@@ -435,6 +562,13 @@ def run_flow(
         model=llm_model,
         max_usd=llm_max_usd,
         max_tokens=llm_max_tokens,
+    )
+    _bootstrap_runtime_defaults(
+        repo_path=resolved_repo_path,
+        workspace_file=resolved_workspace_file,
+        profile_state=profile_state,
+        code_generation=code_generation,
+        dashboard=dashboard,
     )
     deploy_config = _resolve_deploy_config(
         ws,
@@ -471,7 +605,9 @@ def run_flow(
         raise typer.BadParameter("source must be 'jira' or 'azuredevops'")
 
     default_autonomy = "plan" if dry_run else "deploy-callback" if deploy is True else "pr"
-    autonomy_level = parse_autonomy_level(autonomy or default_autonomy)
+    autonomy_level = parse_autonomy_level(
+        "deploy-callback" if full_mode else autonomy or default_autonomy
+    )
     flow = SprintFlow(
         operator=operator,
         workspace=ws,
@@ -491,7 +627,7 @@ def run_flow(
     result = flow.bootstrap(
         sprint_id=sprint_id,
         iteration_path=iteration_path,
-        repo_path=str(repo_path) if repo_path else None,
+        repo_path=str(resolved_repo_path) if resolved_repo_path else None,
         dry_run=dry_run,
         resume=resume,
         run_id=run_id,
@@ -525,12 +661,10 @@ def run_flow(
 
 @app.command(name="watch")
 def watch_cmd(
-    workspace_file: Path = typer.Option(
-        ...,
+    workspace_file: Path | None = typer.Option(
+        None,
         "--workspace",
         "-w",
-        exists=True,
-        dir_okay=False,
         help="Workspace YAML/JSON with a watch section",
     ),
     interval: str | None = typer.Option(
@@ -559,14 +693,36 @@ def watch_cmd(
         help="Reprocess tasks even if watch-state says they were already handled",
     ),
     transport: str = typer.Option("auto", "--transport", help="auto | mcp | api | playwright"),
+    dashboard: bool = typer.Option(
+        True,
+        "--dashboard/--no-dashboard",
+        help="Ensure the localhost API/UI dashboard is running and open it once per day.",
+    ),
+    full_mode: bool = typer.Option(
+        False,
+        "--full-mode",
+        help="Shortcut for maximum autonomy (`deploy-callback`) with dashboard bootstrap.",
+    ),
 ) -> None:
     """Watch Jira/Azure DevOps periodically and process eligible assigned tasks."""
-    ws = load_workspace(workspace_file)
+    profile_state = profile_mod.load()
+    resolved_workspace_file = _require_workspace_file(workspace_file, profile_state)
+    ws = load_workspace(resolved_workspace_file)
+    _bootstrap_runtime_defaults(
+        repo_path=_resolve_repo_path(None, profile_state),
+        workspace_file=resolved_workspace_file,
+        profile_state=profile_state,
+        dashboard=dashboard,
+        code_generation=ws.code_generation,
+    )
     if not ws.watch.enabled and not dry_run:
         raise typer.BadParameter("workspace watch.enabled must be true unless --dry-run is used")
     try:
-        interval_minutes = parse_interval_minutes(interval, default=ws.watch.interval_minutes)
-        autonomy_level = parse_autonomy_level(autonomy)
+        interval_minutes = parse_interval_minutes(
+            interval,
+            default=profile_state.runtime.watch_interval_minutes or ws.watch.interval_minutes,
+        )
+        autonomy_level = parse_autonomy_level("deploy-callback" if full_mode else autonomy)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
 
@@ -931,6 +1087,16 @@ def sprint(
         "--no-cache",
         help="Bypass receipt cache and force worker execution for this run.",
     ),
+    dashboard: bool = typer.Option(
+        True,
+        "--dashboard/--no-dashboard",
+        help="Ensure the localhost API/UI dashboard is running and open it once per day.",
+    ),
+    full_mode: bool = typer.Option(
+        False,
+        "--full-mode",
+        help="Shortcut for maximum autonomy (`deploy-callback`) with dashboard bootstrap.",
+    ),
 ) -> None:
     """One-shot — runs the full 10-step flow with credentials and defaults from profile.
 
@@ -939,6 +1105,22 @@ def sprint(
     if ctx.invoked_subcommand is not None:
         return
     p = profile_mod.load()
+    resolved_workspace_file = _resolve_workspace_file(workspace_file, p)
+    if (
+        p.runtime.auto_full_mode
+        and not provider
+        and not identifier
+        and resolved_workspace_file is not None
+    ):
+        full_cmd(
+            workspace_file=resolved_workspace_file,
+            interval=str(p.runtime.watch_interval_minutes),
+            once=False,
+            force=False,
+            transport="auto",
+            dashboard=dashboard,
+        )
+        return
     provider = provider or p.default_provider
     if not provider:
         provider = typer.prompt("provider", default="jira")
@@ -951,8 +1133,7 @@ def sprint(
 
     scope_mode = scope_mode or p.default_scope or "mine"
     repo = repo_path or (Path(p.default_repo_path) if p.default_repo_path else Path.cwd())
-    ws_path = workspace_file or (Path(p.default_workspace) if p.default_workspace else None)
-    ws = load_workspace(ws_path) if ws_path else None
+    ws = load_workspace(resolved_workspace_file) if resolved_workspace_file else None
     code_generation = _resolve_codegen_config(
         ws,
         enabled=llm_codegen,
@@ -960,6 +1141,13 @@ def sprint(
         model=llm_model,
         max_usd=llm_max_usd,
         max_tokens=llm_max_tokens,
+    )
+    _bootstrap_runtime_defaults(
+        repo_path=repo,
+        workspace_file=resolved_workspace_file,
+        profile_state=p,
+        code_generation=code_generation,
+        dashboard=dashboard,
     )
     deploy_config = _resolve_deploy_config(
         ws,
@@ -1027,12 +1215,15 @@ def sprint(
     else:
         raise typer.BadParameter("provider must be 'jira' or 'azuredevops'")
 
+    autonomy_level = parse_autonomy_level("deploy-callback" if full_mode else None)
+
     flow = SprintFlow(
         operator=operator,
         workspace=ws,
         scope=scope,
         code_generation=code_generation,
         deploy=deploy_config,
+        autonomy_policy=AutonomyPolicy(level=autonomy_level),
     )
     result = flow.bootstrap(
         sprint_id=sprint_id,
@@ -1141,6 +1332,216 @@ def _render_sprint(sprint: Sprint) -> None:
         f"subtasks={len(sprint.subtasks)} bugs={len(sprint.bugs)} "
         f"epics={len(sprint.epics)} features={len(sprint.features)} issues={len(sprint.issues)}"
     )
+
+
+def _maybe_boot_dashboard(
+    enabled: bool, *, open_browser: bool = True, api_reload: bool = False
+) -> None:
+    if not enabled:
+        return
+    status = ensure_localhost_control_plane(
+        api_host=DEFAULT_API_HOST,
+        api_port=DEFAULT_API_PORT,
+        ui_port=DEFAULT_UI_PORT,
+        open_browser=open_browser,
+        api_reload=api_reload,
+    )
+    started: list[str] = []
+    if status.api_started:
+        started.append("api")
+    if status.ui_started:
+        started.append("ui")
+    summary = f"[cyan]dashboard[/cyan] {status.ui_url}  api={status.api_url}"
+    if started:
+        summary += f"  started={','.join(started)}"
+    if status.browser_opened:
+        summary += "  browser=opened"
+    console.print(summary)
+    for warning in status.warnings:
+        console.print(f"[yellow]dashboard note:[/yellow] {warning}")
+
+
+def _resolve_workspace_file(
+    workspace_file: Path | None, profile_state: profile_mod.Profile
+) -> Path | None:
+    if workspace_file is not None:
+        return workspace_file.expanduser().resolve()
+    if profile_state.default_workspace:
+        return Path(profile_state.default_workspace).expanduser().resolve()
+    return None
+
+
+def _require_workspace_file(
+    workspace_file: Path | None, profile_state: profile_mod.Profile
+) -> Path:
+    resolved = _resolve_workspace_file(workspace_file, profile_state)
+    if resolved is None:
+        raise typer.BadParameter("workspace is required; pass --workspace or configure a default")
+    if not resolved.exists():
+        raise typer.BadParameter(f"workspace file missing: {resolved}")
+    return resolved
+
+
+def _resolve_repo_path(repo_path: Path | None, profile_state: profile_mod.Profile) -> Path:
+    if repo_path is not None:
+        return repo_path.expanduser().resolve()
+    if profile_state.default_repo_path:
+        return Path(profile_state.default_repo_path).expanduser().resolve()
+    return Path.cwd().resolve()
+
+
+def _bootstrap_runtime_defaults(
+    *,
+    repo_path: Path,
+    workspace_file: Path | None,
+    profile_state: profile_mod.Profile,
+    dashboard: bool,
+    code_generation: CodeGenerationConfig | None = None,
+) -> None:
+    runtime = profile_state.runtime
+    runtime = runtime.model_copy(
+        update={
+            "start_dashboard_on_start": runtime.start_dashboard_on_start and dashboard,
+        }
+    )
+    report = run_operational_bootstrap(
+        repo_path,
+        workspace_file=workspace_file,
+        runtime=runtime,
+        code_generation=code_generation,
+    )
+    _render_operational_bootstrap(report)
+
+
+def _render_operational_bootstrap(report: OperationalBootstrapReport) -> None:
+    if report.doctor:
+        doctor_status = "ok" if report.doctor.ok else "warn"
+        console.print(f"[cyan]bootstrap[/cyan] doctor={doctor_status} repo={report.repo_path}")
+    if report.dashboard:
+        console.print(
+            "[cyan]bootstrap[/cyan] "
+            f"dashboard={report.dashboard.ui_url} api={report.dashboard.api_url}"
+        )
+    if report.mapper_updated:
+        console.print("[cyan]bootstrap[/cyan] llm-project-mapper updated")
+    if report.python_fallback_active:
+        console.print("[yellow]bootstrap note:[/yellow] Python fallback active")
+    for note in report.notes:
+        if note.name == "doctor" and report.doctor is not None:
+            continue
+        color = "green" if note.status == "ok" else "yellow"
+        console.print(f"[{color}]bootstrap {note.name}:[/{color}] {note.message}")
+
+
+@app.command(name="full")
+def full_cmd(
+    workspace_file: Path | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        help="Workspace YAML/JSON with a watch section",
+    ),
+    interval: str | None = typer.Option(
+        None,
+        "--interval",
+        help="Polling interval, for example 15, 15m or 1h",
+    ),
+    once: bool = typer.Option(
+        False,
+        "--once",
+        help="Run one polling cycle and exit",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Reprocess tasks even if watch-state says they were already handled",
+    ),
+    transport: str = typer.Option("auto", "--transport", help="auto | mcp | api | playwright"),
+    dashboard: bool = typer.Option(
+        True,
+        "--dashboard/--no-dashboard",
+        help="Ensure the localhost API/UI dashboard is running and open it once per day.",
+    ),
+) -> None:
+    """Run SendSprint in continuous full mode with maximum autonomy."""
+    watch_cmd(
+        workspace_file=workspace_file,
+        interval=interval,
+        autonomy="deploy-callback",
+        dry_run=False,
+        once=once,
+        force=force,
+        transport=transport,
+        dashboard=dashboard,
+        full_mode=True,
+    )
+
+
+@app.command(name="configure-defaults")
+def configure_defaults_cmd(
+    repo_path: Path = typer.Option(
+        Path("."),
+        "--repo",
+        "-r",
+        exists=True,
+        file_okay=False,
+        help="Default repository path for SendSprint operations.",
+    ),
+    workspace_file: Path | None = typer.Option(
+        None,
+        "--workspace",
+        "-w",
+        exists=True,
+        dir_okay=False,
+        help="Default workspace file for watch/full mode.",
+    ),
+    watch_interval: int = typer.Option(
+        15,
+        "--watch-interval",
+        min=1,
+        help="Default polling interval in minutes.",
+    ),
+    update_mapper: bool = typer.Option(
+        True,
+        "--update-mapper/--no-update-mapper",
+        help="Refresh llm-project-mapper automatically on startup.",
+    ),
+    auto_full_mode: bool = typer.Option(
+        True,
+        "--auto-full-mode/--no-auto-full-mode",
+        help="Route `sendsprint sprint` to continuous full mode when a default workspace exists.",
+    ),
+) -> None:
+    """Persist the local operational defaults for SendSprint."""
+    resolved_repo = repo_path.expanduser().resolve()
+    resolved_workspace = workspace_file.expanduser().resolve() if workspace_file else None
+    auto_full = bool(auto_full_mode and resolved_workspace)
+    profile_mod.update(
+        default_repo_path=str(resolved_repo),
+        default_workspace=str(resolved_workspace) if resolved_workspace else None,
+        **{
+            "runtime.verify_dependencies_on_start": True,
+            "runtime.update_llm_project_mapper_on_start": update_mapper,
+            "runtime.start_dashboard_on_start": True,
+            "runtime.open_browser_on_start": True,
+            "runtime.fallback_to_python_when_web_blocked": True,
+            "runtime.auto_full_mode": auto_full,
+            "runtime.watch_interval_minutes": watch_interval,
+            "runtime.default_mode": "full",
+        },
+    )
+    console.print(f"[green]defaults configured[/green] repo={resolved_repo}")
+    if resolved_workspace:
+        console.print(f"[green]workspace default[/green] {resolved_workspace}")
+    else:
+        console.print(
+            "[yellow]note:[/yellow] no default workspace configured; "
+            "`sendsprint full` still requires --workspace"
+        )
+    if auto_full_mode and not resolved_workspace:
+        console.print(
+            "[yellow]note:[/yellow] auto full mode was not enabled because no workspace was set"
+        )
 
 
 def _render_run_report(report) -> None:
@@ -1485,26 +1886,35 @@ def catalog_show(
 
 @app.command(name="web")
 def web_cmd(
-    port: int = typer.Option(5173, "--port", "-p", help="Port for the web control plane"),
-    host: str = typer.Option("127.0.0.1", "--host", help="Bind address"),
+    port: int = typer.Option(DEFAULT_UI_PORT, "--port", "-p", help="Port for the web UI"),
+    api_port: int = typer.Option(DEFAULT_API_PORT, "--api-port", help="Port for the API backend"),
+    host: str = typer.Option(DEFAULT_API_HOST, "--host", help="Bind address for the API backend"),
     reload: bool = typer.Option(False, "--reload", help="Enable auto-reload for development"),
+    open_browser: bool = typer.Option(
+        True,
+        "--open-browser/--no-open-browser",
+        help="Open the dashboard in the default browser.",
+    ),
 ) -> None:
-    """Start the localhost web control plane (API + UI)."""
-    try:
-        import uvicorn
-    except ImportError:
-        console.print("[red]uvicorn is required: pip install uvicorn[/red]")
-        raise typer.Exit(1) from None
-
-    console.print(f"[green]SendSprint web control plane v{__version__}[/green]")
-    console.print(f"  listening on http://{host}:{port}")
-    console.print(f"  docs at http://{host}:{port}/docs")
-    uvicorn.run(
-        "sendsprint.api.server:app",
-        host=host,
-        port=port,
-        reload=reload,
+    """Ensure the localhost web control plane (API + UI) is running."""
+    status = ensure_localhost_control_plane(
+        api_host=host,
+        api_port=api_port,
+        ui_port=port,
+        open_browser=open_browser,
+        api_reload=reload,
     )
+    console.print(f"[green]SendSprint web control plane v{__version__}[/green]")
+    console.print(f"  UI:  {status.ui_url}")
+    console.print(f"  API: {status.api_url}")
+    if status.api_started:
+        console.print("  started API backend")
+    if status.ui_started:
+        console.print("  started web UI")
+    if status.browser_opened:
+        console.print("  opened browser")
+    for warning in status.warnings:
+        console.print(f"[yellow]note:[/yellow] {warning}")
 
 
 if __name__ == "__main__":

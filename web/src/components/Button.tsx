@@ -42,8 +42,14 @@ export const Button: React.FC<Props> = ({
           <ActivityIndicator color={variant === "primary" ? "white" : theme.text} />
         ) : (
           <>
-            {icon ? <Text style={styles.icon}>{icon}</Text> : null}
-            <Text style={[styles.label, variant === "ghost" && styles.labelGhost]}>
+            {icon ? <Text style={[styles.icon, variant !== "primary" && styles.iconAlt]}>{icon}</Text> : null}
+            <Text
+              style={[
+                styles.label,
+                variant !== "primary" && styles.labelAlt,
+                variant === "ghost" && styles.labelGhost,
+              ]}
+            >
               {title}
             </Text>
           </>
@@ -63,9 +69,9 @@ const styles = StyleSheet.create({
   primary: {
     backgroundColor: theme.primary,
     shadowColor: theme.primary,
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
   secondary: {
@@ -82,7 +88,9 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   disabled: { opacity: 0.4 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  icon: { color: theme.text, fontSize: 18 },
-  label: { color: theme.text, fontSize: 16, fontWeight: "700" },
-  labelGhost: { color: theme.primarySoft },
+  icon: { color: "#ffffff", fontSize: 18 },
+  iconAlt: { color: theme.text },
+  label: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
+  labelAlt: { color: theme.text },
+  labelGhost: { color: theme.primary },
 });

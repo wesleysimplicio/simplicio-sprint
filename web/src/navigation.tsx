@@ -1,13 +1,15 @@
 import {
   NavigationContainer,
-  DarkTheme as RNDarkTheme,
+  DefaultTheme as RNDefaultTheme,
 } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import { theme } from "./theme";
 import { ConnectScreen } from "./screens/ConnectScreen";
+import { DashboardScreen } from "./screens/DashboardScreen";
 import { ProviderScreen } from "./screens/ProviderScreen";
 import { AuthScreen } from "./screens/AuthScreen";
+import { SettingsScreen } from "./screens/SettingsScreen";
 import { SprintsScreen } from "./screens/SprintsScreen";
 import { SprintDetailScreen } from "./screens/SprintDetailScreen";
 import { RunScreen } from "./screens/RunScreen";
@@ -16,8 +18,10 @@ import type { RunMode } from "./api/types";
 
 export type RootStackParamList = {
   Connect: undefined;
+  Dashboard: undefined;
   Provider: undefined;
   Auth: undefined;
+  Settings: undefined;
   Sprints: undefined;
   SprintDetail: { sprintId: string };
   Run: { sprintId: string; mode: RunMode; itemKeys: string[] };
@@ -27,9 +31,9 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const navTheme = {
-  ...RNDarkTheme,
+  ...RNDefaultTheme,
   colors: {
-    ...RNDarkTheme.colors,
+    ...RNDefaultTheme.colors,
     background: theme.bg,
     card: theme.bg,
     text: theme.text,
@@ -45,13 +49,15 @@ export const Navigation: React.FC = () => (
       screenOptions={{
         headerStyle: { backgroundColor: theme.bg },
         headerTitleStyle: { color: theme.text, fontWeight: "700" },
-        headerTintColor: theme.primarySoft,
+        headerTintColor: theme.primary,
         contentStyle: { backgroundColor: theme.bg },
       }}
     >
       <Stack.Screen name="Connect" component={ConnectScreen} options={{ title: "SendSprint" }} />
+      <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ title: "Dashboard" }} />
       <Stack.Screen name="Provider" component={ProviderScreen} options={{ title: "Conectar" }} />
       <Stack.Screen name="Auth" component={AuthScreen} options={{ title: "Autenticar" }} />
+      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: "Configurações" }} />
       <Stack.Screen name="Sprints" component={SprintsScreen} options={{ title: "Sprints ativas" }} />
       <Stack.Screen
         name="SprintDetail"

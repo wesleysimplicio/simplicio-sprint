@@ -13,7 +13,7 @@ import logging
 import os
 import stat
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,6 +44,19 @@ class LlmProfile(BaseModel):
     model: str = "claude-opus-4-7"
 
 
+class RuntimeProfile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    verify_dependencies_on_start: bool = True
+    update_llm_project_mapper_on_start: bool = False
+    start_dashboard_on_start: bool = True
+    open_browser_on_start: bool = True
+    fallback_to_python_when_web_blocked: bool = True
+    auto_full_mode: bool = False
+    watch_interval_minutes: int = 15
+    default_mode: Literal["run", "watch", "full"] = "full"
+
+
 class Profile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -54,6 +67,7 @@ class Profile(BaseModel):
     jira: JiraProfile = Field(default_factory=JiraProfile)
     azuredevops: AzureDevopsProfile = Field(default_factory=AzureDevopsProfile)
     llm: LlmProfile = Field(default_factory=LlmProfile)
+    runtime: RuntimeProfile = Field(default_factory=RuntimeProfile)
     updated_at: str | None = None  # ISO 8601 UTC
 
 

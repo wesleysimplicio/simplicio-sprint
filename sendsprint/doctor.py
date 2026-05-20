@@ -92,6 +92,7 @@ def run_doctor(
     _check_command(report, "git", "install git")
     _check_gh(report, runner)
     _check_python(report)
+    _check_node_toolchain(report, repo)
     _check_playwright(report, repo, runner)
     _check_llm(report, code_generation or CodeGenerationConfig())
 
@@ -159,6 +160,25 @@ def _check_gh(report: DoctorReport, runner: Runner) -> None:
 
 def _check_python(report: DoctorReport) -> None:
     report.add("python", "ok", f"Python runtime: {sys.executable}")
+
+
+def _check_node_toolchain(report: DoctorReport, repo: Path) -> None:
+    package_roots = [repo]
+    web_root = repo / "web"
+    if web_root.exists():
+        package_roots.append(web_root)
+    if not any((root / "package.json").exists() for root in package_roots):
+        return
+    _check_command(report, "node", "install Node.js")
+    _check_command(report, "npm", "install Node.js/npm")
+    _check_command(report, "npx", "install Node.js/npm")
+    if (web_root / "package.json").exists() and not (web_root / "node_modules").exists():
+        report.add(
+            "web-node-modules",
+            "warn",
+            "web/node_modules missing",
+            "run `cd web && npm install`",
+        )
 
 
 def _check_playwright(report: DoctorReport, repo: Path, runner: Runner) -> None:

@@ -1,5 +1,8 @@
 import type {
+  AuthStatus,
   AuthResponse,
+  ControlPlaneRunDetail,
+  ControlPlaneRunSummary,
   DashboardSnapshot,
   Health,
   ImportSprintsResponse,
@@ -10,6 +13,7 @@ import type {
   SprintSummary,
   StartRunRequest,
   StartRunResponse,
+  ValidationDashboardResponse,
 } from "./types";
 
 export class ApiClient {
@@ -55,7 +59,11 @@ export class ApiClient {
     });
   }
 
-  authAzure(input: { organization: string; project: string; pat: string }) {
+  authStatus() {
+    return this.req<AuthStatus>("/auth/status");
+  }
+
+  authAzure(input: { sprint_url: string; pat: string }) {
     return this.req<AuthResponse>("/auth/azuredevops", {
       method: "POST",
       body: JSON.stringify(input),
@@ -100,8 +108,20 @@ export class ApiClient {
     return this.req<RunStatus>(`/runs/${encodeURIComponent(runId)}`);
   }
 
+  listControlPlaneRuns() {
+    return this.req<ControlPlaneRunSummary[]>("/api/runs");
+  }
+
+  getControlPlaneRun(runId: string) {
+    return this.req<ControlPlaneRunDetail>(`/api/runs/${encodeURIComponent(runId)}`);
+  }
+
   getRunDashboard(runId: string) {
     return this.req<DashboardSnapshot>(`/runs/${encodeURIComponent(runId)}/dashboard`);
+  }
+
+  getValidationDashboard() {
+    return this.req<ValidationDashboardResponse>("/api/dashboard/validations");
   }
 
   evidenceUrl(runId: string, name: string) {

@@ -27,6 +27,23 @@ verde → commit → PR.
 
 ## Como rodar
 
+### 0) Suba tudo de uma vez
+
+```bash
+pip install -e ".[api]"
+cd web && npm install
+sendsprint web
+```
+
+Isso garante o backend em `http://127.0.0.1:8765`, sobe a UI em
+`http://localhost:8081` e abre o browser. O primeiro `sendsprint run`,
+`sendsprint watch` ou `sendsprint sprint` do dia faz esse bootstrap
+automaticamente, a menos que vocÃª passe `--no-dashboard`.
+Para autonomia mÃ¡xima em loop contÃ­nuo, use
+`sendsprint full --workspace workspace.yaml`.
+Se vocÃª quiser isso persistido como padrÃ£o local, rode
+`sendsprint configure-defaults --repo . --workspace workspace.yaml`.
+
 ### 1) Suba o backend (no Mac/Linux/WSL)
 
 ```bash

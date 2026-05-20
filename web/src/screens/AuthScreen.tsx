@@ -22,10 +22,8 @@ export const AuthScreen: React.FC = () => {
   const [jToken, setJToken] = useState("");
   const [jBoardId, setJBoard] = useState("");
 
-  const [aOrg, setAOrg] = useState("");
-  const [aProject, setAProject] = useState("");
+  const [aSprintUrl, setASprintUrl] = useState("");
   const [aPat, setAPat] = useState("");
-  const [aTeam, setATeam] = useState("");
 
   const submit = async () => {
     setBusy(true);
@@ -40,12 +38,11 @@ export const AuthScreen: React.FC = () => {
         if (jBoardId) await setJiraBoardId(jBoardId);
       } else if (provider === "azuredevops") {
         const res = await api.authAzure({
-          organization: aOrg,
-          project: aProject,
+          sprint_url: aSprintUrl,
           pat: aPat,
         });
         await setAccount(res.account);
-        if (aTeam) await setAdoTeamPath(aTeam);
+        await setAdoTeamPath(res.ado_team_path ?? null);
       }
       nav.navigate("Sprints");
     } catch (e) {
@@ -104,20 +101,14 @@ export const AuthScreen: React.FC = () => {
   return (
     <Screen
       title="Azure DevOps"
-      subtitle="O PAT fica no keyring do SO. Use um PAT com escopo 'Work Items (read)' + 'Code (full)' pra abrir PRs."
+      subtitle="Informe sÃ³ a URL da sprint atual e o PAT. O backend infere organization, project e team/iteration."
     >
       <Input
-        label="Organization"
-        value={aOrg}
-        onChangeText={setAOrg}
-        placeholder="my-org"
-        monospace
-      />
-      <Input
-        label="Project"
-        value={aProject}
-        onChangeText={setAProject}
-        placeholder="my-project"
+        label="Sprint URL atual"
+        value={aSprintUrl}
+        onChangeText={setASprintUrl}
+        placeholder="https://dev.azure.com/org/project/_sprints/taskboard/..."
+        keyboardType="url"
         monospace
       />
       <Input
@@ -128,17 +119,10 @@ export const AuthScreen: React.FC = () => {
         secureTextEntry
         monospace
       />
-      <Input
-        label="Team iteration path (opcional)"
-        value={aTeam}
-        onChangeText={setATeam}
-        placeholder="my-org/my-project/my-team"
-        monospace
-      />
       <View style={{ height: 8 }} />
       <Button title="Autenticar e listar sprints" onPress={submit} loading={busy} />
       <Text style={styles.hint}>
-        Se PAT vazio, o backend tenta o cache do keyring local.
+        O PAT fica no keyring do SO. Use escopo ao menos para sprint/work items e code se for abrir PRs.
       </Text>
     </Screen>
   );

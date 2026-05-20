@@ -29,7 +29,7 @@ export const Screen: React.FC<Props> = ({
   const Body = scroll ? ScrollView : View;
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="dark-content" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: theme.text,
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "800",
     letterSpacing: -0.5,
   },
@@ -76,7 +76,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: theme.border,
-    backgroundColor: theme.bgDeep,
+    backgroundColor: "rgba(255,255,255,0.92)",
     gap: 10,
   },
 });

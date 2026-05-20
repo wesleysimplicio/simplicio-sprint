@@ -58,9 +58,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius,
   },
   rowActive: {
-    backgroundColor: "rgba(124,92,255,0.1)",
+    backgroundColor: "rgba(44,107,237,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(124,92,255,0.4)",
+    borderColor: "rgba(44,107,237,0.22)",
   },
   bullet: {
     width: 32,

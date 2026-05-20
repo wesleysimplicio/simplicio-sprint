@@ -75,16 +75,22 @@ visual regression, fix-loop applies patches, round 2 turns green, PR opens.
 ## 🌐 Run it in your browser (web)
 
 ```bash
-# 1) backend
+# one command: ensure API + web UI and open the browser
 pip install -e ".[api]"
-python -m sendsprint.api          # http://localhost:8765
-
-# 2) web UI (separate terminal)
-cd web && npm install && npm run dev   # http://localhost:8081
+cd web && npm install
+sendsprint web                    # UI http://localhost:8081, API http://127.0.0.1:8765
 ```
 
 See [`web/README.md`](./web/README.md) for the full walkthrough and
 [`sendsprint/api/README.md`](./sendsprint/api/README.md) for the HTTP/SSE API.
+The first `sendsprint run`, `sendsprint watch`, or `sendsprint sprint` of the
+day now tries to ensure the localhost dashboard is up and opens
+`http://localhost:8081` automatically. Use `--no-dashboard` to skip it.
+`--full-mode` is a shortcut for maximum autonomy (`deploy-callback`), and
+`sendsprint full --workspace ...` starts the continuous watch loop in that mode.
+`sendsprint configure-defaults` persists repo/workspace defaults plus startup
+checks for package dependencies, `llm-project-mapper` refresh, dashboard
+bootstrap, and Python fallback when the web UI is blocked.
 
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
@@ -173,6 +179,12 @@ sendsprint sprint catalog show agent.codex.plan
 
 # Watch assigned tasks periodically in conservative planning mode
 sendsprint watch --workspace workspace.yaml --autonomy plan
+
+# Continuous full mode with maximum autonomy and dashboard bootstrap
+sendsprint full --workspace workspace.yaml
+
+# Persist your local operational defaults
+sendsprint configure-defaults --repo . --workspace workspace.yaml
 
 # Watch once without changing repos or watch-state
 sendsprint watch --workspace workspace.yaml --dry-run
@@ -378,7 +390,13 @@ sendsprint/
 
 ## Assistant Integrations
 
-Per-platform integration manifests under `skills/`:
+Per-platform reference manifests live under `skills/`. SendSprint can also
+install repo-local plugin adapters for the main assistant hosts:
+
+```bash
+sendsprint plugins list
+sendsprint plugins install --repo . --all
+```
 
 | File | Platform |
 |------|---------|
@@ -388,7 +406,13 @@ Per-platform integration manifests under `skills/`:
 | `skills/openclaw/openclaw.md` | Openclaw |
 | `skills/copilot/copilot-instructions.md` | GitHub Copilot |
 
-Each references the same Python core; the manifest teaches the host assistant how to invoke SendSprint consistently.
+Generated adapters target `.claude/skills/sendsprint/SKILL.md`,
+`.codex/skills/sendsprint/SKILL.md`, `.hermes/skills/sendsprint.md`,
+`.openclaw/skills/sendsprint.md`, `.cursor/rules/sendsprint.mdc`, and
+`.github/copilot-instructions.md`. Each adapter references the same Python
+core; the host assistant delegates to `sendsprint doctor`, `sendsprint web`,
+`sendsprint sprint`, `sendsprint watch`, and `sendsprint full` instead of
+reimplementing the pipeline. See `docs/PLUGIN_ADAPTERS.md`.
 
 ---
 

@@ -24,5 +24,7 @@ def test_pr_policy_allows_issue_updates_but_not_release() -> None:
 
 def test_parse_autonomy_level_rejects_unknown() -> None:
     assert parse_autonomy_level("deploy-callback") == "deploy-callback"
+    assert parse_autonomy_level("full") == "deploy-callback"
+    assert parse_autonomy_level("max") == "deploy-callback"
     with pytest.raises(ValueError):
         parse_autonomy_level("chaos")

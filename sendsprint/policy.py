@@ -101,7 +101,9 @@ class AutonomyPolicy(BaseModel):
 def parse_autonomy_level(value: str | None) -> AutonomyLevel:
     """Parse CLI/config strings into an autonomy level."""
     level = (value or "plan").strip().lower()
+    if level in {"full", "max"}:
+        level = "deploy-callback"
     if level not in LEVEL_ORDER:
         allowed = ", ".join(LEVEL_ORDER)
-        raise ValueError(f"unknown autonomy level '{value}'. expected one of: {allowed}")
+        raise ValueError(f"unknown autonomy level '{value}'. expected one of: {allowed}, full, max")
     return level  # type: ignore[return-value]

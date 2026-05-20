@@ -9,6 +9,7 @@ import pytest
 pytest.importorskip("fastapi")
 
 from sendsprint.api.server import app
+from sendsprint.profile import Profile
 from tests.api_client import AuthenticatedTestClient
 
 client = AuthenticatedTestClient(app)
@@ -32,6 +33,160 @@ def test_list_sprints_returns_demo_when_creds_missing(monkeypatch):
     sprints = resp.json()
     assert len(sprints) >= 1
     assert all(s["provider"] == "jira" for s in sprints)
+
+
+def test_auth_azure_accepts_sprint_url_and_returns_inferred_paths(monkeypatch):
+    updates: list[dict[str, object]] = []
+    secrets: list[tuple[str, str, str]] = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"name": "ONS-16058-MANUTSIS-FORT"}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+        def get(self, url):
+            assert "DigitalProjects-Americas" in url
+            assert "ONS-16058-MANUTSIS-FORT" in url
+            return FakeResponse()
+
+    monkeypatch.setattr("sendsprint.api.routes.auth.httpx.Client", FakeClient)
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth.credentials.set_secret",
+        lambda provider, account, secret: secrets.append((provider, account, secret)),
+    )
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth.profile_mod.update",
+        lambda **kwargs: updates.append(kwargs),
+    )
+
+    payload = {
+        "sprint_url": (
+            "https://dev.azure.com/DigitalProjects-Americas/ONS-16058-MANUTSIS-FORT/"
+            "_sprints/taskboard/Time_019/ONS-16058-MANUTSIS-FORT/Time_019/T019_Sprint_98"
+        ),
+        "pat": "redacted-test-pat",
+    }
+    resp = client.post("/auth/azuredevops", json=payload)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["ado_team_path"] == "DigitalProjects-Americas/ONS-16058-MANUTSIS-FORT/Time_019"
+    assert body["ado_iteration_path"] == "ONS-16058-MANUTSIS-FORT\\Time_019\\T019_Sprint_98"
+    assert updates[0]["azuredevops.organization"] == "DigitalProjects-Americas"
+    assert updates[0]["azuredevops.project"] == "ONS-16058-MANUTSIS-FORT"
+    assert updates[0]["azuredevops.team"] == "Time_019"
+    assert secrets[0][:2] == ("azuredevops", "DigitalProjects-Americas")
+
+
+def test_list_ado_sprints_uses_profile_context_and_iteration_path_id(monkeypatch):
+    for var in ("AZURE_DEVOPS_ORG", "AZURE_DEVOPS_PROJECT", "AZURE_DEVOPS_PAT"):
+        monkeypatch.delenv(var, raising=False)
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "value": [
+                    {
+                        "id": "guid-1",
+                        "name": "T019_Sprint_98",
+                        "path": "ONS-16058-MANUTSIS-FORT\\Time_019\\T019_Sprint_98",
+                        "attributes": {
+                            "startDate": "2026-05-18",
+                            "finishDate": "2026-05-31",
+                        },
+                    }
+                ]
+            }
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+        def get(self, url):
+            assert "_apis/work/teamsettings/iterations" in url
+            assert "DigitalProjects-Americas/ONS-16058-MANUTSIS-FORT/Time_019" in url
+            return FakeResponse()
+
+    monkeypatch.setattr("sendsprint.api.routes.sprints.httpx.Client", FakeClient)
+    monkeypatch.setattr(
+        "sendsprint.api.routes.sprints.profile_mod.load",
+        lambda: Profile.model_validate(
+            {
+                "azuredevops": {
+                    "organization": "DigitalProjects-Americas",
+                    "project": "ONS-16058-MANUTSIS-FORT",
+                    "team": "Time_019",
+                }
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "sendsprint.api.routes.sprints.credentials.get_secret",
+        lambda provider, account: "cached-pat",
+    )
+
+    resp = client.get("/sprints", params={"provider": "azuredevops"})
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body[0]["id"] == "ONS-16058-MANUTSIS-FORT\\Time_019\\T019_Sprint_98"
+
+
+def test_get_ado_sprint_uses_iteration_path(monkeypatch):
+    calls: list[str] = []
+
+    class FakeOperator:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def read_sprint(self, **kwargs):
+            calls.append(kwargs["iteration_path"])
+            return type(
+                "SprintStub",
+                (),
+                {
+                    "id": kwargs["iteration_path"],
+                    "name": "Sprint 98",
+                    "state": "active",
+                    "start_date": None,
+                    "end_date": None,
+                    "goal": None,
+                    "items": [],
+                },
+            )()
+
+    monkeypatch.setattr("sendsprint.api.routes.sprints.AzureDevopsOperator", FakeOperator)
+
+    resp = client.get(
+        "/sprints/ONS-16058-MANUTSIS-FORT%5CTime_019%5CT019_Sprint_98",
+        params={"provider": "azuredevops"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert calls == ["ONS-16058-MANUTSIS-FORT\\Time_019\\T019_Sprint_98"]
 
 
 def test_start_run_returns_run_id_and_emits_events():

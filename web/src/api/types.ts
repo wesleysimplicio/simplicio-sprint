@@ -12,6 +12,24 @@ export type AuthResponse = {
   account: string;
   ok: boolean;
   user_display_name?: string | null;
+  ado_team_path?: string | null;
+  ado_iteration_path?: string | null;
+};
+
+export type AuthStatus = {
+  default_provider?: Provider | null;
+  jira_configured: boolean;
+  azuredevops_configured: boolean;
+  providers: {
+    jira: { configured: boolean; account?: string | null };
+    azuredevops: {
+      configured: boolean;
+      account?: string | null;
+      team_path?: string | null;
+      iteration_path?: string | null;
+    };
+    github: { configured: boolean };
+  };
 };
 
 export type SprintSummary = {
@@ -76,6 +94,74 @@ export type DashboardSnapshot = {
   summary?: string | null;
   pr_url?: string | null;
   blockers: string[];
+};
+
+export type ControlPlaneRunSummary = {
+  run_id: string;
+  state: string;
+  sprint_id: string;
+  provider: string;
+  autonomy_level: string;
+  task?: string | null;
+  branch?: string | null;
+  readiness_score?: number | null;
+  readiness_verdict?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  summary?: string | null;
+  pr_url?: string | null;
+  failed: boolean;
+  last_step?: number | null;
+  progress?: number | null;
+};
+
+export type QualityGateResponse = {
+  run_id: string;
+  verdict: string;
+  checks: Array<{
+    check_name: string;
+    passed: boolean;
+    details: string;
+    severity: string;
+  }>;
+  reasons: string[];
+  created_at?: string | null;
+};
+
+export type EvidenceBundleResponse = {
+  run_id: string;
+  items: Array<{
+    type: string;
+    path: string;
+    label: string;
+    iteration?: number | null;
+    observed_at?: string | null;
+  }>;
+  total_items: number;
+  finalized: boolean;
+  created_at?: string | null;
+};
+
+export type ControlPlaneRunDetail = {
+  run: ControlPlaneRunSummary;
+  quality_gate?: QualityGateResponse | null;
+  evidence?: EvidenceBundleResponse | null;
+  logs: string[];
+  timeline: Array<Record<string, unknown>>;
+};
+
+export type ValidationLane = {
+  lane: string;
+  status: string;
+  last_run_id?: string | null;
+  last_result?: string | null;
+  events_count: number;
+  errors: string[];
+};
+
+export type ValidationDashboardResponse = {
+  lanes: ValidationLane[];
+  total_events: number;
 };
 
 export type RunEvent = {
