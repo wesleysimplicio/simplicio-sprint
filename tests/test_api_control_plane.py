@@ -7,11 +7,11 @@ import time
 import pytest
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient
 
 from sendsprint.api.server import app
+from tests.api_client import AuthenticatedTestClient
 
-client = TestClient(app)
+client = AuthenticatedTestClient(app)
 
 
 # ---------------------------------------------------------------------------

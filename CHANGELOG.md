@@ -8,6 +8,14 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Deterministic read-only `/runs/{run_id}/status-answer` endpoint for
+  Claude/Codex/Hermes status responses backed by existing run snapshots (#116).
+- Resource-aware fan-out decision receipts with CPU idle/memory/capacity
+  telemetry for safe `/goal`/Ralph worker sizing (#118).
+- Runtime profiling baseline module and `sendsprint runtime-baseline` CLI for
+  repeatable hot-path timing evidence (#119).
+- Action catalog/playbook templates with built-in software PR delivery and
+  marketing launch examples, plus `sendsprint actions ...` CLI commands (#124).
 - Live dashboard API endpoints under `/api/dashboard/` with yool stats
   (cache hits/misses, retries, cost, duration per yool), agent provider
   status, validation lane status (dev, lint, test, security, pr), and

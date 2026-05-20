@@ -7,14 +7,14 @@ import time
 import pytest
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient
 
 from sendsprint.api.routes.dashboard import configure
 from sendsprint.api.runs import events, manager
 from sendsprint.api.server import app
 from sendsprint.yool.contracts import ContractRegistry, InputCache, YoolContract
+from tests.api_client import AuthenticatedTestClient
 
-client = TestClient(app)
+client = AuthenticatedTestClient(app)
 
 
 # ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ def test_yools_empty():
 
 
 def test_yools_with_events():
-    run_id = _seed_run(
+    _seed_run(
         extra_events=[
             {
                 "type": "step",
@@ -224,11 +224,11 @@ def test_validations_with_events():
     )
     resp = client.get("/api/dashboard/validations")
     data = resp.json()
-    lint_lane = [l for l in data["lanes"] if l["lane"] == "lint"][0]
+    lint_lane = [lane for lane in data["lanes"] if lane["lane"] == "lint"][0]
     assert lint_lane["events_count"] >= 1
     assert lint_lane["last_result"] == "ok"
 
-    test_lane = [l for l in data["lanes"] if l["lane"] == "test"][0]
+    test_lane = [lane for lane in data["lanes"] if lane["lane"] == "test"][0]
     assert test_lane["events_count"] >= 1
     assert test_lane["last_result"] == "failed"
 

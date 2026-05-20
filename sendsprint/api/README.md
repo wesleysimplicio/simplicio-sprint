@@ -16,7 +16,7 @@ Variáveis de ambiente:
 
 | Var | Default | Uso |
 |---|---|---|
-| `SENDSPRINT_API_HOST` | `0.0.0.0` | Bind do uvicorn (use `0.0.0.0` pra ser visível na LAN) |
+| `SENDSPRINT_API_HOST` | `127.0.0.1` | Bind do uvicorn (use `0.0.0.0` só quando precisar expor na LAN) |
 | `SENDSPRINT_API_PORT` | `8765` | Porta |
 
 OpenAPI docs em `http://<host>:8765/docs`.
@@ -36,6 +36,8 @@ OpenAPI docs em `http://<host>:8765/docs`.
 | POST | `/runs` | Inicia um run: `{provider, sprint_id, mode, item_keys, repo_path?}` |
 | GET | `/runs` | Lista runs em memória |
 | GET | `/runs/{id}` | Status do run (`queued/running/done/failed`) |
+| GET | `/runs/{id}/agent-status` | Snapshot estruturado para Claude/Codex/Hermes |
+| GET | `/runs/{id}/status-answer` | Resposta determinística e read-only baseada no snapshot |
 | GET | `/runs/{id}/events` | **SSE stream** — eventos em tempo real do flow |
 | GET | `/runs/{id}/evidence/{name}` | Serve screenshots/logs gerados em `evidence/{run_id}/` |
 
@@ -100,7 +102,9 @@ pytest tests/test_api.py -v
 
 - Credenciais persistem no **OS keyring** (mesma camada da CLI; ver
   `sendsprint.credentials`). O backend nunca devolve tokens em respostas.
-- CORS está aberto (`allow_origins=["*"]`) pra facilitar o dev. Se for expor
-  além do localhost, restrinja em `server.py`.
+- CORS e `Origin` ficam restritos a `localhost`, `127.0.0.1` e `[::1]`, com
+  qualquer porta local de desenvolvimento.
+- Requisições mutáveis exigem `Authorization: Bearer <token>`. O token é gerado
+  no startup e impresso no console local; respostas read-only continuam abertas.
 - O servidor é **single-tenant** — espera estar rodando na máquina do dev. Não
   use atrás de proxy público sem autenticação adicional.

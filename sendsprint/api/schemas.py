@@ -157,6 +157,21 @@ class AgentRunSnapshot(BaseModel):
     timeline: list[AgentTimelineEvent] = Field(default_factory=list)
 
 
+class AgentStatusAnswer(BaseModel):
+    run_id: str
+    adapter: Literal["claude", "codex", "hermes", "generic"] = "generic"
+    state: Literal["queued", "running", "done", "failed", "unknown"]
+    summary: str
+    current_step: str = "unknown"
+    active_agents: list[str] = Field(default_factory=list)
+    last_evidence: str | None = None
+    blockers: list[str] = Field(default_factory=list)
+    pr_url: str | None = None
+    next_action: str = "unknown"
+    constraints: list[str] = Field(default_factory=list)
+    details: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+
+
 class ImportSprintsRequest(BaseModel):
     provider: Provider
     board_id: str | None = None

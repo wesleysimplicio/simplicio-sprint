@@ -11,11 +11,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sendsprint import __version__
 from sendsprint.api.routes import auth as auth_routes
-from sendsprint.api.security import (
-    LocalAuthMiddleware,
-    OriginCheckMiddleware,
-    generate_operator_token,
-)
 from sendsprint.api.routes import control_plane as cp_routes
 from sendsprint.api.routes import dashboard as dashboard_routes
 from sendsprint.api.routes import operator as op_routes
@@ -23,6 +18,11 @@ from sendsprint.api.routes import runs as run_routes
 from sendsprint.api.routes import sprints as sprint_routes
 from sendsprint.api.runs import events
 from sendsprint.api.schemas import HealthResponse
+from sendsprint.api.security import (
+    LocalAuthMiddleware,
+    OriginCheckMiddleware,
+    generate_operator_token,
+)
 
 
 @asynccontextmanager
@@ -49,13 +49,10 @@ def create_app() -> FastAPI:
     app.add_middleware(LocalAuthMiddleware)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:*",
-            "http://127.0.0.1:*",
-            "http://[::1]:*",
-        ],
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$",
         allow_methods=["*"],
         allow_headers=["*"],
+        allow_credentials=False,
     )
 
     @app.get("/health", response_model=HealthResponse, tags=["meta"])

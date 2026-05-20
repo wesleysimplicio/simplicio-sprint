@@ -7,11 +7,11 @@ import time
 import pytest
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient
 
 from sendsprint.api.server import app
+from tests.api_client import AuthenticatedTestClient
 
-client = TestClient(app)
+client = AuthenticatedTestClient(app)
 
 
 def test_health_returns_version_and_provider_flags():
@@ -91,6 +91,29 @@ def test_agent_status_returns_detailed_snapshot() -> None:
     assert snapshot["item_keys"] == ["APP-7"]
     assert snapshot["timeline"]
     assert "recent_logs" in snapshot
+
+
+def test_status_answer_returns_read_only_agent_summary() -> None:
+    payload = {
+        "provider": "jira",
+        "sprint_id": "88",
+        "mode": "selected",
+        "item_keys": ["APP-8"],
+    }
+    resp = client.post("/runs", json=payload)
+    assert resp.status_code == 200
+    run_id = resp.json()["run_id"]
+
+    answer_resp = client.get(
+        f"/runs/{run_id}/status-answer",
+        params={"adapter": "codex", "question": "what is running?"},
+    )
+
+    assert answer_resp.status_code == 200
+    answer = answer_resp.json()
+    assert answer["adapter"] == "codex"
+    assert answer["run_id"] == run_id
+    assert "read-only status answer" in answer["constraints"]
 
 
 def test_dashboard_run_404_for_missing():

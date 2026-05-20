@@ -12,7 +12,14 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from sendsprint.api.runs import events, manager
 from sendsprint.api.runs.agent_status import build_agent_snapshot
-from sendsprint.api.schemas import AgentRunSnapshot, RunStatus, StartRunRequest, StartRunResponse
+from sendsprint.api.runs.status_answer import render_status_answer
+from sendsprint.api.schemas import (
+    AgentRunSnapshot,
+    AgentStatusAnswer,
+    RunStatus,
+    StartRunRequest,
+    StartRunResponse,
+)
 
 router = APIRouter(prefix="/runs", tags=["runs"])
 
@@ -42,6 +49,18 @@ def get_agent_status(run_id: str) -> AgentRunSnapshot:
     if snapshot is None:
         raise HTTPException(status_code=404, detail="run not found")
     return snapshot
+
+
+@router.get("/{run_id}/status-answer", response_model=AgentStatusAnswer)
+def get_status_answer(
+    run_id: str,
+    adapter: str = "generic",
+    question: str | None = None,
+) -> AgentStatusAnswer:
+    snapshot = build_agent_snapshot(run_id)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="run not found")
+    return render_status_answer(snapshot, adapter=adapter, question=question)
 
 
 @router.get("/{run_id}/dashboard", response_model=dict)

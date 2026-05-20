@@ -17,6 +17,11 @@ from rich.table import Table
 
 from sendsprint import __version__, credentials
 from sendsprint import profile as profile_mod
+from sendsprint.action_catalog import (
+    find_action_playbook,
+    list_action_playbooks,
+    write_action_catalog,
+)
 from sendsprint.agentic_starter import (
     DEFAULT_AGENTIC_STARTER_REF,
     DEFAULT_AGENTIC_STARTER_SOURCE,
@@ -37,9 +42,10 @@ from sendsprint.operators.base import Transport
 from sendsprint.policy import AutonomyPolicy, parse_autonomy_level
 from sendsprint.preflight import PreflightReport, run_preflight
 from sendsprint.reports import render_executive_report
+from sendsprint.runtime_baseline import run_runtime_baseline
 from sendsprint.scaffolder import Scaffolder
 from sendsprint.scope import build_scope
-from sendsprint.templates import catalog
+from sendsprint.templates import catalog as validation_template_catalog
 from sendsprint.tech import detect_tech
 from sendsprint.trackers import GitHubIssuesTracker
 from sendsprint.watch import WatchCycleResult, Watcher
@@ -153,7 +159,7 @@ def templates_cmd(
     output: Path | None = typer.Option(None, "-o", help="Write templates JSON"),
 ) -> None:
     """List shipped validation templates."""
-    data = [item.model_dump() for item in catalog()]
+    data = [item.model_dump() for item in validation_template_catalog()]
     if output:
         output.write_text(json.dumps(data, indent=2), encoding="utf-8")
         console.print(f"[green]wrote templates to {output}[/green]")
@@ -161,7 +167,7 @@ def templates_cmd(
         table = Table(show_header=True, header_style="bold")
         for col in ("Template", "Stacks", "Install", "Unit", "E2E"):
             table.add_column(col)
-        for item in catalog():
+        for item in validation_template_catalog():
             table.add_row(
                 item.name,
                 ", ".join(item.stacks),
@@ -170,6 +176,75 @@ def templates_cmd(
                 item.e2e or "-",
             )
         console.print(table)
+
+
+@app.command(name="runtime-baseline")
+def runtime_baseline_cmd(
+    repo_path: Path = typer.Argument(Path("."), exists=True, file_okay=False),
+    output: Path | None = typer.Option(None, "-o", "--output", help="Write benchmark JSON"),
+    max_files: int = typer.Option(2_000, "--max-files", help="Maximum files to scan"),
+) -> None:
+    """Run a cross-platform Python runtime baseline before Go/Rust split work."""
+    report = run_runtime_baseline(repo_path, output=output, max_files=max_files)
+    table = Table(title="Runtime baseline", show_lines=False)
+    for col in ("case", "ms", "ops", "metadata"):
+        table.add_column(col)
+    for case in report.cases:
+        table.add_row(
+            case.name,
+            f"{case.elapsed_ms:.3f}",
+            str(case.operations),
+            json.dumps(case.metadata, sort_keys=True),
+        )
+    console.print(table)
+    if report.evidence_path:
+        console.print(f"[green]wrote baseline to {report.evidence_path}[/green]")
+
+
+action_app = typer.Typer(add_completion=False, help="Manage domain action playbooks.")
+app.add_typer(action_app, name="actions")
+
+
+@action_app.command("list")
+def action_catalog_list(
+    source: Path | None = typer.Option(None, "--source", "-s", help="Custom action catalog JSON"),
+    output: Path | None = typer.Option(None, "--output", "-o", help="Write playbooks JSON"),
+) -> None:
+    """List domain-agnostic action playbooks."""
+    playbooks = list_action_playbooks(source)
+    data = [item.model_dump(mode="json") for item in playbooks]
+    if output:
+        output.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        console.print(f"[green]wrote action catalog to {output}[/green]")
+        return
+    table = Table(title="Action playbooks", show_lines=False)
+    for col in ("key", "domain", "approval", "output", "title"):
+        table.add_column(col, style="cyan" if col == "key" else "")
+    for item in playbooks:
+        table.add_row(item.key, item.domain, item.approval_policy, item.output_format, item.title)
+    console.print(table)
+
+
+@action_app.command("show")
+def action_catalog_show(
+    key: str = typer.Argument(..., help="Action key, e.g. marketing.campaign-launch"),
+    source: Path | None = typer.Option(None, "--source", "-s", help="Custom action catalog JSON"),
+) -> None:
+    """Show one action playbook with inputs, checks, evidence, and publish policy."""
+    playbook = find_action_playbook(key, source)
+    if playbook is None:
+        console.print(f"[red]not found[/red]: {key}")
+        raise typer.Exit(code=1)
+    console.print_json(data=playbook.model_dump(mode="json"))
+
+
+@action_app.command("write-default")
+def action_catalog_write_default(
+    output: Path = typer.Argument(Path("templates/action-catalog.json")),
+) -> None:
+    """Write the built-in action catalog to an editable repo-local JSON file."""
+    target = write_action_catalog(output)
+    console.print(f"[green]wrote action catalog to {target}[/green]")
 
 
 @app.command(name="doctor")
@@ -1397,7 +1472,7 @@ def web_cmd(
         import uvicorn
     except ImportError:
         console.print("[red]uvicorn is required: pip install uvicorn[/red]")
-        raise typer.Exit(1)
+        raise typer.Exit(1) from None
 
     console.print(f"[green]SendSprint web control plane v{__version__}[/green]")
     console.print(f"  listening on http://{host}:{port}")
