@@ -10,7 +10,7 @@ Issue: #104
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from sendsprint.api.routes.operator import _set_relay
 from sendsprint.api.runs import manager
@@ -18,6 +18,9 @@ from sendsprint.api.schemas import RunStatus, StartRunRequest
 from sendsprint.api.server import create_app
 from sendsprint.audit import AuditEntry, AuditLog, audit_log
 from sendsprint.status_relay import StatusRelay
+from tests.api_client import AuthenticatedTestClient
+
+TestClient = AuthenticatedTestClient
 
 
 @pytest.fixture(autouse=True)
@@ -64,7 +67,7 @@ def _seed_run(
 @pytest.fixture()
 def client():
     app = create_app()
-    return TestClient(app)
+    return AuthenticatedTestClient(app)
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +86,7 @@ class TestAuditEntry:
 
     def test_frozen(self):
         entry = AuditEntry(operator="alice", action="pause", run_id="r1")
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             entry.operator = "bob"  # type: ignore[misc]
 
     def test_serialization_roundtrip(self):
@@ -161,7 +164,7 @@ class TestAuditLog:
 
 
 class TestPauseAction:
-    def test_pause_running(self, client: TestClient):
+    def test_pause_running(self, client: AuthenticatedTestClient):
         _seed_run("r1", state="running")
         resp = client.post("/api/runs/r1/actions/pause", json={"operator": "tester"})
         assert resp.status_code == 200
@@ -169,12 +172,12 @@ class TestPauseAction:
         assert data["action"] == "pause"
         assert data["result"] == "ok"
 
-    def test_pause_not_running(self, client: TestClient):
+    def test_pause_not_running(self, client: AuthenticatedTestClient):
         _seed_run("r1", state="done")
         resp = client.post("/api/runs/r1/actions/pause")
         assert resp.status_code == 409
 
-    def test_pause_404(self, client: TestClient):
+    def test_pause_404(self, client: AuthenticatedTestClient):
         resp = client.post("/api/runs/missing/actions/pause")
         assert resp.status_code == 404
 

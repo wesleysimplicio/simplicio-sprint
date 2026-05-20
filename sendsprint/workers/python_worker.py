@@ -11,14 +11,19 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import resource
 import time
 import uuid
 from collections import deque
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from enum import Enum
-from typing import Any, Callable, Coroutine
+from enum import StrEnum
+from typing import Any
+
+try:
+    import resource
+except ImportError:  # Windows
+    resource = None  # type: ignore[assignment]
 
 from sendsprint.contracts import (
     CommandType,
@@ -42,7 +47,7 @@ DEFAULT_HEARTBEAT_INTERVAL_S = 5
 DEFAULT_LOG_TAIL_LINES = 50
 
 
-class TaskState(str, Enum):
+class TaskState(StrEnum):
     queued = "queued"
     running = "running"
     completed = "completed"
@@ -225,7 +230,7 @@ class PythonWorker:
                 wt.finished_at = time.monotonic()
                 self._log(f"cancelled {wt.run_id}")
                 return self._event(wt.run_id, EventType.cancelled)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 wt.state = TaskState.failed
                 wt.error = f"timeout after {wt.command.timeout_s}s"
                 wt.finished_at = time.monotonic()
@@ -249,11 +254,16 @@ class PythonWorker:
         )
 
     def _apply_resource_limits(self) -> None:
-        """Best-effort CPU nice + memory soft limit (Unix only)."""
-        try:
-            os.nice(self.cpu_nice)
-        except (OSError, PermissionError):
-            logger.debug("os.nice(%d) skipped (not permitted)", self.cpu_nice)
+        """Best-effort CPU nice + memory soft limit on platforms that support it."""
+        if hasattr(os, "nice"):
+            try:
+                os.nice(self.cpu_nice)
+            except (OSError, PermissionError):
+                logger.debug("os.nice(%d) skipped (not permitted)", self.cpu_nice)
+
+        if resource is None:
+            logger.debug("resource limits skipped (resource module unavailable)")
+            return
 
         try:
             soft, hard = resource.getrlimit(resource.RLIMIT_AS)
