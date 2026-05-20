@@ -8,6 +8,20 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Pre-publish diff verifier module `sendsprint/diff_verifier.py` with
+  `DiffVerdict` enum (pass, warn, block), `FindingType` / `FindingSeverity`
+  enums, `DiffFinding` (frozen Pydantic model), `DiffReport`, and
+  `DiffVerifier` class providing `verify(diff_text, plan)`,
+  `check_unexpected_files()`, `check_large_changes()`,
+  `check_missing_tests()`, and `check_generated_artifacts()`. Returns a
+  structured verdict for `DeliveryQualityGate` consumption. Includes diff
+  parsing helpers for file extraction and added-line counting (#99).
+- 37 tests in `tests/test_diff_verifier.py` covering model validation,
+  serialization, parsing helpers, all four check methods (unexpected files,
+  large changes, missing tests, generated artifacts), full verify with plan
+  matching, verdict precedence (block > warn > pass), empty diff, and summary
+  formatting (#99).
+
 - Delivery readiness score module `sendsprint/readiness_score.py` with
   `ScoreComponent` model (name, weight, raw_score 0-100, details),
   `ReadinessVerdict` enum (auto_publish, needs_human_approval, blocked),
