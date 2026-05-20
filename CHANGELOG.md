@@ -8,6 +8,19 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Automatic rework loop module `sendsprint/rework.py` with `FailureClass` enum
+  (correctable, environmental, human_required), `ReworkAttempt` model,
+  `ReworkOutcome` enum, `ReworkResult` model, `ReworkLoop` class
+  (run with max_retries/timeout_s limits), `classify_failure()` and `diagnose()`
+  heuristics, and evidence bundle integration via `persist_to_bundle()`.
+  Integrates with `DeliveryQualityGate` for validation and `BundleManager` for
+  persisting attempt history (#95).
+- 35 tests in `tests/test_rework.py` covering failure classification (lint,
+  tests, coverage, diff-hygiene as correctable; timeout/connection-refused as
+  environmental; security/unknown as human-required), diagnosis output, loop
+  outcomes (fixed, max_retries_exceeded, timeout_exceeded, environmental_failure,
+  human_required), evidence persistence and disk reloadability (#95).
+
 - Pre-publish diff verifier module `sendsprint/diff_verifier.py` with
   `DiffVerdict` enum (pass, warn, block), `FindingType` / `FindingSeverity`
   enums, `DiffFinding` (frozen Pydantic model), `DiffReport`, and
