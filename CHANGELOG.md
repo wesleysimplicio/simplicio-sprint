@@ -8,6 +8,17 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Deeper GitHub integration module `sendsprint/github_integration.py` with four
+  classes for the full issue/PR/CI/review lifecycle (#100):
+  `DuplicateDetector` (search for duplicate issues, PRs, and concurrent work),
+  `ProgressReporter` (post progress comments with structured evidence summaries),
+  `CIMonitor` (check combined CI status, poll until completion with timeout),
+  `ReviewReader` (read reviews + inline comments, extract actionable feedback).
+  All classes accept an injectable `httpx.Client` for zero-network testing.
+- 31 tests in `tests/test_github_integration.py` covering all four classes,
+  dataclass properties, URL construction, polling/timeout behavior, and
+  actionable feedback extraction with mocked httpx transport.
+
 - Cross-platform `sendsprint/platform.py` module with `PlatformInfo` model,
   `detect_platform()`, `is_windows()`, `is_unix()`, `normalize_path()`,
   `vendor_bin()`, `shell_command()`, and `venv_activate_cmd()` helpers for
