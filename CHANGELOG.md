@@ -6,6 +6,22 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-05-20
+
+### Added
+
+- Yool runtime hardening module `sendsprint/yool/contracts.py` with Pydantic
+  models: `YoolContract` (input/output schema + budget constraints),
+  `BudgetEnforcer` (multi-dimension enforcement for tokens, cost, time, CPU,
+  disk), `RetryPolicy` (selective retry by error type with exponential backoff),
+  `InputCache` (hash-based in-memory cache with TTL and eviction),
+  `InspectReport` (enriched inspect with cost, cache hits, retry info, budget
+  remaining), `ContractRegistry` (in-memory contract lookup with validation),
+  and `validate_payload` (minimal JSON-Schema validator) (#98).
+- 50 tests in `tests/test_yool_hardening.py` covering contract validation,
+  budget enforcement, retry selection, cache hit/miss/TTL/eviction, inspect
+  report construction, and contract registry operations (#98).
+
 ## [0.18.0] - 2026-05-20
 
 ### Added

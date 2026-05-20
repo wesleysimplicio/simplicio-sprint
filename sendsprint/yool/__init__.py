@@ -23,4 +23,5 @@ __all__ = [
     "DEFAULT_AGENT_CATALOG_PATH",
     "DEFAULT_RECEIPT_ROOT",
     "DEFAULT_TUPLE_ROOT",
+    "contracts",
 ]
