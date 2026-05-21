@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import sys
+import types
+
 import httpx
 import pytest
 
+from sendsprint.browser_agents import BrowserCapturePayload
 from sendsprint.operators.base import TransportUnavailable
 from sendsprint.operators.jira_operator import (
     JIRA_TYPE_MAP,
@@ -201,3 +205,80 @@ def test_update_status_posts_comment_and_transition(monkeypatch: pytest.MonkeyPa
         ("GET", "https://example.atlassian.net/rest/api/3/issue/PROJ-1/transitions"),
         ("POST", "https://example.atlassian.net/rest/api/3/issue/PROJ-1/transitions"),
     ]
+
+
+def test_playwright_uses_native_capture_before_browser_agent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = types.ModuleType("playwright.sync_api")
+    module.sync_playwright = object()
+    package = types.ModuleType("playwright")
+    package.sync_api = module
+    monkeypatch.setitem(sys.modules, "playwright", package)
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", module)
+    monkeypatch.setattr(
+        "sendsprint.operators.jira_operator.JiraOperator._scrape_items_via_playwright",
+        lambda self, sync_playwright, sprint_url: [
+            self._browser_item_to_sprint_item(
+                BrowserCapturePayload.model_validate(
+                    {"items": [{"key": "APP-9", "title": "Native capture", "type": "Story"}]}
+                ).items[0]
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        "sendsprint.operators.jira_operator.capture_sprint_with_browser_agents",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("browser agent should not run")),
+    )
+    op = JiraOperator(
+        base_url="https://example.atlassian.net",
+        email="x@y.com",
+        api_token="secret",
+        transport="playwright",
+    )
+
+    sprint = op._read_via_playwright(sprint_id=9)
+
+    assert sprint.items[0].key == "APP-9"
+    assert sprint.transport == "playwright"
+
+
+def test_playwright_falls_back_to_browser_agent_when_native_capture_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = types.ModuleType("playwright.sync_api")
+    module.sync_playwright = object()
+    package = types.ModuleType("playwright")
+    package.sync_api = module
+    monkeypatch.setitem(sys.modules, "playwright", package)
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", module)
+    monkeypatch.setattr(
+        "sendsprint.operators.jira_operator.JiraOperator._scrape_items_via_playwright",
+        lambda self, sync_playwright, sprint_url: (_ for _ in ()).throw(
+            RuntimeError(f"playwright failed for {sprint_url}")
+        ),
+    )
+    monkeypatch.setattr(
+        "sendsprint.operators.jira_operator.capture_sprint_with_browser_agents",
+        lambda **kwargs: (
+            BrowserCapturePayload.model_validate(
+                {
+                    "sprint_name": "Sprint 9",
+                    "items": [{"key": "APP-10", "title": "Fallback item", "type": "Task"}],
+                }
+            ),
+            "codex",
+        ),
+    )
+    op = JiraOperator(
+        base_url="https://example.atlassian.net",
+        email="x@y.com",
+        api_token="secret",
+        transport="playwright",
+    )
+
+    sprint = op._read_via_playwright(sprint_id=9)
+
+    assert sprint.name == "Sprint 9"
+    assert sprint.items[0].key == "APP-10"
+    assert sprint.items[0].type == "Task"

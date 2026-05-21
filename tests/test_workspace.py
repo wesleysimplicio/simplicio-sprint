@@ -39,6 +39,12 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
         },
         "code_generation": {"enabled": True, "provider": "openai", "max_usd": 2.5},
         "deploy": {"enabled": True, "url": "https://deploy.example/hook"},
+        "playwright_auto_flows": {
+            "enabled": True,
+            "frontend_base_url": "http://127.0.0.1:5173",
+            "dev_server_command": "npm run dev -- --host 127.0.0.1",
+            "timeout_seconds": 45,
+        },
     }
     ws_file = tmp_path / "workspace.yaml"
     ws_file.write_text(yaml.dump(cfg), encoding="utf-8")
@@ -63,6 +69,10 @@ def test_load_workspace_valid_yaml(tmp_path: Path) -> None:
     assert ws.code_generation.max_usd == 2.5
     assert ws.deploy.enabled is True
     assert ws.deploy.url == "https://deploy.example/hook"
+    assert ws.playwright_auto_flows.enabled is True
+    assert ws.playwright_auto_flows.frontend_base_url == "http://127.0.0.1:5173"
+    assert ws.playwright_auto_flows.dev_server_command == "npm run dev -- --host 127.0.0.1"
+    assert ws.playwright_auto_flows.timeout_seconds == 45
     assert ws.projects == []
     assert ws.repos[0].project is None
     assert ws.repos[0].capabilities == []
@@ -126,6 +136,15 @@ def test_load_workspace_single_project_config(tmp_path: Path) -> None:
                             "labels": ["scope:back"],
                             "paths": ["apps/payments-api/**"],
                         },
+                        "frontend": {
+                            "base_url": "http://127.0.0.1:5173",
+                            "dev_server_command": "npm run dev -- --host 127.0.0.1",
+                            "flow_inventory": "auto",
+                            "generate_route_smokes": True,
+                            "screenshot_evidence": True,
+                            "timeout_seconds": 60,
+                            "max_routes": 25,
+                        },
                         "branch_pattern": "feature/pay-api/{number}-{title}",
                         "commit_pattern": "fix(payments-api): {title}",
                         "validation_commands": ["ruff check sendsprint", "pytest tests -q"],
@@ -156,6 +175,13 @@ def test_load_workspace_single_project_config(tmp_path: Path) -> None:
         "labels": ["scope:back"],
         "paths": ["apps/payments-api/**"],
     }
+    assert repo.frontend.base_url == "http://127.0.0.1:5173"
+    assert repo.frontend.dev_server_command == "npm run dev -- --host 127.0.0.1"
+    assert repo.frontend.flow_inventory == "auto"
+    assert repo.frontend.generate_route_smokes is True
+    assert repo.frontend.screenshot_evidence is True
+    assert repo.frontend.timeout_seconds == 60
+    assert repo.frontend.max_routes == 25
     assert repo.branch_pattern == "feature/pay-api/{number}-{title}"
     assert repo.commit_pattern == "fix(payments-api): {title}"
     assert repo.validation_commands == ["ruff check sendsprint", "pytest tests -q"]
@@ -232,6 +258,24 @@ def test_load_workspace_valid_json(tmp_path: Path) -> None:
     assert ws.repos == []
     assert ws.default_base_branch == "develop"
     assert ws.branch_name_template == "feature/{number}-{title}"
+    assert ws.playwright_auto_flows.enabled is True
+    assert ws.playwright_auto_flows.frontend_base_url is None
+    assert ws.playwright_auto_flows.dev_server_command is None
+    assert ws.playwright_auto_flows.timeout_seconds == 30
+    assert ws.playwright_auto_flows.max_routes == 50
+
+
+def test_load_workspace_resolves_relative_root_path_from_workspace_file(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repos"
+    repo_root.mkdir()
+    ws_dir = tmp_path / "config"
+    ws_dir.mkdir()
+    ws_file = ws_dir / "workspace.yaml"
+    ws_file.write_text("root_path: ../repos\nrepos: []\n", encoding="utf-8")
+
+    ws = load_workspace(ws_file)
+
+    assert Path(ws.root_path) == repo_root.resolve()
 
 
 def test_load_workspace_missing_file_raises(tmp_path: Path) -> None:

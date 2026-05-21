@@ -1,6 +1,6 @@
 {
   "name": "sendsprint-root",
-  "version": "0.15.0",
+  "version": "0.21.0",
   "private": true,
   "description": "Root Node tooling for SendSprint: Playwright E2E + workspace lint passthrough.",
   "scripts": {

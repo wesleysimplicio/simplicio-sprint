@@ -271,6 +271,30 @@ class TestTestRunner:
         assert runner.evidence_dir.exists()
         assert runner.evidence_dir.is_dir()
 
+    def test_run_unit_does_not_reuse_stale_screenshot_evidence(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        captured: dict[str, list[str]] = {}
+        evidence_dir = tmp_path / "sendsprint-evidence"
+        evidence_dir.mkdir()
+        (evidence_dir / "old.png").write_bytes(b"png")
+
+        def fake_run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+        fp = make_fp(tmp_path, techs=["python"])
+        runner = TestRunner(tmp_path, fp)
+        report = runner.run_unit()
+
+        assert report.status == "ok"
+        assert captured["cmd"][:1] == ["pytest"]
+        assert not any(
+            evidence.kind == "screenshot" and evidence.path == "sendsprint-evidence/old.png"
+            for evidence in report.evidence
+        )
+
     # --- Bun / Deno (TASK-001 + Sprint 3 #12) ---
 
     def test_test_runner_bun_command(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

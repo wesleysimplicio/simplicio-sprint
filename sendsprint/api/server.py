@@ -6,8 +6,10 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from packaging.version import InvalidVersion, Version
 
 from sendsprint import __version__
 from sendsprint.api.routes import auth as auth_routes
@@ -17,7 +19,7 @@ from sendsprint.api.routes import operator as op_routes
 from sendsprint.api.routes import runs as run_routes
 from sendsprint.api.routes import sprints as sprint_routes
 from sendsprint.api.runs import events
-from sendsprint.api.schemas import HealthResponse
+from sendsprint.api.schemas import HealthResponse, VersionCheckResponse
 from sendsprint.api.security import (
     LocalAuthMiddleware,
     OriginCheckMiddleware,
@@ -68,6 +70,10 @@ def create_app() -> FastAPI:
             },
         )
 
+    @app.get("/version/check", response_model=VersionCheckResponse, tags=["meta"])
+    def check_version() -> VersionCheckResponse:
+        return _check_latest_version()
+
     app.include_router(auth_routes.router)
     app.include_router(sprint_routes.router)
     app.include_router(run_routes.router)
@@ -78,6 +84,48 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+def _check_latest_version() -> VersionCheckResponse:
+    try:
+        latest = _fetch_latest_pypi_version()
+        update_available = _is_newer(latest, __version__)
+        return VersionCheckResponse(
+            current_version=__version__,
+            latest_version=latest,
+            update_available=update_available,
+            message=(
+                f"Update available: {latest}"
+                if update_available
+                else f"SendSprint is up to date ({__version__})."
+            ),
+        )
+    except Exception as exc:
+        return VersionCheckResponse(
+            current_version=__version__,
+            latest_version=None,
+            update_available=False,
+            status="unavailable",
+            message=f"Could not check PyPI for updates: {str(exc)[:240]}",
+        )
+
+
+def _fetch_latest_pypi_version() -> str:
+    with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+        response = client.get("https://pypi.org/pypi/sendsprint/json")
+        response.raise_for_status()
+        data = response.json()
+    latest = data.get("info", {}).get("version")
+    if not isinstance(latest, str) or not latest.strip():
+        raise ValueError("PyPI response did not include info.version")
+    return latest.strip()
+
+
+def _is_newer(candidate: str, current: str) -> bool:
+    try:
+        return Version(candidate) > Version(current)
+    except InvalidVersion:
+        return candidate != current
 
 
 def main() -> None:

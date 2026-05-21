@@ -28,6 +28,7 @@ summarizes where each feature should land and which tests usually guard it.
 | Add stack support | `sendsprint/tech/detector.py`, `agents/dev.py`, `lint_runner.py`, `test_runner.py` | `tests/test_tech_detector.py`, `tests/test_agents.py` |
 | Add safety/preflight check | `sendsprint/preflight.py` | `tests/test_preflight.py` |
 | Add evidence/report behavior | `sendsprint/models/reports.py`, `agents/pr_body_builder.py`, API run bridge | `tests/test_pr_body_builder.py`, `tests/test_api.py` |
+| Add frontend flow inventory | `sendsprint/models/workspace.py`, `sendsprint/workspace/loader.py`, `sendsprint/agents/test_runner.py`, evidence pipeline | `tests/test_workspace.py`, `tests/test_agents.py`, Playwright smoke tests |
 | Add dashboard or Web setup data | `sendsprint/api/schemas.py`, `sendsprint/api/routes/`, `web/src/`, `web/src/components/setup/` | `tests/test_api.py`, `tests/e2e/dashboard.smoke.spec.ts` |
 | Add tuple/DAG execution behavior | `sendsprint/yool/`, `sendsprint/flow/sprint_flow.py`, `sendsprint/agent_registry.py` | `tests/test_yool_runtime.py`, `tests/test_yool_receipts_dispatcher.py`, `tests/test_sprint_flow.py` |
 | Add release automation | `.github/workflows/`, `scripts/` | workflow syntax + focused script tests |
@@ -51,6 +52,9 @@ summarizes where each feature should land and which tests usually guard it.
 - `RunState` persists resumable progress under `.sendsprint/runs/`.
 - `RunReport`, `StepReport`, `TestEvidence`, `SecurityFinding`, and `PrInfo`
   are the common reporting surface for CLI, API, dashboard, PRs, and evidence.
+- Front repos may declare frontend runtime metadata, including local base URL
+  and dev server command, so the test lane can inventory browser flows, generate
+  route smoke checks, attach screenshots, and route failures through the fix loop.
 
 ## Issue Implementation Map
 

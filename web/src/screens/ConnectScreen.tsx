@@ -1,11 +1,13 @@
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { getApiErrorMessage } from "../api/client";
 import { Button } from "../components/Button";
+import { Card } from "../components/Card";
 import { Input } from "../components/Input";
 import { Screen } from "../components/Screen";
-import type { AuthStatus, Provider } from "../api/types";
+import type { AuthBootstrap, Provider } from "../api/types";
 import type { RootStackParamList } from "../navigation";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
@@ -14,38 +16,77 @@ type Nav = NativeStackNavigationProp<RootStackParamList, "Connect">;
 
 export const ConnectScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
-  const { api, session, setAccount, setAdoTeamPath, setBackendUrl, setProvider } = useSession();
+  const {
+    api,
+    session,
+    setAccount,
+    setAdoTeamPath,
+    setAppUser,
+    setBackendUrl,
+    setOperatorToken,
+    setProvider,
+  } = useSession();
   const [url, setUrl] = useState(session.backendUrl);
-  const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState(session.appUser?.email ?? "");
+  const [password, setPassword] = useState("");
   const [booting, setBooting] = useState(true);
-  const [pinged, setPinged] = useState<{ ok: boolean; version?: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<AuthBootstrap | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const redirected = useRef(false);
 
   useEffect(() => {
     void bootstrap();
   }, []);
 
-  const resolveConfiguredProvider = (status: AuthStatus): Provider | null => {
-    if (status.default_provider === "azuredevops" && status.azuredevops_configured) {
-      return "azuredevops";
+  const bootstrap = async () => {
+    setBooting(true);
+    setError(null);
+    try {
+      api.setBaseUrl(url);
+      const bootstrapState = await api.authBootstrap();
+      api.setOperatorToken(bootstrapState.operator_token);
+      await setOperatorToken(bootstrapState.operator_token);
+      setStatus(bootstrapState);
+      if (session.appUser?.active && !redirected.current) {
+        redirected.current = true;
+        await hydrateKnownProvider(bootstrapState);
+        goDashboard();
+      }
+    } catch (e) {
+      setError(getApiErrorMessage(e));
+      setStatus(null);
+    } finally {
+      setBooting(false);
     }
-    if (status.default_provider === "jira" && status.jira_configured) {
-      return "jira";
-    }
-    if (status.azuredevops_configured) return "azuredevops";
-    if (status.jira_configured) return "jira";
-    return null;
   };
 
-  const applyKnownSession = async (status: AuthStatus, provider: Provider) => {
-    await setProvider(provider);
-    if (provider === "azuredevops") {
-      await setAccount(status.providers.azuredevops.account ?? null);
-      await setAdoTeamPath(status.providers.azuredevops.team_path ?? null);
+  const hydrateKnownProvider = async (bootstrapState: AuthBootstrap) => {
+    const resolvedProvider = resolveConfiguredProvider(bootstrapState);
+    if (!resolvedProvider) return;
+    await setProvider(resolvedProvider);
+    if (resolvedProvider === "azuredevops") {
+      await setAccount(bootstrapState.providers.azuredevops.account ?? null);
+      await setAdoTeamPath(bootstrapState.providers.azuredevops.team_path ?? null);
       return;
     }
-    await setAccount(status.providers.jira.account ?? null);
+    await setAccount(bootstrapState.providers.jira.account ?? null);
     await setAdoTeamPath(null);
+  };
+
+  const resolveConfiguredProvider = (bootstrapState: AuthBootstrap): Provider | null => {
+    if (
+      bootstrapState.default_provider === "azuredevops" &&
+      bootstrapState.azuredevops_configured
+    ) {
+      return "azuredevops";
+    }
+    if (bootstrapState.default_provider === "jira" && bootstrapState.jira_configured) {
+      return "jira";
+    }
+    if (bootstrapState.azuredevops_configured) return "azuredevops";
+    if (bootstrapState.jira_configured) return "jira";
+    return null;
   };
 
   const goDashboard = () => {
@@ -57,43 +98,27 @@ export const ConnectScreen: React.FC = () => {
     );
   };
 
-  const bootstrap = async () => {
-    try {
-      api.setBaseUrl(url);
-      const health = await api.health();
-      setPinged({ ok: health.ok, version: health.version });
-      const status = await api.authStatus();
-      const provider = resolveConfiguredProvider(status);
-      if (provider && !redirected.current) {
-        redirected.current = true;
-        await applyKnownSession(status, provider);
-        goDashboard();
-      }
-    } catch {
-      setPinged({ ok: false });
-    } finally {
-      setBooting(false);
-    }
-  };
-
-  const handleConnect = async () => {
+  const handleLogin = async () => {
+    if (busy) return;
     setBusy(true);
+    setError(null);
     try {
       await setBackendUrl(url);
       api.setBaseUrl(url);
-      const health = await api.health();
-      setPinged({ ok: health.ok, version: health.version });
-      const status = await api.authStatus();
-      const provider = resolveConfiguredProvider(status);
-      if (provider) {
-        await applyKnownSession(status, provider);
-        goDashboard();
-        return;
-      }
-      nav.navigate("Provider");
+      const bootstrapState = await api.authBootstrap();
+      api.setOperatorToken(bootstrapState.operator_token);
+      await setOperatorToken(bootstrapState.operator_token);
+      const user = await api.loginApp({ email, password });
+      await setAppUser({
+        email: user.email,
+        active: user.active,
+        displayName: user.display_name ?? null,
+      });
+      await hydrateKnownProvider(bootstrapState);
+      setStatus(bootstrapState);
+      goDashboard();
     } catch (e) {
-      Alert.alert("Conexao falhou", String((e as Error).message ?? e));
-      setPinged({ ok: false });
+      setError(getApiErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -101,86 +126,118 @@ export const ConnectScreen: React.FC = () => {
 
   return (
     <Screen
-      title="SendSprint local"
-      subtitle="Se o CLI ja deixou o backend autenticado, o painel entra direto logado. Caso contrario, conecte ao endpoint local e escolha o provider."
+      title="SendSprint"
+      subtitle="Entre com email e senha da assinatura. Nesta fase local todos os usuarios autenticados ficam ativos."
+      footer={
+        <Button
+          title={busy ? "Entrando..." : "Entrar"}
+          onPress={handleLogin}
+          loading={busy}
+          disabled={booting}
+        />
+      }
     >
-      <View style={styles.hero}>
-        <Text style={styles.brand}>SendSprint</Text>
-        <Text style={styles.brandSub}>control plane local da sprint</Text>
-      </View>
+      <Card style={styles.hero}>
+        <Text style={styles.kicker}>LOCAL CONTROL PLANE</Text>
+        <Text style={styles.title}>Entrega de sprint com shell orientado por chat</Text>
+        <Text style={styles.copy}>
+          O login do app valida o acesso ao SendSprint. A conexao com Jira, Azure DevOps ou GitHub
+          acontece depois, a partir do botao iniciar.
+        </Text>
+      </Card>
 
       <Input
-        label="URL do backend"
-        value={url}
-        onChangeText={setUrl}
-        placeholder="http://127.0.0.1:8765"
-        keyboardType="url"
-        autoCapitalize="none"
-        monospace
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        placeholder="voce@empresa.com"
+        keyboardType="email-address"
+      />
+      <Input
+        label="Senha"
+        value={password}
+        onChangeText={setPassword}
+        placeholder="********"
+        secureTextEntry
       />
 
-      <Button title="Conectar" onPress={handleConnect} loading={busy} disabled={booting} />
-      <Button title="Setup" variant="secondary" onPress={() => nav.navigate("ProjectSetup")} />
-
-      {booting ? (
-        <View style={styles.bootRow}>
-          <ActivityIndicator color={theme.primary} />
-          <Text style={styles.bootText}>Verificando backend e sessao persistida...</Text>
-        </View>
-      ) : null}
-
-      {pinged?.ok ? <Text style={styles.ok}>Backend v{pinged.version} OK</Text> : null}
-      {pinged && !pinged.ok ? <Text style={styles.fail}>Backend nao respondeu</Text> : null}
-
-      <Text style={styles.tip}>
-        Preferencia local: http://127.0.0.1:8765. Em outro dispositivo, use o IP da maquina na
-        mesma rede.
-      </Text>
+      <Card style={styles.backendCard}>
+        <Text style={styles.backendLabel}>BACKEND LOCAL</Text>
+        <Input
+          label="URL do backend"
+          value={url}
+          onChangeText={setUrl}
+          placeholder="http://127.0.0.1:8765"
+          keyboardType="url"
+          autoCapitalize="none"
+          monospace
+        />
+        {booting ? (
+          <View style={styles.statusRow}>
+            <ActivityIndicator color={theme.primary} size="small" />
+            <Text style={styles.statusText}>Validando endpoint e recuperando token local...</Text>
+          </View>
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : (
+          <Text style={styles.okText}>
+            Backend pronto. Provider padrao: {status?.default_provider ?? "nenhum"}.
+          </Text>
+        )}
+      </Card>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
   hero: {
-    backgroundColor: theme.surface,
-    borderRadius: theme.radius,
-    padding: 28,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: theme.border,
-    marginBottom: 12,
-    shadowColor: "#91b4dc",
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
+    backgroundColor: "#eef5ff",
+    gap: 8,
   },
-  brand: {
+  kicker: {
+    color: theme.primary,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: "800",
+  },
+  title: {
     color: theme.text,
-    fontSize: 36,
-    fontWeight: "900",
-    letterSpacing: -1,
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: "800",
   },
-  brandSub: {
-    color: theme.primarySoft,
+  copy: {
+    color: theme.textMuted,
     fontSize: 14,
-    marginTop: 4,
+    lineHeight: 21,
   },
-  bootRow: {
+  backendCard: {
+    gap: 10,
+  },
+  backendLabel: {
+    color: theme.textMuted,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: "700",
+  },
+  statusRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
-  bootText: {
-    color: theme.textMuted,
-    fontSize: 13,
-  },
-  ok: { color: theme.success, fontSize: 14 },
-  fail: { color: theme.danger, fontSize: 14 },
-  tip: {
+  statusText: {
     color: theme.textMuted,
     fontSize: 12,
-    lineHeight: 18,
+  },
+  okText: {
+    color: theme.success,
+    fontSize: 12,
     fontFamily: theme.fontMono,
+  },
+  errorText: {
+    color: theme.danger,
+    fontSize: 12,
+    fontFamily: theme.fontMono,
+    lineHeight: 18,
   },
 });

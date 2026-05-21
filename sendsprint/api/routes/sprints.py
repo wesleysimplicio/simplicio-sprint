@@ -141,9 +141,15 @@ def _import_worker(job_id: str, req: ImportSprintsRequest) -> None:
 
 
 def _list_jira_active(board_id: str | None) -> list[SprintSummary]:
-    base = os.getenv("JIRA_BASE_URL", "").rstrip("/")
-    email = os.getenv("JIRA_EMAIL", "")
+    profile = profile_mod.load()
+    base = (os.getenv("JIRA_BASE_URL", "") or (profile.jira.base_url or "")).rstrip("/")
+    email = os.getenv("JIRA_EMAIL", "") or (profile.jira.email or "")
     token = os.getenv("JIRA_API_TOKEN", "")
+    if not token and email:
+        try:
+            token = credentials.get_secret("jira", email) or ""
+        except credentials.CredentialError:
+            token = ""
     if not (base and email and token):
         return _demo_sprints("jira")
     if not board_id:
@@ -215,7 +221,10 @@ def _resolve_ado_context(team_path: str | None) -> tuple[str, str, str, str | No
     project = os.getenv("AZURE_DEVOPS_PROJECT", "") or (profile.azuredevops.project or "")
     pat = os.getenv("AZURE_DEVOPS_PAT", "")
     if not pat and org:
-        pat = credentials.get_secret("azuredevops", org) or ""
+        try:
+            pat = credentials.get_secret("azuredevops", org) or ""
+        except credentials.CredentialError:
+            pat = ""
     resolved_team_path = team_path
     if not resolved_team_path and profile.azuredevops.team:
         resolved_team_path = f"{org}/{project}/{profile.azuredevops.team}"

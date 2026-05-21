@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import sys
+import types
+
 import httpx
 import pytest
 
+from sendsprint.browser_agents import BrowserCapturePayload
 from sendsprint.operators.azure_devops_operator import (
     ADO_TYPE_MAP,
     AzureDevopsOperator,
@@ -140,3 +144,50 @@ def test_update_status_patches_work_item(monkeypatch: pytest.MonkeyPatch) -> Non
             "https://dev.azure.com/myorg/myproj/_apis/wit/workitems/123?api-version=7.1",
         )
     ]
+
+
+def test_playwright_capture_falls_back_to_browser_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+    module = types.ModuleType("playwright.sync_api")
+    module.sync_playwright = object()
+    package = types.ModuleType("playwright")
+    package.sync_api = module
+    monkeypatch.setitem(sys.modules, "playwright", package)
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", module)
+    monkeypatch.setattr(
+        "sendsprint.operators.azure_devops_operator.AzureDevopsOperator._scrape_items_via_playwright",
+        lambda self, sync_playwright, sprint_url: (_ for _ in ()).throw(
+            RuntimeError(f"playwright blocked for {sprint_url}")
+        ),
+    )
+    monkeypatch.setattr(
+        "sendsprint.operators.azure_devops_operator.capture_sprint_with_browser_agents",
+        lambda **kwargs: (
+            BrowserCapturePayload.model_validate(
+                {
+                    "sprint_name": "Sprint 98",
+                    "items": [
+                        {
+                            "key": "5678",
+                            "title": "Atualizar autenticacao",
+                            "type": "Task",
+                            "status": "New",
+                        }
+                    ],
+                }
+            ),
+            "codex",
+        ),
+    )
+    op = AzureDevopsOperator(
+        organization="myorg",
+        project="myproj",
+        team="MyTeam",
+        transport="playwright",
+    )
+
+    sprint = op._read_via_playwright(iteration_path="myproj\\MyTeam\\Sprint 98")
+
+    assert sprint.name == "Sprint 98"
+    assert sprint.transport == "playwright"
+    assert sprint.items[0].key == "5678"
+    assert sprint.items[0].type == "Task"

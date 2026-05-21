@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import httpx
 import pytest
 
 pytest.importorskip("fastapi")
@@ -26,6 +27,53 @@ def test_health_returns_version_and_provider_flags():
     assert set(body["providers_configured"]) == {"jira", "azuredevops"}
 
 
+def test_version_check_reports_available_update(monkeypatch):
+    monkeypatch.setattr("sendsprint.api.server.__version__", "0.20.0")
+    monkeypatch.setattr("sendsprint.api.server._fetch_latest_pypi_version", lambda: "0.21.0")
+
+    resp = client.get("/version/check")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["current_version"] == "0.20.0"
+    assert body["latest_version"] == "0.21.0"
+    assert body["update_available"] is True
+    assert body["status"] == "ok"
+
+
+def test_version_check_reports_up_to_date(monkeypatch):
+    monkeypatch.setattr("sendsprint.api.server.__version__", "0.20.0")
+    monkeypatch.setattr("sendsprint.api.server._fetch_latest_pypi_version", lambda: "0.20.0")
+
+    resp = client.get("/version/check")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["current_version"] == "0.20.0"
+    assert body["latest_version"] == "0.20.0"
+    assert body["update_available"] is False
+    assert body["status"] == "ok"
+
+
+def test_version_check_reports_unavailable_when_pypi_fails(monkeypatch):
+    monkeypatch.setattr("sendsprint.api.server.__version__", "0.20.0")
+
+    def fail() -> str:
+        raise RuntimeError("network blocked")
+
+    monkeypatch.setattr("sendsprint.api.server._fetch_latest_pypi_version", fail)
+
+    resp = client.get("/version/check")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["current_version"] == "0.20.0"
+    assert body["latest_version"] is None
+    assert body["update_available"] is False
+    assert body["status"] == "unavailable"
+    assert "network blocked" in body["message"]
+
+
 def test_list_sprints_returns_demo_when_creds_missing(monkeypatch):
     for var in ("JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"):
         monkeypatch.delenv(var, raising=False)
@@ -34,6 +82,151 @@ def test_list_sprints_returns_demo_when_creds_missing(monkeypatch):
     sprints = resp.json()
     assert len(sprints) >= 1
     assert all(s["provider"] == "jira" for s in sprints)
+
+
+def test_auth_bootstrap_exposes_operator_token():
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr("sendsprint.api.routes.auth.get_operator_token", lambda: "local-token")
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth.status",
+        lambda: {
+            "default_provider": None,
+            "jira_configured": False,
+            "azuredevops_configured": False,
+            "providers": {},
+        },
+    )
+    resp = client.get("/auth/bootstrap")
+
+    try:
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["operator_token"] == "local-token"
+    finally:
+        monkeypatch.undo()
+
+
+def test_app_login_marks_local_user_active():
+    resp = client.post(
+        "/auth/app-login",
+        json={"email": "dev@example.com", "password": "local-pass"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["email"] == "dev@example.com"
+    assert body["active"] is True
+
+
+def test_auth_jira_uses_browser_fallback_on_401(monkeypatch):
+    updates: list[dict[str, object]] = []
+
+    request = httpx.Request("GET", "https://example.atlassian.net/rest/api/3/myself")
+    response = httpx.Response(401, request=request, text="Unauthorized")
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+        def get(self, url):
+            raise httpx.HTTPStatusError(
+                "Unauthorized",
+                request=request,
+                response=response,
+            )
+
+    monkeypatch.setattr("sendsprint.api.routes.auth.httpx.Client", FakeClient)
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth._capture_jira_with_browser_fallback",
+        lambda **kwargs: {"sprint_id": "browser-captured", "capture_transport": "playwright"},
+    )
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth.profile_mod.update",
+        lambda **kwargs: updates.append(kwargs),
+    )
+
+    resp = client.post(
+        "/auth/jira",
+        json={
+            "base_url": "https://example.atlassian.net",
+            "email": "dev@example.com",
+            "api_token": "bad-token",
+            "sprint_url": "https://example.atlassian.net/jira/software/projects/APP/boards/1",
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["fallback_used"] is True
+    assert body["capture_transport"] == "playwright"
+    assert updates[0]["jira.last_sprint_url"] == "https://example.atlassian.net/jira/software/projects/APP/boards/1"
+
+
+def test_list_jira_sprints_uses_profile_context(monkeypatch):
+    for var in ("JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "values": [
+                    {
+                        "id": 131,
+                        "name": "Sprint 131",
+                        "state": "active",
+                        "goal": "Ship auth shell",
+                    }
+                ]
+            }
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+        def get(self, url):
+            assert url.endswith("/rest/agile/1.0/board/42/sprint?state=active")
+            return FakeResponse()
+
+    monkeypatch.setattr("sendsprint.api.routes.sprints.httpx.Client", FakeClient)
+    monkeypatch.setattr(
+        "sendsprint.api.routes.sprints.profile_mod.load",
+        lambda: Profile.model_validate(
+            {
+                "jira": {
+                    "base_url": "https://example.atlassian.net",
+                    "email": "dev@example.com",
+                }
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "sendsprint.api.routes.sprints.credentials.get_secret",
+        lambda provider, account: "cached-token",
+    )
+
+    resp = client.get("/sprints", params={"provider": "jira", "board_id": "42"})
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body[0]["id"] == "131"
+    assert body[0]["goal"] == "Ship auth shell"
 
 
 def test_auth_azure_accepts_sprint_url_and_returns_inferred_paths(monkeypatch):
@@ -89,7 +282,65 @@ def test_auth_azure_accepts_sprint_url_and_returns_inferred_paths(monkeypatch):
     assert updates[0]["azuredevops.organization"] == "DigitalProjects-Americas"
     assert updates[0]["azuredevops.project"] == "ONS-16058-MANUTSIS-FORT"
     assert updates[0]["azuredevops.team"] == "Time_019"
+    assert updates[0]["azuredevops.last_sprint_url"] == payload["sprint_url"]
     assert secrets[0][:2] == ("azuredevops", "DigitalProjects-Americas")
+
+
+def test_auth_azure_allows_manual_project_context_override(monkeypatch):
+    updates: list[dict[str, object]] = []
+    secrets: list[tuple[str, str, str]] = []
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"name": "ManualProject"}
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            del exc_type, exc, tb
+            return False
+
+        def get(self, url):
+            assert url.endswith("/_apis/projects/ManualProject?api-version=7.1")
+            return FakeResponse()
+
+    monkeypatch.setattr("sendsprint.api.routes.auth.httpx.Client", FakeClient)
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth.credentials.set_secret",
+        lambda provider, account, secret: secrets.append((provider, account, secret)),
+    )
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth.profile_mod.update",
+        lambda **kwargs: updates.append(kwargs),
+    )
+
+    payload = {
+        "sprint_url": (
+            "https://myorg.visualstudio.com/ManualProject/"
+            "_sprints/taskboard/MyTeam/Sprint 12"
+        ),
+        "organization": "myorg",
+        "project": "ManualProject",
+        "team": "CustomTeam",
+        "pat": "redacted-test-pat",
+    }
+    resp = client.post("/auth/azuredevops", json=payload)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["ado_team_path"] == "myorg/ManualProject/CustomTeam"
+    assert body["ado_iteration_path"] == "ManualProject\\CustomTeam\\Sprint 12"
+    assert updates[0]["azuredevops.team"] == "CustomTeam"
+    assert updates[0]["azuredevops.last_sprint_url"] == payload["sprint_url"]
+    assert secrets[0][:2] == ("azuredevops", "myorg")
 
 
 def test_list_ado_sprints_uses_profile_context_and_iteration_path_id(monkeypatch):

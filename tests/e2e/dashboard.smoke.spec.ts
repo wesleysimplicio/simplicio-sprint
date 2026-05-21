@@ -48,6 +48,82 @@ const mockUnconfiguredBackend = async (page: Page) => {
   });
 };
 
+const mockConfiguredDashboardBackend = async (page: Page) => {
+  await page.route(/\/health$/, async (route) => {
+    await route.fulfill({
+      json: {
+        ok: true,
+        version: '0.20.0',
+        providers_configured: { jira: true, azuredevops: false },
+      },
+    });
+  });
+
+  await page.route(/\/auth\/status$/, async (route) => {
+    await route.fulfill({
+      json: {
+        default_provider: 'jira',
+        jira_configured: true,
+        azuredevops_configured: false,
+        providers: {
+          jira: { configured: true, account: 'dev@example.com' },
+          azuredevops: {
+            configured: false,
+            account: null,
+            team_path: null,
+            iteration_path: null,
+          },
+          github: { configured: false },
+        },
+      },
+    });
+  });
+
+  await page.route(/\/api\/runs$/, async (route) => {
+    await route.fulfill({ json: [] });
+  });
+
+  await page.route(/\/api\/dashboard\/validations$/, async (route) => {
+    await route.fulfill({
+      json: {
+        lanes: [],
+        total_events: 0,
+      },
+    });
+  });
+
+  await page.route(/\/version\/check$/, async (route) => {
+    await route.fulfill({
+      json: {
+        current_version: '0.20.0',
+        latest_version: '0.21.0',
+        update_available: true,
+        status: 'ok',
+        source: 'pypi',
+        source_url: 'https://pypi.org/project/sendsprint/',
+        message: 'Update available: 0.21.0',
+      },
+    });
+  });
+};
+
+const mockUnavailableVersionBackend = async (page: Page) => {
+  await mockConfiguredDashboardBackend(page);
+  await page.route(/\/version\/check$/, async (route) => {
+    await route.fulfill({
+      json: {
+        current_version: '0.20.0',
+        latest_version: null,
+        update_available: false,
+        status: 'unavailable',
+        source: 'pypi',
+        source_url: 'https://pypi.org/project/sendsprint/',
+        message: 'Could not check PyPI for updates: network blocked',
+      },
+    });
+  });
+};
+
 test.describe('SendSprint web dashboard smoke', () => {
   test.skip(!baseUrl, 'BASE_URL not set — skipping E2E smoke (run with web dev server).');
 
@@ -141,5 +217,33 @@ test.describe('SendSprint web dashboard smoke', () => {
     await expect(body).toContainText(/single-project mode usa somente o primeiro repositorio/i);
     await expect(body).toContainText(/repos active: 1/i);
     await expect(body).not.toContainText(/repository 2/i);
+  });
+
+  test('settings can check for SendSprint updates', async ({ page }) => {
+    await mockConfiguredDashboardBackend(page);
+    await page.goto('/');
+
+    const body = page.locator('body');
+    await expect(body).toContainText(/SendSprint Dashboard|Logado/i, { timeout: 15_000 });
+
+    await page.getByText(/parametros e conexoes|par[aâ]metros/i).click();
+    await expect(body).toContainText(/UPDATE SENDSPRINT/i);
+
+    await page.getByText(/verificar update sendsprint/i).click();
+    await expect(body).toContainText(/Update disponivel: 0\.21\.0/i);
+    await expect(body).toContainText(/Instalado 0\.20\.0/i);
+  });
+
+  test('settings show degraded message when update check is unavailable', async ({ page }) => {
+    await mockUnavailableVersionBackend(page);
+    await page.goto('/');
+
+    const body = page.locator('body');
+    await expect(body).toContainText(/SendSprint Dashboard|Logado/i, { timeout: 15_000 });
+
+    await page.getByText(/parametros e conexoes|par[aâ]metros/i).click();
+    await page.getByText(/verificar update sendsprint/i).click();
+    await expect(body).toContainText(/Nao foi possivel verificar updates agora\./i);
+    await expect(body).toContainText(/network blocked/i);
   });
 });

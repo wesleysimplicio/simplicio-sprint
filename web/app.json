@@ -11,8 +11,7 @@
       "resizeMode": "contain"
     },
     "web": {
-      "bundler": "metro",
-      "favicon": "./assets/favicon.png"
+      "bundler": "metro"
     },
     "extra": {
       "defaultBackend": "http://localhost:8765"

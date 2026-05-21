@@ -1,9 +1,9 @@
-import { useNavigation } from "@react-navigation/native";
+import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage, getApiErrorStatusLine } from "../api/client";
-import type { AuthResponse } from "../api/types";
+import type { AuthResponse, CurrentSprint, SprintDetail } from "../api/types";
 import { Button } from "../components/Button";
 import { Input } from "../components/Input";
 import { Screen } from "../components/Screen";
@@ -25,12 +25,66 @@ const formatAuthSuccess = (res: AuthResponse): string => {
   if (res.user_display_name) parts.push(`Usuario: ${res.user_display_name}`);
   if (res.ado_team_path) parts.push(`Time: ${res.ado_team_path}`);
   if (res.ado_iteration_path) parts.push(`Iteracao: ${res.ado_iteration_path}`);
+  if (res.fallback_used) {
+    parts.push(`Fallback: ${res.capture_transport ?? "browser capture"}`);
+  }
   return parts.join(" | ");
+};
+
+const toJiraCurrentSprint = (
+  detail: SprintDetail,
+  baseUrl: string,
+  sprintUrl: string,
+): CurrentSprint => {
+  const host = safeHostname(baseUrl);
+  return {
+    provider: "jira",
+    sprintId: detail.sprint.id,
+    sprintName: detail.sprint.name,
+    sprintUrl: sprintUrl || null,
+    portfolioName: host ? host.split(".")[0] : "jira",
+    projectName: host ?? "jira",
+    teamName: null,
+  };
+};
+
+const toAzureCurrentSprint = (
+  detail: SprintDetail,
+  res: AuthResponse,
+  sprintUrl: string,
+): CurrentSprint => {
+  const [portfolioName, projectName, teamName] = (res.ado_team_path ?? "")
+    .split("/")
+    .filter(Boolean);
+  return {
+    provider: "azuredevops",
+    sprintId: detail.sprint.id,
+    sprintName: detail.sprint.name,
+    sprintUrl: sprintUrl || null,
+    portfolioName: portfolioName ?? null,
+    projectName: projectName ?? null,
+    teamName: teamName ?? null,
+  };
+};
+
+const safeHostname = (value: string): string | null => {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
+  }
 };
 
 export const AuthScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
-  const { session, api, setAccount, setJiraBoardId, setAdoTeamPath } = useSession();
+  const {
+    session,
+    api,
+    setAccount,
+    setAdoTeamPath,
+    setCurrentSprint,
+    setJiraBoardId,
+  } = useSession();
   const provider = session.provider;
 
   const [busy, setBusy] = useState(false);
@@ -39,9 +93,39 @@ export const AuthScreen: React.FC = () => {
   const [jEmail, setJEmail] = useState("");
   const [jToken, setJToken] = useState("");
   const [jBoardId, setJBoard] = useState("");
+  const [jSprintId, setJSprintId] = useState("");
+  const [jSprintUrl, setJSprintUrl] = useState("");
 
   const [aSprintUrl, setASprintUrl] = useState("");
   const [aPat, setAPat] = useState("");
+  const [aOrg, setAOrg] = useState("");
+  const [aProject, setAProject] = useState("");
+  const [aTeam, setATeam] = useState("");
+
+  const goToSprint = (sprintId: string) => {
+    nav.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: "Dashboard" }, { name: "SprintDetail", params: { sprintId } }],
+      }),
+    );
+  };
+
+  const importJiraSprint = async (baseUrl: string): Promise<SprintDetail | null> => {
+    const boardId = jBoardId.trim();
+    const sprintId = jSprintId.trim() || "browser-captured";
+    const sprintUrl = jSprintUrl.trim();
+    if (boardId) {
+      const sprints = await api.listSprints("jira", { board_id: boardId });
+      const first = sprints[0];
+      if (!first) return null;
+      return api.getSprint(first.id, "jira");
+    }
+    if (sprintUrl) {
+      return api.getSprint(sprintId, "jira");
+    }
+    return null;
+  };
 
   const submit = async () => {
     if (busy) return;
@@ -51,8 +135,13 @@ export const AuthScreen: React.FC = () => {
     const jiraEmail = jEmail.trim();
     const jiraToken = jToken.trim();
     const jiraBoardId = jBoardId.trim();
+    const jiraSprintId = jSprintId.trim();
+    const jiraSprintUrl = jSprintUrl.trim();
     const sprintUrl = aSprintUrl.trim();
     const pat = aPat.trim();
+    const organization = aOrg.trim();
+    const project = aProject.trim();
+    const team = aTeam.trim();
 
     if (provider === "jira" && (!jiraBase || !jiraEmail || !jiraToken)) {
       setNotice({
@@ -63,11 +152,12 @@ export const AuthScreen: React.FC = () => {
       return;
     }
 
-    if (provider === "azuredevops" && (!sprintUrl || !pat)) {
+    if (provider === "azuredevops" && ((!sprintUrl && (!organization || !project)) || !pat)) {
       setNotice({
         kind: "error",
         title: "Campos obrigatorios",
-        message: "Informe a URL da sprint atual e o Personal Access Token do Azure DevOps.",
+        message:
+          "Informe a URL da sprint ou Organization + Project, junto com o Personal Access Token do Azure DevOps.",
       });
       return;
     }
@@ -77,50 +167,88 @@ export const AuthScreen: React.FC = () => {
       if (provider === "jira") {
         setNotice({
           kind: "loading",
-          title: "Validando Jira",
-          message: "Enviando credenciais ao backend local para gravar o token no keyring do SO.",
+          title: "Conectando Jira",
+          message:
+            "Validando credenciais. Se o backend receber 401 e houver Sprint URL, ele tenta Playwright e os fallbacks de browser agent.",
         });
         const res = await api.authJira({
           base_url: jiraBase,
           email: jiraEmail,
           api_token: jiraToken,
+          sprint_url: jiraSprintUrl || undefined,
+          sprint_id: jiraSprintId || undefined,
         });
         await setAccount(res.account);
         await setJiraBoardId(jiraBoardId || null);
+        await setAdoTeamPath(null);
         setJToken("");
+
+        const imported = await importJiraSprint(jiraBase);
+        if (imported) {
+          await setCurrentSprint(toJiraCurrentSprint(imported, jiraBase, jiraSprintUrl));
+          setNotice({
+            kind: "success",
+            title: "Jira conectado",
+            message: `${formatAuthSuccess(res)}. Sprint ${imported.sprint.name} importada para o backlog.`,
+          });
+          goToSprint(imported.sprint.id);
+          return;
+        }
+
         setNotice({
           kind: "success",
           title: "Jira conectado",
-          message: `${formatAuthSuccess(res)}. Listando sprints ativas agora.`,
+          message: `${formatAuthSuccess(res)}. Nenhuma sprint foi importada automaticamente; abrindo a listagem.`,
         });
-      } else if (provider === "azuredevops") {
+        nav.navigate("Sprints");
+        return;
+      }
+
+      if (provider === "azuredevops") {
         setNotice({
           kind: "loading",
-          title: "Validando Azure DevOps",
+          title: "Conectando Azure DevOps",
           message:
-            "Enviando a URL da sprint e o PAT ao backend local; o PAT fica no keyring do SO.",
+            "Validando a sprint URL e o PAT. Em 401, o backend tenta Playwright primeiro e depois os browser agents instalados.",
         });
         const res = await api.authAzure({
           sprint_url: sprintUrl,
           pat,
+          organization: organization || undefined,
+          project: project || undefined,
+          team: team || undefined,
         });
         await setAccount(res.account);
         await setAdoTeamPath(res.ado_team_path ?? null);
+        await setJiraBoardId(null);
         setAPat("");
+
+        if (!res.ado_iteration_path) {
+          setNotice({
+            kind: "success",
+            title: "Azure DevOps conectado",
+            message: `${formatAuthSuccess(res)}. O backend conectou, mas nao retornou a iteracao atual.`,
+          });
+          nav.navigate("Sprints");
+          return;
+        }
+
+        const imported = await api.getSprint(res.ado_iteration_path, "azuredevops");
+        await setCurrentSprint(toAzureCurrentSprint(imported, res, sprintUrl));
         setNotice({
           kind: "success",
           title: "Azure DevOps conectado",
-          message: `${formatAuthSuccess(res)}. Listando sprints ativas agora.`,
+          message: `${formatAuthSuccess(res)}. Sprint ${imported.sprint.name} importada para o backlog.`,
         });
-      } else {
-        setNotice({
-          kind: "error",
-          title: "Provedor ausente",
-          message: "Escolha Jira ou Azure DevOps antes de autenticar.",
-        });
+        goToSprint(imported.sprint.id);
         return;
       }
-      nav.navigate("Sprints");
+
+      setNotice({
+        kind: "error",
+        title: "Provedor ausente",
+        message: "Escolha Jira ou Azure DevOps antes de autenticar.",
+      });
     } catch (e) {
       setNotice({
         kind: "error",
@@ -137,7 +265,7 @@ export const AuthScreen: React.FC = () => {
     return (
       <Screen
         title="Jira"
-        subtitle="O token fica salvo no keyring do SO no backend local. Ele nao e persistido no app web."
+        subtitle="Conecte o Jira e, se houver Sprint URL, importe a sprint imediatamente para o backlog interno do SendSprint."
       >
         <Input
           label="Base URL"
@@ -170,11 +298,28 @@ export const AuthScreen: React.FC = () => {
           keyboardType="numeric"
           monospace
         />
+        <Input
+          label="Sprint ID (opcional)"
+          value={jSprintId}
+          onChangeText={setJSprintId}
+          placeholder="131"
+          keyboardType="default"
+          monospace
+        />
+        <Input
+          label="Sprint URL (opcional)"
+          value={jSprintUrl}
+          onChangeText={setJSprintUrl}
+          placeholder="https://org.atlassian.net/jira/software/projects/..."
+          keyboardType="url"
+          monospace
+        />
         <StatusNotice notice={notice} />
         <View style={{ height: 8 }} />
-        <Button title="Autenticar e listar sprints" onPress={submit} loading={busy} />
+        <Button title="Conectar e importar sprint" onPress={submit} loading={busy} />
         <Text style={styles.hint}>
-          O token e gerado em https://id.atlassian.com/manage-profile/security/api-tokens
+          O token vai para o keyring do sistema. Com Sprint URL, o backend pode degradar para
+          Playwright e browser agents quando a API responder 401.
         </Text>
       </Screen>
     );
@@ -183,7 +328,7 @@ export const AuthScreen: React.FC = () => {
   return (
     <Screen
       title="Azure DevOps"
-      subtitle="Informe a URL da sprint atual e o PAT. O backend infere organization, project e team/iteration."
+      subtitle="Informe a Sprint URL atual e o PAT. Se a API responder 401, o backend inicia o fallback de captura e importa a sprint no backlog."
     >
       <Input
         label="Sprint URL atual"
@@ -201,12 +346,33 @@ export const AuthScreen: React.FC = () => {
         secureTextEntry
         monospace
       />
+      <Input
+        label="Organization (opcional)"
+        value={aOrg}
+        onChangeText={setAOrg}
+        placeholder="DigitalProjects-Americas"
+        monospace
+      />
+      <Input
+        label="Project (opcional)"
+        value={aProject}
+        onChangeText={setAProject}
+        placeholder="ONS-16058-MANUTSIS-FORT"
+        monospace
+      />
+      <Input
+        label="Team (opcional)"
+        value={aTeam}
+        onChangeText={setATeam}
+        placeholder="Time_019"
+        monospace
+      />
       <StatusNotice notice={notice} />
       <View style={{ height: 8 }} />
-      <Button title="Autenticar e listar sprints" onPress={submit} loading={busy} />
+      <Button title="Conectar e importar sprint" onPress={submit} loading={busy} />
       <Text style={styles.hint}>
-        O PAT fica no keyring do SO pelo backend local. Use escopo de sprint/work items e code
-        se for abrir PRs.
+        O PAT fica no keyring do sistema pelo backend local. Com 401, o backend tenta Playwright
+        primeiro e depois Claude, Codex, Hermes e OpenClaw quando instalados/configurados.
       </Text>
     </Screen>
   );

@@ -66,13 +66,19 @@ export const ProjectSetupScreen: React.FC = () => {
 
   const save = async () => {
     const nextRepositories = draft.mode === "single" ? draft.repositories.slice(0, 1) : draft.repositories;
-    const invalid = nextRepositories.find(
-      (repo) => !repo.name.trim() || !repo.repoPath.trim() || !repo.project.trim(),
-    );
+    const invalid = nextRepositories.find((repo) => !repo.repoPath.trim());
     if (invalid) {
       Alert.alert(
         "Setup incompleto",
-        "Preencha nome, caminho/URL e projeto para cada repositorio registrado.",
+        "Informe ao menos um caminho local para cada repositorio registrado.",
+      );
+      return;
+    }
+    const remote = nextRepositories.find((repo) => looksRemote(repo.repoPath.trim()));
+    if (remote) {
+      Alert.alert(
+        "Caminho invalido",
+        "URLs remotas nao destravam a execucao. Use o caminho local do checkout do repositorio.",
       );
       return;
     }
@@ -102,6 +108,10 @@ export const ProjectSetupScreen: React.FC = () => {
           Esta tela salva apenas metadados nao secretos no navegador: repositorios,
           papeis, projetos, padroes e comandos. Tokens, PATs e API keys continuam
           indo direto para o backend local e keyring do sistema.
+        </Text>
+        <Text style={styles.noticeText}>
+          Para liberar play por task, use caminhos locais reais. URLs remotas servem apenas como
+          referencia e nao destravam a execucao.
         </Text>
       </Card>
 
@@ -201,18 +211,26 @@ const createRepository = (index = 0): RepositoryRegistration => ({
   project: "",
   branchPattern: "feature/{item_key}-{slug}",
   commitPattern: "{type}: {summary}",
+  deployTargetBranch: "dev",
   validationCommands: ["npm run typecheck", "npm test"],
 });
 
 const cleanRepository = (repo: RepositoryRegistration): RepositoryRegistration => ({
   ...repo,
-  name: repo.name.trim(),
+  name: repo.name.trim() || repo.repoPath.trim().split(/[\\/]/).filter(Boolean).pop() || "repo",
   repoPath: repo.repoPath.trim(),
   project: repo.project.trim(),
   branchPattern: repo.branchPattern.trim() || "feature/{item_key}-{slug}",
   commitPattern: repo.commitPattern.trim() || "{type}: {summary}",
+  deployTargetBranch: repo.deployTargetBranch.trim() || "dev",
   validationCommands: repo.validationCommands.map((cmd) => cmd.trim()).filter(Boolean),
 });
+
+const looksRemote = (repoPath: string): boolean =>
+  repoPath.startsWith("http://") ||
+  repoPath.startsWith("https://") ||
+  repoPath.startsWith("git@") ||
+  repoPath.startsWith("ssh://");
 
 const styles = StyleSheet.create({
   notice: {

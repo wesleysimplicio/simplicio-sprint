@@ -41,7 +41,7 @@ export const RepositoryForm: React.FC<Props> = ({
       <View style={styles.header}>
         <View>
           <Text style={styles.kicker}>REPOSITORY {index + 1}</Text>
-          <Text style={styles.title}>{repository.name || "New repository"}</Text>
+          <Text style={styles.title}>{repository.name || fallbackRepositoryTitle(repository.repoPath)}</Text>
         </View>
         {canRemove ? <Button title="Remove" variant="ghost" onPress={onRemove} /> : null}
       </View>
@@ -55,14 +55,17 @@ export const RepositoryForm: React.FC<Props> = ({
       />
 
       <Input
-        label="Local path or remote URL"
+        label="Local repository path"
         value={repository.repoPath}
         onChangeText={(repoPath) => patch({ repoPath })}
-        placeholder="C:/workspace/web-app or https://github.com/org/repo"
+        placeholder="C:/workspace/web-app"
         autoCapitalize="none"
         keyboardType="url"
         monospace
       />
+      {looksRemote(repository.repoPath.trim()) ? (
+        <Text style={styles.help}>Remote URLs nao liberam execucao. Use um checkout local.</Text>
+      ) : null}
 
       <View style={styles.field}>
         <Text style={styles.label}>Role</Text>
@@ -114,6 +117,15 @@ export const RepositoryForm: React.FC<Props> = ({
         monospace
       />
 
+      <Input
+        label="Deploy target branch"
+        value={repository.deployTargetBranch}
+        onChangeText={(deployTargetBranch) => patch({ deployTargetBranch })}
+        placeholder="dev"
+        autoCapitalize="none"
+        monospace
+      />
+
       <View style={styles.field}>
         <Text style={styles.label}>Validation commands</Text>
         <TextInput
@@ -137,6 +149,19 @@ const parseCommands = (text: string): string[] =>
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+
+const fallbackRepositoryTitle = (repoPath: string): string => {
+  const normalized = repoPath.replace(/\\/g, "/").trim();
+  if (!normalized) return "New repository";
+  const parts = normalized.split("/").filter(Boolean);
+  return parts[parts.length - 1] || "New repository";
+};
+
+const looksRemote = (repoPath: string): boolean =>
+  repoPath.startsWith("http://") ||
+  repoPath.startsWith("https://") ||
+  repoPath.startsWith("git@") ||
+  repoPath.startsWith("ssh://");
 
 const styles = StyleSheet.create({
   card: {

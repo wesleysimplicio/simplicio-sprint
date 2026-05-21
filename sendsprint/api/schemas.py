@@ -17,15 +17,28 @@ class HealthResponse(BaseModel):
     providers_configured: dict[str, bool]
 
 
+class VersionCheckResponse(BaseModel):
+    current_version: str
+    latest_version: str | None = None
+    update_available: bool = False
+    status: Literal["ok", "unavailable"] = "ok"
+    source: str = "pypi"
+    source_url: str = "https://pypi.org/project/sendsprint/"
+    message: str
+
+
 class JiraAuthRequest(BaseModel):
     base_url: str
     email: str
     api_token: str
+    sprint_url: str | None = None
+    sprint_id: str | None = None
 
 
 class AzureAuthRequest(BaseModel):
     organization: str | None = None
     project: str | None = None
+    team: str | None = None
     pat: str | None = None
     sprint_url: str | None = None
 
@@ -37,6 +50,28 @@ class AuthResponse(BaseModel):
     user_display_name: str | None = None
     ado_team_path: str | None = None
     ado_iteration_path: str | None = None
+    fallback_used: bool = False
+    capture_transport: str | None = None
+
+
+class AppLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AppLoginResponse(BaseModel):
+    ok: bool = True
+    email: str
+    active: bool = True
+    display_name: str | None = None
+
+
+class AuthBootstrapResponse(BaseModel):
+    operator_token: str
+    default_provider: Provider | None = None
+    jira_configured: bool = False
+    azuredevops_configured: bool = False
+    providers: dict[str, object] = Field(default_factory=dict)
 
 
 class SprintSummary(BaseModel):
@@ -73,6 +108,7 @@ class StartRunRequest(BaseModel):
     item_keys: list[str] = Field(default_factory=list)
     repo_path: str | None = None
     workspace_path: str | None = None
+    project_setup: dict[str, object] | None = None
     dry_run: bool = False
     resume: bool = True
     no_cache: bool = False

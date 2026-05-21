@@ -8,16 +8,30 @@ import React, {
 } from "react";
 import Constants from "expo-constants";
 import { ApiClient } from "../api/client";
-import type { ProjectSetup, Provider, RepositoryRegistration } from "../api/types";
+import type {
+  CurrentSprint,
+  ProjectSetup,
+  Provider,
+  RepositoryRegistration,
+} from "../api/types";
 
 const STORAGE_KEY = "sendsprint.session.v1";
 
+type AppUser = {
+  email: string;
+  active: boolean;
+  displayName?: string | null;
+};
+
 type Session = {
   backendUrl: string;
+  operatorToken?: string | null;
+  appUser?: AppUser | null;
   provider: Provider | null;
   account: string | null;
   jiraBoardId?: string | null;
   adoTeamPath?: string | null;
+  currentSprint?: CurrentSprint | null;
   projectSetup: ProjectSetup;
 };
 
@@ -25,10 +39,13 @@ type Ctx = {
   session: Session;
   api: ApiClient;
   setBackendUrl: (url: string) => Promise<void>;
+  setOperatorToken: (token: string | null) => Promise<void>;
+  setAppUser: (user: AppUser | null) => Promise<void>;
   setProvider: (p: Provider | null) => Promise<void>;
   setAccount: (account: string | null) => Promise<void>;
   setJiraBoardId: (id: string | null) => Promise<void>;
   setAdoTeamPath: (path: string | null) => Promise<void>;
+  setCurrentSprint: (sprint: CurrentSprint | null) => Promise<void>;
   setProjectSetup: (setup: ProjectSetup) => Promise<void>;
   reset: () => Promise<void>;
 };
@@ -45,10 +62,13 @@ const defaultProjectSetup: ProjectSetup = {
 
 const initial: Session = {
   backendUrl: defaultBackend,
+  operatorToken: null,
+  appUser: null,
   provider: null,
   account: null,
   jiraBoardId: null,
   adoTeamPath: null,
+  currentSprint: null,
   projectSetup: defaultProjectSetup,
 };
 
@@ -76,16 +96,22 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next));
   };
 
-  const api = useMemo(() => new ApiClient(session.backendUrl), [session.backendUrl]);
+  const api = useMemo(
+    () => new ApiClient(session.backendUrl, session.operatorToken ?? undefined),
+    [session.backendUrl, session.operatorToken],
+  );
 
   const value: Ctx = {
     session,
     api,
     setBackendUrl: (url) => persist({ ...session, backendUrl: url }),
+    setOperatorToken: (token) => persist({ ...session, operatorToken: token }),
+    setAppUser: (user) => persist({ ...session, appUser: user }),
     setProvider: (p) => persist({ ...session, provider: p }),
     setAccount: (a) => persist({ ...session, account: a }),
     setJiraBoardId: (id) => persist({ ...session, jiraBoardId: id }),
     setAdoTeamPath: (p) => persist({ ...session, adoTeamPath: p }),
+    setCurrentSprint: (sprint) => persist({ ...session, currentSprint: sprint }),
     setProjectSetup: (setup) =>
       persist({
         ...session,
@@ -134,6 +160,7 @@ const normalizeRepository = (repo: RepositoryRegistration): RepositoryRegistrati
   project: repo.project ?? "",
   branchPattern: repo.branchPattern ?? "feature/{item_key}-{slug}",
   commitPattern: repo.commitPattern ?? "{type}: {summary}",
+  deployTargetBranch: repo.deployTargetBranch ?? "dev",
   validationCommands: Array.isArray(repo.validationCommands)
     ? repo.validationCommands.filter(Boolean)
     : [],

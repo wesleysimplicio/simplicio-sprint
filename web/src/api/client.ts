@@ -1,5 +1,7 @@
 import type {
   ApiErrorPayload,
+  AppLoginResponse,
+  AuthBootstrap,
   AuthStatus,
   AuthResponse,
   ControlPlaneRunDetail,
@@ -16,6 +18,7 @@ import type {
   StartRunRequest,
   StartRunResponse,
   ValidationDashboardResponse,
+  VersionCheckResponse,
 } from "./types";
 
 type ResponseBody = ApiErrorPayload | unknown[] | string | null;
@@ -69,7 +72,10 @@ const extractBackendMessage = (body: ResponseBody): string | null => {
 };
 
 export class ApiClient {
-  constructor(private baseUrl: string) {}
+  constructor(
+    private baseUrl: string,
+    private operatorToken?: string,
+  ) {}
 
   setBaseUrl(url: string) {
     this.baseUrl = url.replace(/\/+$/, "");
@@ -77,6 +83,10 @@ export class ApiClient {
 
   getBaseUrl() {
     return this.baseUrl;
+  }
+
+  setOperatorToken(token: string | null | undefined) {
+    this.operatorToken = token ?? undefined;
   }
 
   private async req<T>(
@@ -91,7 +101,13 @@ export class ApiClient {
     }
     const resp = await fetch(url.toString(), {
       ...init,
-      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      headers: {
+        "Content-Type": "application/json",
+        ...(this.operatorToken && init?.method && init.method.toUpperCase() !== "GET"
+          ? { Authorization: `Bearer ${this.operatorToken}` }
+          : {}),
+        ...(init?.headers ?? {}),
+      },
     });
     const raw = await resp.text();
     const body = tryParseJson(raw);
@@ -105,7 +121,17 @@ export class ApiClient {
     return this.req<Health>("/health");
   }
 
-  authJira(input: { base_url: string; email: string; api_token: string }) {
+  checkVersion() {
+    return this.req<VersionCheckResponse>("/version/check");
+  }
+
+  authJira(input: {
+    base_url: string;
+    email: string;
+    api_token: string;
+    sprint_url?: string;
+    sprint_id?: string;
+  }) {
     return this.req<AuthResponse>("/auth/jira", {
       method: "POST",
       body: JSON.stringify(input),
@@ -116,7 +142,24 @@ export class ApiClient {
     return this.req<AuthStatus>("/auth/status");
   }
 
-  authAzure(input: { sprint_url: string; pat: string }) {
+  authBootstrap() {
+    return this.req<AuthBootstrap>("/auth/bootstrap");
+  }
+
+  loginApp(input: { email: string; password: string }) {
+    return this.req<AppLoginResponse>("/auth/app-login", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  authAzure(input: {
+    sprint_url: string;
+    pat: string;
+    organization?: string;
+    project?: string;
+    team?: string;
+  }) {
     return this.req<AuthResponse>("/auth/azuredevops", {
       method: "POST",
       body: JSON.stringify(input),

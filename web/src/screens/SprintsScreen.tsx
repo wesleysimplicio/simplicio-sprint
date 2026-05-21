@@ -29,7 +29,7 @@ type Notice = {
 
 export const SprintsScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
-  const { api, session } = useSession();
+  const { api, session, setCurrentSprint } = useSession();
   const [sprints, setSprints] = useState<SprintSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadNotice, setLoadNotice] = useState<Notice | null>(null);
@@ -209,7 +209,26 @@ export const SprintsScreen: React.FC = () => {
             {sprints.map((s) => (
               <Card
                 key={s.id}
-                onPress={() => nav.navigate("SprintDetail", { sprintId: s.id })}
+                onPress={() => {
+                  void setCurrentSprint({
+                    provider,
+                    sprintId: s.id,
+                    sprintName: s.name,
+                    portfolioName:
+                      provider === "azuredevops"
+                        ? session.adoTeamPath?.split("/")[0] ?? null
+                        : session.account?.split("@")[1]?.split(".")[0] ?? null,
+                    projectName:
+                      provider === "azuredevops"
+                        ? session.adoTeamPath?.split("/")[1] ?? null
+                        : session.account?.split("@")[1] ?? null,
+                    teamName:
+                      provider === "azuredevops"
+                        ? session.adoTeamPath?.split("/")[2] ?? null
+                        : null,
+                  });
+                  nav.navigate("SprintDetail", { sprintId: s.id });
+                }}
                 style={{ marginBottom: 12 }}
               >
                 <View style={styles.row}>

@@ -75,11 +75,15 @@ export const RunScreen: React.FC = () => {
             ? session.projectSetup.repositories[0]?.repoPath.trim()
             : null;
         const res = await api.startRun({
-          provider: session.provider ?? "jira",
+          provider: session.currentSprint?.provider ?? session.provider ?? "jira",
           sprint_id: route.params.sprintId,
           mode: route.params.mode,
           item_keys: route.params.itemKeys,
-          repo_path: primaryRepo || undefined,
+          repo_path:
+            primaryRepo && !looksRemote(primaryRepo) && !session.projectSetup.repositories.length
+              ? primaryRepo
+              : undefined,
+          project_setup: session.projectSetup.repositories.length ? session.projectSetup : null,
         });
         setRunId(res.run_id);
         subRef.current = subscribeToRun(api.eventsUrl(res.run_id), {
@@ -283,6 +287,12 @@ export const RunScreen: React.FC = () => {
     </Screen>
   );
 };
+
+const looksRemote = (repoPath: string): boolean =>
+  repoPath.startsWith("http://") ||
+  repoPath.startsWith("https://") ||
+  repoPath.startsWith("git@") ||
+  repoPath.startsWith("ssh://");
 
 function groupBy<T, K extends string | number>(arr: T[], keyOf: (t: T) => K): Map<K, T[]> {
   const m = new Map<K, T[]>();

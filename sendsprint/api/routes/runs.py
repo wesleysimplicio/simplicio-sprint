@@ -11,6 +11,7 @@ from typing import Any, Literal, cast
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse
 
+from sendsprint.api.project_setup_workspace import materialize_workspace_from_project_setup
 from sendsprint.api.runs import events, manager
 from sendsprint.api.runs.agent_status import build_agent_snapshot
 from sendsprint.api.runs.status_answer import render_status_answer
@@ -33,14 +34,14 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 
 @router.post("", response_model=StartRunResponse)
 def start_run(req: StartRunRequest) -> StartRunResponse:
-    status = manager.start_run(req)
+    status = manager.start_run(_prepare_run_request(req))
     return StartRunResponse(run_id=status.run_id)
 
 
 @router.post("/preview", response_model=RoutePreviewResponse)
 def preview_run(req: StartRunRequest) -> RoutePreviewResponse:
     """Build the route preview used before execution by Web and CLI clients."""
-    return build_route_preview(req)
+    return build_route_preview(_prepare_run_request(req))
 
 
 @router.get("", response_model=list[RunStatus])
@@ -384,3 +385,10 @@ def _recommended_route_action(reason: str) -> str:
     if "no scope, role, or tech signal" in lowered:
         return "Add workspace repo roles, tech markers, or explicit task scope before execution."
     return "Review this route before execution and add explicit scope or repo metadata if needed."
+
+
+def _prepare_run_request(req: StartRunRequest) -> StartRunRequest:
+    if not req.project_setup:
+        return req
+    workspace_path = materialize_workspace_from_project_setup(req.project_setup)
+    return req.model_copy(update={"workspace_path": workspace_path, "repo_path": None})

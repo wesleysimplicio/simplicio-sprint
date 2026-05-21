@@ -13,6 +13,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from sendsprint.api.project_setup_workspace import materialize_workspace_from_project_setup
 from sendsprint.api.routes.runs import build_route_preview
 from sendsprint.api.runs import events, manager
 from sendsprint.api.schemas import RoutePreviewResponse, StartRunRequest
@@ -33,6 +34,7 @@ class ControlPlaneRunSummary(BaseModel):
     sprint_id: str
     provider: str
     autonomy_level: str = "plan"
+    item_keys: list[str] = Field(default_factory=list)
     task: str | None = None
     branch: str | None = None
     readiness_score: float | None = None
@@ -85,6 +87,7 @@ class StartControlPlaneRunRequest(BaseModel):
     item_keys: list[str] = Field(default_factory=list)
     repo_path: str | None = None
     workspace_path: str | None = None
+    project_setup: dict[str, object] | None = None
     dry_run: bool = False
     resume: bool = True
     no_cache: bool = False
@@ -131,6 +134,7 @@ def _enrich_run(run_id: str) -> ControlPlaneRunSummary:
         sprint_id=status.sprint_id,
         provider=status.provider,
         autonomy_level=request.autonomy_level if request else "plan",
+        item_keys=list(request.item_keys) if request else [],
         task=task,
         branch=branch,
         readiness_score=score,
@@ -320,15 +324,25 @@ def get_run_quality(run_id: str) -> QualityGateResponse:
 
 
 def _to_start_run_request(req: StartControlPlaneRunRequest) -> StartRunRequest:
-    return StartRunRequest(
+    start_req = StartRunRequest(
         provider=req.provider,  # type: ignore[arg-type]
         sprint_id=req.sprint_id,
         mode=req.mode,  # type: ignore[arg-type]
         item_keys=req.item_keys,
         repo_path=req.repo_path,
         workspace_path=req.workspace_path,
+        project_setup=req.project_setup,
         dry_run=req.dry_run,
         resume=req.resume,
         no_cache=req.no_cache,
         autonomy_level=req.autonomy_level,  # type: ignore[arg-type]
     )
+    if req.project_setup:
+        workspace_path = materialize_workspace_from_project_setup(req.project_setup)
+        return start_req.model_copy(
+            update={
+                "workspace_path": workspace_path,
+                "repo_path": None,
+            }
+        )
+    return start_req

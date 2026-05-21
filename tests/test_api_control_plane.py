@@ -83,6 +83,47 @@ def test_start_run_with_autonomy_level():
     assert resp.json()["run_id"]
 
 
+def test_start_run_materializes_workspace_from_project_setup(monkeypatch):
+    captured = {}
+
+    class FakeStatus:
+        run_id = "cp-workspace"
+
+    def fake_start_run(req):
+        captured["request"] = req
+        return FakeStatus()
+
+    monkeypatch.setattr(
+        "sendsprint.api.routes.control_plane.materialize_workspace_from_project_setup",
+        lambda project_setup: "generated-workspace.json",
+    )
+    monkeypatch.setattr("sendsprint.api.routes.control_plane.manager.start_run", fake_start_run)
+
+    resp = client.post(
+        "/api/runs",
+        json={
+            "provider": "jira",
+            "sprint_id": "cp-202",
+            "project_setup": {
+                "repositories": [
+                    {
+                        "name": "web",
+                        "repoPath": "C:/workspace/web",
+                        "role": "frontend",
+                        "project": "Portal",
+                        "deployTargetBranch": "dev",
+                    }
+                ]
+            },
+        },
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["run_id"] == "cp-workspace"
+    assert captured["request"].workspace_path == "generated-workspace.json"
+    assert captured["request"].repo_path is None
+
+
 def test_control_plane_preview_is_read_only_and_filterable(monkeypatch, tmp_path: Path) -> None:
     from sendsprint.api.runs import manager
     from sendsprint.models import Sprint, SprintItem

@@ -7,6 +7,8 @@ import os
 from abc import ABC, abstractmethod
 from typing import Any, Literal
 
+import httpx
+
 from sendsprint.models import Sprint
 
 logger = logging.getLogger(__name__)
@@ -32,13 +34,22 @@ class BaseOperator(ABC):
         self._kwargs = kwargs
 
     def read_sprint(self, **kwargs: Any) -> Sprint:
-        chosen = self._resolve_transport()
-        logger.info("[%s] reading sprint via %s", self.source, chosen)
-        if chosen == "mcp":
-            return self._read_via_mcp(**kwargs)
-        if chosen == "api":
-            return self._read_via_api(**kwargs)
-        return self._read_via_playwright(**kwargs)
+        if self.transport != "auto":
+            chosen = self._resolve_transport()
+            logger.info("[%s] reading sprint via %s", self.source, chosen)
+            return self._read_with_transport(chosen, **kwargs)
+
+        errors: list[str] = []
+        for transport in self._available_transports():
+            try:
+                logger.info("[%s] reading sprint via %s", self.source, transport)
+                return self._read_with_transport(transport, **kwargs)
+            except (TransportUnavailable, httpx.HTTPError, RuntimeError, ValueError) as exc:
+                errors.append(f"{transport}: {exc}")
+                logger.warning("[%s] %s transport failed: %s", self.source, transport, exc)
+                continue
+        detail = "; ".join(errors) if errors else "no transports available"
+        raise TransportUnavailable(f"{self.source} could not read sprint: {detail}")
 
     def _resolve_transport(self) -> Literal["mcp", "api", "playwright"]:
         if self.transport != "auto":
@@ -48,6 +59,24 @@ class BaseOperator(ABC):
         if self._api_available():
             return "api"
         return "playwright"
+
+    def _available_transports(self) -> list[Literal["mcp", "api", "playwright"]]:
+        transports: list[Literal["mcp", "api", "playwright"]] = []
+        if self._mcp_available():
+            transports.append("mcp")
+        if self._api_available():
+            transports.append("api")
+        transports.append("playwright")
+        return transports
+
+    def _read_with_transport(
+        self, transport: Literal["mcp", "api", "playwright"], **kwargs: Any
+    ) -> Sprint:
+        if transport == "mcp":
+            return self._read_via_mcp(**kwargs)
+        if transport == "api":
+            return self._read_via_api(**kwargs)
+        return self._read_via_playwright(**kwargs)
 
     def _mcp_available(self) -> bool:
         return os.getenv(f"MCP_{self.source.upper()}_AVAILABLE") == "1"

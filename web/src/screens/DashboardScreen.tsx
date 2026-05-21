@@ -28,12 +28,12 @@ type ColumnKey = "queued" | "build" | "validate" | "review" | "done" | "blocked"
 type Nav = NativeStackNavigationProp<RootStackParamList, "Dashboard">;
 
 const COLUMN_META: Record<ColumnKey, { label: string; hint: string }> = {
-  queued: { label: "Queue", hint: "Aguardando entrada ou preparacao" },
-  build: { label: "Build", hint: "Execucao inicial e contexto" },
+  queued: { label: "Queue", hint: "Aguardando setup ou despacho" },
+  build: { label: "Build", hint: "Mapeamento, planejamento e codigo" },
   validate: { label: "Validate", hint: "Lint, testes e seguranca" },
-  review: { label: "Review", hint: "PR, evidencias e aprovacao" },
-  done: { label: "Done", hint: "Entregas concluidas" },
-  blocked: { label: "Blocked", hint: "Falhas e retrabalho" },
+  review: { label: "Review", hint: "PR, evidencias e aprovacao humana" },
+  done: { label: "Done", hint: "Prontas para deploy" },
+  blocked: { label: "Blocked", hint: "Falhas ou dependencias pendentes" },
 };
 
 export const DashboardScreen: React.FC = () => {
@@ -101,14 +101,108 @@ export const DashboardScreen: React.FC = () => {
           ? "Azure DevOps"
           : "Jira";
 
+  const currentSprintMeta = [
+    session.currentSprint?.portfolioName,
+    session.currentSprint?.projectName,
+    session.currentSprint?.teamName,
+  ]
+    .filter(Boolean)
+    .join(" / ");
+
+  if (loading) {
+    return (
+      <Screen title="SendSprint" subtitle="Carregando shell operacional local...">
+        <ActivityIndicator color={theme.primary} style={{ marginTop: 48 }} />
+      </Screen>
+    );
+  }
+
+  if (!session.currentSprint) {
+    return (
+      <Screen
+        title="SendSprint"
+        subtitle="Entre, escolha a origem do trabalho e importe a sprint para liberar o backlog interno."
+        footer={
+          <View style={{ gap: 10 }}>
+            <Button title="Iniciar" onPress={() => nav.navigate("Provider")} />
+            <Button
+              title="Setup do projeto"
+              variant="secondary"
+              onPress={() => nav.navigate("ProjectSetup")}
+            />
+            <Button
+              title="Parametros e conexoes"
+              variant="secondary"
+              onPress={() => nav.navigate("Settings")}
+            />
+          </View>
+        }
+      >
+        <Card style={styles.heroCard}>
+          <Text style={styles.kicker}>CHAT-FIRST DELIVERY SHELL</Text>
+          <Text style={styles.heroTitle}>Tudo vazio ate conectar uma sprint real</Text>
+          <Text style={styles.heroText}>
+            O login do app ja foi validado. A proxima etapa e escolher Jira ou Azure DevOps e
+            importar a sprint para o backlog Kanban do SendSprint.
+          </Text>
+        </Card>
+
+        <View style={styles.emptyGrid}>
+          <Card style={styles.emptyCell}>
+            <Text style={styles.emptyLabel}>AUTH</Text>
+            <Text style={styles.emptyValue}>
+              {session.appUser?.displayName ?? session.appUser?.email ?? "Usuario local"}
+            </Text>
+            <Text style={styles.emptyHint}>Todos ativos nesta fase local.</Text>
+          </Card>
+          <Card style={styles.emptyCell}>
+            <Text style={styles.emptyLabel}>PROVIDER PADRAO</Text>
+            <Text style={styles.emptyValue}>{providerLabel}</Text>
+            <Text style={styles.emptyHint}>Pode ser trocado ao iniciar.</Text>
+          </Card>
+          <Card style={styles.emptyCell}>
+            <Text style={styles.emptyLabel}>REPOSITORIOS</Text>
+            <Text style={styles.emptyValue}>{session.projectSetup.repositories.length}</Text>
+            <Text style={styles.emptyHint}>
+              Configure paths locais para habilitar play por task.
+            </Text>
+          </Card>
+        </View>
+
+        <Card style={styles.todoCard}>
+          <Text style={styles.todoTitle}>Fluxo esperado agora</Text>
+          <Text style={styles.todoText}>1. Clique em Iniciar.</Text>
+          <Text style={styles.todoText}>2. Conecte Jira ou Azure DevOps.</Text>
+          <Text style={styles.todoText}>3. Importe a sprint e abra o backlog.</Text>
+          <Text style={styles.todoText}>
+            4. Configure o repositorio do projeto para liberar play por task ou play all.
+          </Text>
+        </Card>
+      </Screen>
+    );
+  }
+
   return (
     <Screen
-      title="SendSprint Dashboard"
-      subtitle="Kanban operacional, relatorios por task e lanes de validacao em um layout leve."
+      title={session.currentSprint.sprintName}
+      subtitle={
+        currentSprintMeta
+          ? `${currentSprintMeta} · backlog importado e pronto para despacho`
+          : "Sprint importada e pronta para despacho"
+      }
       footer={
         <View style={{ gap: 10 }}>
-          <Button title="Setup" variant="secondary" onPress={() => nav.navigate("ProjectSetup")} />
-          <Button title="Ver sprints" variant="secondary" onPress={() => nav.navigate("Sprints")} />
+          <Button
+            title="Abrir backlog"
+            onPress={() =>
+              nav.navigate("SprintDetail", { sprintId: session.currentSprint?.sprintId ?? "" })
+            }
+          />
+          <Button
+            title="Setup do projeto"
+            variant="secondary"
+            onPress={() => nav.navigate("ProjectSetup")}
+          />
           <Button
             title="Parametros e conexoes"
             variant="secondary"
@@ -126,118 +220,117 @@ export const DashboardScreen: React.FC = () => {
         </View>
       }
     >
-      {loading ? (
-        <ActivityIndicator color={theme.primary} style={{ marginTop: 48 }} />
-      ) : (
-        <ScrollView
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                void load(true);
-              }}
-              tintColor={theme.primary}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        >
-          <Card style={styles.hero}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.kicker}>LOCAL CONTROL PLANE</Text>
-              <Text style={styles.heroTitle}>Logado e pronto para operar</Text>
-              <Text style={styles.heroText}>
-                {providerLabel}
-                {session.account ? ` · ${session.account}` : ""}
-                {auth?.providers.azuredevops.team_path
-                  ? ` · ${auth.providers.azuredevops.team_path}`
-                  : ""}
-              </Text>
-            </View>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>{totals.running} running</Text>
-            </View>
-          </Card>
-
-          <View style={styles.metricGrid}>
-            <MetricCard label="Runs totais" value={String(totals.total)} />
-            <MetricCard label="Em execucao" value={String(totals.running)} accent="primary" />
-            <MetricCard label="Bloqueadas" value={String(totals.blocked)} accent="danger" />
-            <MetricCard label="Concluidas" value={String(totals.done)} accent="success" />
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              void load(true);
+            }}
+            tintColor={theme.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        <Card style={styles.heroCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.kicker}>ACTIVE DELIVERY CONTEXT</Text>
+            <Text style={styles.heroTitle}>{session.currentSprint.sprintName}</Text>
+            <Text style={styles.heroText}>
+              {providerLabel}
+              {currentSprintMeta ? ` · ${currentSprintMeta}` : ""}
+            </Text>
           </View>
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>{totals.running} running</Text>
+          </View>
+        </Card>
 
-          <Card>
-            <Text style={styles.sectionLabel}>VALIDATION LANES</Text>
-            {(validation?.lanes ?? []).map((lane) => (
-              <View key={lane.lane} style={styles.laneRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.laneTitle}>{lane.lane.toUpperCase()}</Text>
-                  <Text style={styles.laneText}>
-                    {lane.last_result ?? lane.status} · {lane.events_count} eventos
-                  </Text>
-                </View>
-                <View style={styles.barTrack}>
-                  <View
-                    style={[
-                      styles.barFill,
-                      {
-                        width: `${Math.min(100, lane.events_count * 12)}%`,
-                        backgroundColor: lane.status === "failed" ? theme.danger : theme.primary,
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
-            ))}
-          </Card>
+        <View style={styles.metricGrid}>
+          <MetricCard label="Runs totais" value={String(totals.total)} />
+          <MetricCard label="Em execucao" value={String(totals.running)} accent="primary" />
+          <MetricCard label="Bloqueadas" value={String(totals.blocked)} accent="danger" />
+          <MetricCard label="Prontas" value={String(totals.done)} accent="success" />
+        </View>
 
-          <Text style={styles.boardTitle}>KANBAN DE TASKS</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.board}>
-            {(Object.keys(COLUMN_META) as ColumnKey[]).map((column) => (
-              <View key={column} style={styles.column}>
-                <View style={styles.columnHead}>
-                  <Text style={styles.columnTitle}>{COLUMN_META[column].label}</Text>
-                  <Text style={styles.columnHint}>{COLUMN_META[column].hint}</Text>
-                </View>
-                <View style={{ gap: 10 }}>
-                  {grouped[column].length === 0 ? (
-                    <Card style={styles.emptyCard}>
-                      <Text style={styles.emptyText}>Sem cards nesta etapa.</Text>
-                    </Card>
-                  ) : (
-                    grouped[column].map((run) => (
-                      <Pressable key={run.run_id} onPress={() => void openDetail(run.run_id)}>
-                        <Card style={styles.taskCard}>
-                          <View style={styles.taskHead}>
-                            <Text style={styles.taskSprint}>{run.sprint_id}</Text>
-                            <StatusChip text={run.state} tone={chipTone(run)} />
-                          </View>
-                          <Text style={styles.taskTitle}>
-                            {run.task ?? run.summary ?? "Task sem titulo"}
-                          </Text>
-                          <Text style={styles.taskMeta}>{run.provider} · {run.autonomy_level}</Text>
-                          <View style={styles.progressTrack}>
-                            <View
-                              style={[
-                                styles.progressFill,
-                                { width: `${Math.max(8, Math.round((run.progress ?? 0.1) * 100))}%` },
-                              ]}
-                            />
-                          </View>
-                          <Text style={styles.taskMeta}>
-                            readiness {Math.round(run.readiness_score ?? 0)} ·{" "}
-                            {run.readiness_verdict ?? "pending"}
-                          </Text>
-                        </Card>
-                      </Pressable>
-                    ))
-                  )}
-                </View>
+        <Card>
+          <Text style={styles.sectionLabel}>VALIDATION LANES</Text>
+          {(validation?.lanes ?? []).map((lane) => (
+            <View key={lane.lane} style={styles.laneRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.laneTitle}>{lane.lane.toUpperCase()}</Text>
+                <Text style={styles.laneText}>
+                  {lane.last_result ?? lane.status} · {lane.events_count} eventos
+                </Text>
               </View>
-            ))}
-          </ScrollView>
+              <View style={styles.barTrack}>
+                <View
+                  style={[
+                    styles.barFill,
+                    {
+                      width: `${Math.min(100, lane.events_count * 12)}%`,
+                      backgroundColor: lane.status === "failed" ? theme.danger : theme.primary,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          ))}
+        </Card>
+
+        <Text style={styles.boardTitle}>RUNS EM CURSO</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.board}
+        >
+          {(Object.keys(COLUMN_META) as ColumnKey[]).map((column) => (
+            <View key={column} style={styles.column}>
+              <View style={styles.columnHead}>
+                <Text style={styles.columnTitle}>{COLUMN_META[column].label}</Text>
+                <Text style={styles.columnHint}>{COLUMN_META[column].hint}</Text>
+              </View>
+              <View style={{ gap: 10 }}>
+                {grouped[column].length === 0 ? (
+                  <Card style={styles.emptyRunCard}>
+                    <Text style={styles.emptyRunText}>Sem runs nesta etapa.</Text>
+                  </Card>
+                ) : (
+                  grouped[column].map((run) => (
+                    <Pressable key={run.run_id} onPress={() => void openDetail(run.run_id)}>
+                      <Card style={styles.taskCard}>
+                        <View style={styles.taskHead}>
+                          <Text style={styles.taskSprint}>{run.sprint_id}</Text>
+                          <StatusChip text={run.state} tone={chipTone(run)} />
+                        </View>
+                        <Text style={styles.taskTitle}>
+                          {run.task ?? run.summary ?? "Task sem titulo"}
+                        </Text>
+                        <Text style={styles.taskMeta}>{run.provider} · {run.autonomy_level}</Text>
+                        <View style={styles.progressTrack}>
+                          <View
+                            style={[
+                              styles.progressFill,
+                              {
+                                width: `${Math.max(8, Math.round((run.progress ?? 0.1) * 100))}%`,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.taskMeta}>
+                          readiness {Math.round(run.readiness_score ?? 0)} ·{" "}
+                          {run.readiness_verdict ?? "pending"}
+                        </Text>
+                      </Card>
+                    </Pressable>
+                  ))
+                )}
+              </View>
+            </View>
+          ))}
         </ScrollView>
-      )}
+      </ScrollView>
 
       <RunDetailModal detail={selected} onClose={() => setSelected(null)} />
     </Screen>
@@ -247,7 +340,9 @@ export const DashboardScreen: React.FC = () => {
 const resolveColumn = (run: ControlPlaneRunSummary): ColumnKey => {
   if (run.failed || run.state === "failed") return "blocked";
   if (run.state === "done") return "done";
-  if ((run.last_step ?? 0) >= 9 || run.readiness_verdict === "needs_human_approval") return "review";
+  if ((run.last_step ?? 0) >= 9 || run.readiness_verdict === "needs_human_approval") {
+    return "review";
+  }
   if ((run.last_step ?? 0) >= 4) return "validate";
   if ((run.last_step ?? 0) >= 1 || run.state === "running") return "build";
   return "queued";
@@ -318,46 +413,31 @@ const RunDetailModal: React.FC<{
           </View>
           <Button title="Fechar" variant="ghost" onPress={onClose} />
         </View>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14 }}>
-          <Card>
-            <Text style={styles.sectionLabel}>QUALIDADE</Text>
-            <Text style={styles.modalText}>verdict: {detail?.quality_gate?.verdict ?? "pending"}</Text>
-            {(detail?.quality_gate?.checks ?? []).slice(0, 5).map((check) => (
-              <Text key={check.check_name} style={styles.modalText}>
-                {check.passed ? "OK" : "FAIL"} {check.check_name} · {check.details || check.severity}
-              </Text>
-            ))}
-          </Card>
 
-          <Card>
-            <Text style={styles.sectionLabel}>EVIDENCIAS</Text>
-            <Text style={styles.modalText}>
-              {(detail?.evidence?.total_items ?? 0)} item(s) · finalizado{" "}
-              {detail?.evidence?.finalized ? "sim" : "nao"}
-            </Text>
-            {(detail?.evidence?.items ?? []).slice(0, 6).map((item) => (
-              <Text key={`${item.path}-${item.label}`} style={styles.modalText}>
-                {item.label} · {item.path}
-              </Text>
-            ))}
-          </Card>
+        <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+          {detail?.quality_gate ? (
+            <Card style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>QUALITY GATE</Text>
+              <Text style={styles.modalBody}>{detail.quality_gate.verdict}</Text>
+              {detail.quality_gate.checks.map((check) => (
+                <Text key={check.check_name} style={styles.modalList}>
+                  {check.check_name}: {check.passed ? "ok" : "falhou"}
+                </Text>
+              ))}
+            </Card>
+          ) : null}
 
-          <Card>
-            <Text style={styles.sectionLabel}>LOGS</Text>
-            {(detail?.logs ?? []).slice(-8).map((log, index) => (
-              <Text key={`${index}-${log}`} style={styles.modalMono}>
-                {log}
-              </Text>
-            ))}
-          </Card>
-
-          <Card>
-            <Text style={styles.sectionLabel}>TIMELINE</Text>
-            {(detail?.timeline ?? []).slice(-10).map((entry, index) => (
-              <Text key={String(index)} style={styles.modalMono}>
-                {String(entry.type ?? "event")} · {String(entry.name ?? entry.message ?? "")}
-              </Text>
-            ))}
+          <Card style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>LOGS</Text>
+            {(detail?.logs ?? []).length === 0 ? (
+              <Text style={styles.modalBody}>Sem logs capturados ainda.</Text>
+            ) : (
+              detail?.logs.map((log, index) => (
+                <Text key={`${index}-${log}`} style={styles.modalMono}>
+                  {log}
+                </Text>
+              ))
+            )}
           </Card>
         </ScrollView>
       </View>
@@ -366,40 +446,80 @@ const RunDetailModal: React.FC<{
 );
 
 const styles = StyleSheet.create({
-  hero: {
+  heroCard: {
+    backgroundColor: "#eef5ff",
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 14,
-    backgroundColor: "#f1f7ff",
+    alignItems: "flex-start",
+    gap: 12,
   },
   kicker: {
     color: theme.primary,
     fontSize: 11,
     letterSpacing: 2,
-    fontWeight: "700",
+    fontWeight: "800",
   },
   heroTitle: {
     color: theme.text,
-    fontSize: 26,
+    fontSize: 28,
+    lineHeight: 34,
     fontWeight: "800",
-    marginTop: 6,
+    marginTop: 4,
   },
   heroText: {
     color: theme.textMuted,
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 21,
     marginTop: 4,
   },
   heroBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: "rgba(44,107,237,0.12)",
   },
   heroBadgeText: {
     color: theme.primary,
+    fontSize: 12,
     fontWeight: "700",
+  },
+  emptyGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  emptyCell: {
+    flexBasis: "30%",
+    minWidth: 180,
+    gap: 4,
+  },
+  emptyLabel: {
+    color: theme.textMuted,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: "700",
+  },
+  emptyValue: {
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  emptyHint: {
+    color: theme.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  todoCard: {
+    backgroundColor: theme.surfaceAlt,
+  },
+  todoTitle: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  todoText: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
   },
   metricGrid: {
     flexDirection: "row",
@@ -409,7 +529,7 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     minWidth: 150,
-    flexGrow: 1,
+    flex: 1,
   },
   metricLabel: {
     color: theme.textMuted,
@@ -418,23 +538,24 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 28,
     fontWeight: "800",
-    marginTop: 8,
   },
   sectionLabel: {
     color: theme.textMuted,
     fontSize: 11,
     letterSpacing: 2,
     fontWeight: "700",
+    marginBottom: 8,
   },
   laneRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    marginTop: 12,
+    gap: 12,
+    marginTop: 8,
   },
   laneTitle: {
     color: theme.text,
     fontWeight: "700",
+    fontSize: 13,
   },
   laneText: {
     color: theme.textMuted,
@@ -442,10 +563,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   barTrack: {
-    width: 160,
-    height: 10,
+    width: 120,
+    height: 8,
     borderRadius: 999,
-    backgroundColor: theme.bgDeep,
+    backgroundColor: theme.surfaceAlt,
     overflow: "hidden",
   },
   barFill: {
@@ -453,26 +574,27 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   boardTitle: {
-    color: theme.text,
-    fontSize: 16,
-    fontWeight: "800",
+    color: theme.textMuted,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: "700",
     marginTop: 18,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   board: {
-    gap: 14,
-    paddingBottom: 6,
+    gap: 12,
+    paddingBottom: 12,
   },
   column: {
-    width: 300,
+    width: 272,
     gap: 10,
   },
   columnHead: {
-    paddingHorizontal: 2,
+    paddingHorizontal: 4,
   },
   columnTitle: {
     color: theme.text,
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "800",
   },
   columnHint: {
@@ -480,11 +602,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  emptyCard: {
-    backgroundColor: "rgba(255,255,255,0.72)",
+  emptyRunCard: {
+    backgroundColor: theme.surfaceAlt,
   },
-  emptyText: {
+  emptyRunText: {
     color: theme.textMuted,
+    fontSize: 12,
   },
   taskCard: {
     gap: 8,
@@ -493,18 +616,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 8,
   },
   taskSprint: {
     color: theme.primary,
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: theme.fontMono,
   },
   taskTitle: {
     color: theme.text,
     fontSize: 15,
     fontWeight: "700",
-    lineHeight: 20,
   },
   taskMeta: {
     color: theme.textMuted,
@@ -513,36 +634,36 @@ const styles = StyleSheet.create({
   progressTrack: {
     height: 8,
     borderRadius: 999,
-    backgroundColor: theme.bgDeep,
+    backgroundColor: theme.surfaceAlt,
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
-    borderRadius: 999,
     backgroundColor: theme.primary,
+    borderRadius: 999,
   },
   statusChip: {
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: 999,
   },
   statusChipText: {
     fontSize: 11,
-    fontWeight: "700",
-    textTransform: "uppercase",
+    fontWeight: "800",
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(16,34,58,0.18)",
+    backgroundColor: "rgba(14, 24, 36, 0.35)",
     justifyContent: "center",
     padding: 20,
   },
   modalCard: {
-    maxHeight: "88%",
-    borderRadius: 24,
-    backgroundColor: "#ffffff",
-    padding: 18,
-    gap: 14,
+    backgroundColor: theme.bg,
+    borderRadius: theme.radius,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 16,
+    gap: 12,
   },
   modalHead: {
     flexDirection: "row",
@@ -551,26 +672,38 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: theme.text,
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "800",
   },
   modalSubtitle: {
     color: theme.textMuted,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
     marginTop: 4,
   },
-  modalText: {
+  modalSection: {
+    marginBottom: 12,
+  },
+  modalSectionTitle: {
+    color: theme.textMuted,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  modalBody: {
     color: theme.text,
     fontSize: 13,
-    lineHeight: 19,
-    marginTop: 6,
+    lineHeight: 20,
   },
-  modalMono: {
+  modalList: {
     color: theme.textMuted,
     fontSize: 12,
     lineHeight: 18,
+  },
+  modalMono: {
+    color: theme.text,
+    fontSize: 12,
+    lineHeight: 18,
     fontFamily: theme.fontMono,
-    marginTop: 6,
   },
 });

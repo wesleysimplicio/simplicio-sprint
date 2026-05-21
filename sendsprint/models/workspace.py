@@ -12,6 +12,19 @@ RepoRole = Literal["front", "api", "back", "infra", "mobile", "lib", "other"]
 ScopeMode = Literal["all", "mine"]
 WatchProvider = Literal["jira", "azuredevops"]
 WatchScope = Literal["assigned_to_me", "all"]
+FlowInventoryMode = Literal["auto", "off"]
+
+
+class FrontendFlowConfig(BaseModel):
+    """Repo-local frontend route discovery and Playwright smoke settings."""
+
+    base_url: str | None = None
+    dev_server_command: str | None = None
+    flow_inventory: FlowInventoryMode = "auto"
+    generate_route_smokes: bool = True
+    screenshot_evidence: bool = True
+    timeout_seconds: int = Field(default=30, ge=1)
+    max_routes: int = Field(default=50, ge=1)
 
 
 class RepoConfig(BaseModel):
@@ -39,6 +52,7 @@ class RepoConfig(BaseModel):
     build_command: str | None = None
     lint_command: str | None = None
     e2e_command: str | None = None
+    frontend: FrontendFlowConfig = Field(default_factory=FrontendFlowConfig)
 
 
 class CodeGenerationConfig(BaseModel):
@@ -60,6 +74,16 @@ class DeployWorkflowConfig(BaseModel):
     method: str = "POST"
     headers: dict[str, str] = Field(default_factory=dict)
     final_status: str = "Deployed"
+
+
+class PlaywrightAutoFlowsConfig(BaseModel):
+    """Workspace defaults for generated frontend Playwright route smokes."""
+
+    enabled: bool = True
+    frontend_base_url: str | None = None
+    dev_server_command: str | None = None
+    timeout_seconds: int = Field(default=30, ge=1)
+    max_routes: int = Field(default=50, ge=1)
 
 
 class WatchConfig(BaseModel):
@@ -140,6 +164,9 @@ class WorkspaceConfig(BaseModel):
     branch_name_template: str = "feature/{number}-{title}"
     code_generation: CodeGenerationConfig = Field(default_factory=CodeGenerationConfig)
     deploy: DeployWorkflowConfig = Field(default_factory=DeployWorkflowConfig)
+    playwright_auto_flows: PlaywrightAutoFlowsConfig = Field(
+        default_factory=PlaywrightAutoFlowsConfig
+    )
     watch: WatchConfig = Field(default_factory=WatchConfig)
 
     @model_validator(mode="after")

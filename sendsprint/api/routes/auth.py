@@ -11,11 +11,40 @@ from fastapi import APIRouter, HTTPException
 
 from sendsprint import credentials
 from sendsprint import profile as profile_mod
-from sendsprint.api.schemas import AuthResponse, AzureAuthRequest, JiraAuthRequest
+from sendsprint.api.schemas import (
+    AppLoginRequest,
+    AppLoginResponse,
+    AuthBootstrapResponse,
+    AuthResponse,
+    AzureAuthRequest,
+    JiraAuthRequest,
+)
+from sendsprint.api.security import get_operator_token
 from sendsprint.azure_devops_urls import parse_azure_sprint_url
 from sendsprint.credentials import Provider as CredentialProvider
+from sendsprint.operators import AzureDevopsOperator, JiraOperator
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.get("/bootstrap", response_model=AuthBootstrapResponse)
+def bootstrap() -> AuthBootstrapResponse:
+    token = get_operator_token()
+    if not token:
+        raise HTTPException(status_code=503, detail="operator token not initialized")
+    status_payload = status()
+    return AuthBootstrapResponse(operator_token=token, **status_payload)
+
+
+@router.post("/app-login", response_model=AppLoginResponse)
+def app_login(req: AppLoginRequest) -> AppLoginResponse:
+    email = req.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="A valid email is required.")
+    if not req.password.strip():
+        raise HTTPException(status_code=400, detail="Password is required.")
+    display_name = email.split("@", 1)[0].replace(".", " ").replace("_", " ").title()
+    return AppLoginResponse(email=email, active=True, display_name=display_name)
 
 
 @router.post("/jira", response_model=AuthResponse)
@@ -27,6 +56,37 @@ def auth_jira(req: JiraAuthRequest) -> AuthResponse:
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401 and req.sprint_url:
+            fallback = _capture_jira_with_browser_fallback(
+                base_url=base,
+                email=req.email,
+                sprint_id=req.sprint_id or "browser-captured",
+                sprint_url=req.sprint_url,
+                original_error=(
+                    f"Jira auth failed: {exc.response.status_code} {exc.response.reason_phrase}"
+                ),
+            )
+            profile_mod.update(
+                default_provider="jira",
+                **{
+                    "jira.base_url": base,
+                    "jira.email": req.email,
+                    "jira.last_sprint_url": req.sprint_url or None,
+                    "jira.default_sprint_id": (
+                        int(req.sprint_id)
+                        if req.sprint_id and req.sprint_id.isdigit()
+                        else None
+                    ),
+                },
+            )
+            return AuthResponse(
+                provider="jira",
+                account=req.email,
+                ok=True,
+                user_display_name=req.email,
+                fallback_used=True,
+                capture_transport=fallback["capture_transport"],
+            )
         raise HTTPException(
             status_code=401,
             detail=f"Jira auth failed: {exc.response.status_code} {exc.response.reason_phrase}",
@@ -37,6 +97,17 @@ def auth_jira(req: JiraAuthRequest) -> AuthResponse:
     # Keyring may be unavailable in some envs; auth still validated.
     with contextlib.suppress(credentials.CredentialError):
         credentials.set_secret("jira", req.email, req.api_token)
+    profile_mod.update(
+        default_provider="jira",
+        **{
+            "jira.base_url": base,
+            "jira.email": req.email,
+            "jira.last_sprint_url": req.sprint_url or None,
+            "jira.default_sprint_id": (
+                int(req.sprint_id) if req.sprint_id and req.sprint_id.isdigit() else None
+            ),
+        },
+    )
 
     return AuthResponse(
         provider="jira",
@@ -51,6 +122,8 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
     parsed = parse_azure_sprint_url(req.sprint_url) if req.sprint_url else None
     org = (req.organization or (parsed.organization if parsed else "")).strip("/")
     project = (req.project or (parsed.project if parsed else "")).strip("/")
+    team = (req.team or (parsed.team if parsed else "")).strip("/") or None
+    account = f"{org}/{project}" if org and project else ""
     pat = (req.pat or "").strip()
     if not org or not project:
         raise HTTPException(
@@ -69,6 +142,42 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 401 and parsed and req.sprint_url:
+            fallback = _capture_ado_with_browser_fallback(
+                organization=org,
+                project=project,
+                team=team,
+                iteration_path=(
+                    "\\".join(part for part in (project, team, parsed.iteration_name) if part)
+                    if parsed and parsed.iteration_name
+                    else None
+                ),
+                sprint_url=req.sprint_url,
+                original_error=f"Azure DevOps auth failed: {exc.response.status_code}",
+            )
+            with contextlib.suppress(credentials.CredentialError):
+                credentials.delete_secret("azuredevops", org)
+                credentials.delete_secret("azuredevops", account)
+            profile_mod.update(
+                default_provider="azuredevops",
+                **{
+                    "azuredevops.organization": org,
+                    "azuredevops.project": project,
+                    "azuredevops.team": team,
+                    "azuredevops.last_sprint_url": req.sprint_url or None,
+                    "azuredevops.default_iteration": fallback["iteration_path"],
+                },
+            )
+            return AuthResponse(
+                provider="azuredevops",
+                account=account,
+                ok=True,
+                user_display_name=project,
+                ado_team_path="/".join(part for part in (org, project, team) if part),
+                ado_iteration_path=fallback["iteration_path"],
+                fallback_used=True,
+                capture_transport=fallback["capture_transport"],
+            )
         raise HTTPException(
             status_code=401,
             detail=f"Azure DevOps auth failed: {exc.response.status_code}",
@@ -76,7 +185,6 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail=f"ADO unreachable: {exc}") from exc
 
-    account = f"{org}/{project}"
     with contextlib.suppress(credentials.CredentialError):
         credentials.set_secret("azuredevops", org, pat)
         credentials.set_secret("azuredevops", account, pat)
@@ -85,8 +193,13 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
         **{
             "azuredevops.organization": org,
             "azuredevops.project": project,
-            "azuredevops.team": parsed.team if parsed else None,
-            "azuredevops.default_iteration": parsed.iteration_path if parsed else None,
+            "azuredevops.team": team,
+            "azuredevops.last_sprint_url": req.sprint_url or None,
+            "azuredevops.default_iteration": (
+                "\\".join(part for part in (project, team, parsed.iteration_name) if part)
+                if parsed and parsed.iteration_name
+                else None
+            ),
         },
     )
 
@@ -95,8 +208,12 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
         account=account,
         ok=True,
         user_display_name=data.get("name"),
-        ado_team_path=parsed.team_path if parsed else f"{org}/{project}",
-        ado_iteration_path=parsed.iteration_path if parsed else None,
+        ado_team_path="/".join(part for part in (org, project, team) if part),
+        ado_iteration_path=(
+            "\\".join(part for part in (project, team, parsed.iteration_name) if part)
+            if parsed and parsed.iteration_name
+            else None
+        ),
     )
 
 
@@ -154,3 +271,59 @@ def _github_cli_authenticated() -> bool:
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired):
         return False
     return result.returncode == 0
+
+
+def _capture_ado_with_browser_fallback(
+    *,
+    organization: str,
+    project: str,
+    team: str | None,
+    iteration_path: str | None,
+    sprint_url: str,
+    original_error: str,
+) -> dict[str, str]:
+    if not iteration_path:
+        raise HTTPException(status_code=401, detail=original_error)
+    operator = AzureDevopsOperator(
+        organization=organization,
+        project=project,
+        team=team,
+        transport="playwright",
+    )
+    try:
+        sprint = operator.read_sprint(iteration_path=iteration_path, sprint_url=sprint_url)
+    except Exception as exc:  # pragma: no cover - exercised through API integration tests
+        raise HTTPException(
+            status_code=401,
+            detail=f"{original_error}; browser fallback failed: {exc}",
+        ) from exc
+    return {
+        "iteration_path": iteration_path,
+        "capture_transport": sprint.transport,
+    }
+
+
+def _capture_jira_with_browser_fallback(
+    *,
+    base_url: str,
+    email: str,
+    sprint_id: str,
+    sprint_url: str,
+    original_error: str,
+) -> dict[str, str]:
+    operator = JiraOperator(
+        base_url=base_url,
+        email=email,
+        transport="playwright",
+    )
+    try:
+        sprint = operator.read_sprint(sprint_id=sprint_id, sprint_url=sprint_url)
+    except Exception as exc:  # pragma: no cover - exercised through API integration tests
+        raise HTTPException(
+            status_code=401,
+            detail=f"{original_error}; browser fallback failed: {exc}",
+        ) from exc
+    return {
+        "sprint_id": sprint_id,
+        "capture_transport": sprint.transport,
+    }

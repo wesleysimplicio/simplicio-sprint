@@ -28,6 +28,7 @@ class JiraProfile(BaseModel):
     base_url: str | None = None
     email: str | None = None
     default_sprint_id: int | None = None
+    last_sprint_url: str | None = None
 
 
 class AzureDevopsProfile(BaseModel):
@@ -36,6 +37,7 @@ class AzureDevopsProfile(BaseModel):
     project: str | None = None
     team: str | None = None
     default_iteration: str | None = None
+    last_sprint_url: str | None = None
 
 
 class LlmProfile(BaseModel):

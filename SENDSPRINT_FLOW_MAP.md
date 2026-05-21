@@ -403,6 +403,7 @@ sequenceDiagram
 | 3 | Build/dev | `agents/dev.py` | npm, pnpm, yarn, pip, cargo, dotnet etc. |
 | 4 | Lint | `agents/lint_runner.py` | `ruff`, `eslint`, etc. |
 | 5 | Testes | `agents/test_runner.py` | `pytest`, Playwright |
+| 5.1 | Inventario frontend opt-in | `agents/test_runner.py`, evidencia de run | dev server local, Playwright route smokes, screenshots |
 | 6 | Segurança | `agents/security_reviewer.py` | scans e audits |
 | 7 | Rework loop | `rework.py`, `quality_gate.py` | reruns até 3x |
 | 8 | Commit/push | `SprintFlow`, `agents/worktree.py` | git |
@@ -446,6 +447,13 @@ Após execução, o SendSprint consolida:
 - evidence bundle
 - rollback plan
 - executive report
+
+Para repos com `role: front`, o workspace pode declarar `frontend.base_url` e
+`frontend.dev_server_command`. Esse contrato permite que o passo de testes trate
+o app local como uma superficie validavel: sobe ou reaproveita o dev server,
+inventaria fluxos/rotas acessiveis a partir da URL base, gera smokes Playwright
+curtos, salva screenshots como evidencia e transforma falhas de rota em entrada
+do mesmo rework loop limitado a 3 rodadas.
 
 ### Módulos envolvidos
 

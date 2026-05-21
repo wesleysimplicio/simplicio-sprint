@@ -575,6 +575,9 @@ class SprintFlow:
             fp,
             custom_unit_cmd=repo_cfg.test_command if repo_cfg else None,
             custom_e2e_cmd=repo_cfg.e2e_command if repo_cfg else None,
+            repo_config=repo_cfg,
+            frontend_config=repo_cfg.frontend if repo_cfg else None,
+            auto_flows_config=self.workspace.playwright_auto_flows if self.workspace else None,
         )
         test_reports = self._step5_tests(runner, local)
         next_payload = {
@@ -596,6 +599,9 @@ class SprintFlow:
             fp,
             custom_unit_cmd=repo_cfg.test_command if repo_cfg else None,
             custom_e2e_cmd=repo_cfg.e2e_command if repo_cfg else None,
+            repo_config=repo_cfg,
+            frontend_config=repo_cfg.frontend if repo_cfg else None,
+            auto_flows_config=self.workspace.playwright_auto_flows if self.workspace else None,
         )
         lint_report = StepReport.model_validate(
             payload.get("lint_report") or sec_report.model_dump()

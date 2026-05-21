@@ -37,6 +37,10 @@ def load_workspace(path: str | Path) -> WorkspaceConfig:
 
     if "root_path" not in raw:
         raw["root_path"] = str(p.parent.resolve())
+    else:
+        configured_root = Path(str(raw["root_path"])).expanduser()
+        if not configured_root.is_absolute():
+            raw["root_path"] = str((p.parent / configured_root).resolve())
 
     repos_raw = raw.get("repos", []) or []
     repos = [r if isinstance(r, RepoConfig) else RepoConfig(**r) for r in repos_raw]

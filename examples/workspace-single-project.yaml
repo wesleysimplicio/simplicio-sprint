@@ -32,6 +32,25 @@ projects:
     validation_commands:
       - pytest tests/payments -q
     repos:
+      - name: checkout-web
+        path: apps/checkout-web
+        role: front
+        tech: react
+        frontend:
+          base_url: http://localhost:5173
+          dev_server_command: npm run dev -- --host 127.0.0.1 --port 5173
+          flow_inventory: auto
+          generate_route_smokes: true
+          screenshot_evidence: true
+        routing_hints:
+          labels:
+            - scope:front
+          paths:
+            - apps/checkout-web/**
+        validation_commands:
+          - npm test
+          - npx playwright test
+
       - name: payments-api
         path: apps/payments-api
         role: api
@@ -56,4 +75,3 @@ projects:
           - pytest tests -q
         lint_command: ruff check sendsprint
         test_command: pytest tests -q
-

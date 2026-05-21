@@ -4,7 +4,44 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
-## [0.20.0] - 2026-05-20
+## [0.21.0] - 2026-05-20
+
+### Added
+
+- Frontend route inventory in `sendsprint/frontend_flows.py` with deterministic
+  discovery for Next.js app/pages routes, common router declarations, and
+  static HTML links, plus focused tests for the discovery contract.
+- Generated Playwright route smoke support for frontend repos, including
+  workspace/repo `playwright_auto_flows` configuration, generated specs inside
+  `sendsprint-evidence/`, and dashboard coverage for the new Settings update
+  state and degraded version-check state.
+
+### Changed
+
+- The web Settings screen now exposes SendSprint version checks through the
+  local API, handles unavailable PyPI checks as a degraded state, clears stale
+  version results on retry, and degrades more safely when backend auth status
+  cannot be loaded.
+- Workspace loading now resolves explicit relative `root_path` values relative
+  to the workspace file, which makes portable `workspace.yaml` setups behave
+  consistently across different process working directories.
+- Web export metadata was cleaned up so the Console + Web local build no longer
+  references a missing favicon asset during `expo export`.
+
+### Fixed
+
+- Frontend auto-flow execution now honors repo metadata (`role: front`) in
+  addition to tech detection, treats workspace auto-flow settings as defaults
+  instead of hard caps, and passes repo config through both the main test path
+  and fix-loop retest path.
+- Test runner behavior is more robust for generated Playwright flows: invalid
+  dev-server commands return structured failures, readiness failures stop before
+  Playwright runs, timeout paths keep newly created screenshot evidence, and
+  stale screenshots from previous runs are no longer attached to new reports.
+- Frontend discovery now avoids false negatives when a repo lives under an
+  ancestor folder such as `dist/`, reduces false positives for asset/document
+  paths, and avoids title bleed from a later route object into a previous one.
+
 ## [0.20.0] - 2026-05-20
 
 ### Added

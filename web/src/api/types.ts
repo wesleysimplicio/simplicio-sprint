@@ -28,6 +28,7 @@ export type RepositoryRegistration = {
   project: string;
   branchPattern: string;
   commitPattern: string;
+  deployTargetBranch: string;
   validationCommands: string[];
 };
 
@@ -37,10 +38,30 @@ export type ProjectSetup = {
   updatedAt?: string | null;
 };
 
+export type CurrentSprint = {
+  provider: Provider;
+  sprintId: string;
+  sprintName: string;
+  sprintUrl?: string | null;
+  portfolioName?: string | null;
+  projectName?: string | null;
+  teamName?: string | null;
+};
+
 export type Health = {
   ok: boolean;
   version: string;
   providers_configured: { jira: boolean; azuredevops: boolean };
+};
+
+export type VersionCheckResponse = {
+  current_version: string;
+  latest_version?: string | null;
+  update_available: boolean;
+  status: "ok" | "unavailable";
+  source: string;
+  source_url: string;
+  message: string;
 };
 
 export type AuthResponse = {
@@ -50,6 +71,15 @@ export type AuthResponse = {
   user_display_name?: string | null;
   ado_team_path?: string | null;
   ado_iteration_path?: string | null;
+  fallback_used?: boolean;
+  capture_transport?: string | null;
+};
+
+export type AppLoginResponse = {
+  ok: boolean;
+  email: string;
+  active: boolean;
+  display_name?: string | null;
 };
 
 export type AuthStatus = {
@@ -66,6 +96,10 @@ export type AuthStatus = {
     };
     github: { configured: boolean };
   };
+};
+
+export type AuthBootstrap = AuthStatus & {
+  operator_token: string;
 };
 
 export type SprintSummary = {
@@ -102,6 +136,7 @@ export type StartRunRequest = {
   item_keys?: string[];
   repo_path?: string | null;
   workspace_path?: string | null;
+  project_setup?: ProjectSetup | null;
   dry_run?: boolean;
   resume?: boolean;
   no_cache?: boolean;
@@ -210,6 +245,7 @@ export type ControlPlaneRunSummary = {
   sprint_id: string;
   provider: string;
   autonomy_level: string;
+  item_keys: string[];
   task?: string | null;
   branch?: string | null;
   readiness_score?: number | null;

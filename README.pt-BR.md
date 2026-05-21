@@ -4,9 +4,9 @@
 
 > 🇧🇷 Versão em português. Read this in English: [README.md](README.md).
 
-SendSprint e um **utilitario pessoal de entrega autonoma sprint-para-PR** — um pacote open-source publico que voce instala na sua propria maquina e autoriza contra os repos onde voce ja trabalha. Ele le itens da sprint no Jira ou Azure DevOps, mapeia a arquitetura alvo, cria branches/worktrees isolados, builda, testa, valida seguranca, captura evidencias, comita, abre pull requests, revisa o diff e reporta o estado da entrega em um fluxo controlado com geracao de codigo por LLM e callback de deploy opt-in.
+SendSprint e um **utilitario pessoal de entrega autonoma sprint-para-PR** que voce instala na sua propria maquina e autoriza contra os repos onde voce ja trabalha. Ele le itens da sprint no Jira ou Azure DevOps, mapeia a arquitetura alvo, cria branches/worktrees isolados, builda, testa, valida seguranca, captura evidencias, comita, abre pull requests, revisa o diff e reporta o estado da entrega em um fluxo controlado com geracao de codigo por LLM e callback de deploy opt-in.
 
-**Nao tem servico hospedado, nao tem SaaS, nao tem billing nem assinatura.** Tudo roda local sob seu controle: credenciais ficam no keyring do SO, trabalho acontece em worktrees no seu disco, e qualquer acao contra um projeto da empresa e autorizada pelo operador que iniciou a execucao. O repo continua publico no GitHub pra quem quiser instalar do mesmo jeito — mas o fluxo e seu, nao produto de ninguem.
+**Nao tem servico hospedado, nao tem SaaS, nao tem billing nem assinatura.** Tudo roda local sob seu controle: credenciais ficam no keyring do SO, trabalho acontece em worktrees no seu disco, e qualquer acao contra um projeto da empresa e autorizada pelo operador que iniciou a execucao. O pacote pode ser distribuido independentemente da visibilidade do repositorio — o fluxo e seu, nao produto de ninguem.
 
 A proposta e simples: remover o custo de coordenacao manual entre backlog, codigo, testes, evidencia e PR. O SendSprint cria uma esteira repetivel da sprint ate `develop` pra um unico engenheiro, com preflight, dry-run, execucao resumivel, branch por task e saida auditavel.
 
@@ -84,7 +84,7 @@ Veja [`web/README.md`](./web/README.md) pro passo-a-passo e
 
 Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.20.0 — Metadados de release alinhados para task understanding e roteamento de portfolio: entendimento deterministico dos itens da sprint, roteamento multi-repo com confidence gate, workspace com portfolio/projetos, route preview read-only na API/control plane, setup web de projetos e feedback de auth Azure, e plugins para Windsurf, Kiro e Antigravity. O fluxo principal ainda inclui `sendsprint sprint` local-first, leitura Jira/Azure DevOps, dry-run/resume, evidence bundles, previews no dashboard, criacao de PR, validacao pos-PR, modo OSS contribution e runtime yool/tuple.
+> **Status:** v0.21.0 — Console + Web esta operacional para o slice free local-first atual: entendimento deterministico das tasks, metadados de portfolio/projetos para roteamento, route preview read-only, setup web de projetos com feedback de auth Azure, inventario de rotas frontend com smokes Playwright gerados, readiness mais robusto do dev server, verificacao de versao em Settings, e plugins para Windsurf, Kiro e Antigravity. O fluxo principal ainda inclui `sendsprint sprint` local-first, leitura Jira/Azure DevOps, dry-run/resume, evidence bundles, previews no dashboard, criacao de PR, validacao pos-PR, modo OSS contribution e runtime yool/tuple.
 
 ---
 
@@ -96,7 +96,7 @@ Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub
 | 2 | **Mapeamento de arquitetura** | Inspeciona docs do repo; gera baseline se score < 0.6 |
 | 3 | **Dev** | Detecta tech stack, cria worktree, instala deps + build |
 | 4 | **Lint** | Análise estática por tech (eslint, ruff, clippy, etc.) |
-| 5 | **Testes** | Unit + Playwright E2E com evidência em screenshot |
+| 5 | **Testes** | Unit + Playwright E2E com evidência em screenshot; repos front podem optar por inventario de fluxo e smokes de rotas gerados |
 | 6 | **Security review** | Scan flag-only (segredos, .env, npm audit) |
 | 7 | **Fix loop** | Se lint/teste/sec falhar: re-build + re-run (até 3 rodadas) |
 | 8 | **Commit** | `git add -A && git commit` no branch do worktree |
@@ -106,6 +106,9 @@ Funciona em **13 ferramentas de IA pra código**: Claude Code, Codex CLI, GitHub
 Hooks opcionais:
 
 - **Passo 3.5 — geracao por LLM** aplica um diff unificado opt-in entre build e lint.
+- **Passo 5.1 — inventario de fluxo frontend** pode subir o dev server de um
+  repo front, navegar pela URL base declarada, gerar smokes Playwright de rotas,
+  capturar screenshots e devolver falhas ao mesmo fix loop de lint/testes.
 - **Passo 11 — trigger de deploy** envia um webhook opt-in apos a criacao do PR e tenta atualizar o status do ticket.
 
 Prioridade de transporte: `mcp` -> `api` -> `playwright`.
@@ -278,6 +281,12 @@ repos:
     path: frontend-web
     role: front
     tech: angular
+    frontend:
+      base_url: http://localhost:4200
+      dev_server_command: npm start -- --host 127.0.0.1 --port 4200
+      flow_inventory: auto
+      generate_route_smokes: true
+      screenshot_evidence: true
   - name: mobile-app
     path: mobile-app
     role: mobile

@@ -9,9 +9,9 @@
 > 🇺🇸 English. Leia em português: [README.pt-BR.md](README.pt-BR.md).
 
 
-SendSprint is a **personal autonomous sprint-to-pull-request delivery utility** — a public open-source package you install into your own machine and authorize against the repos you already work on. It reads Jira or Azure DevOps sprint work, maps the target architecture, creates isolated branches/worktrees, builds, tests, checks security, captures evidence, commits, opens pull requests, reviews the diff, and reports delivery state in one controlled flow with opt-in LLM code generation and deploy callbacks.
+SendSprint is a **personal autonomous sprint-to-pull-request delivery utility** you install into your own machine and authorize against the repos you already work on. It reads Jira or Azure DevOps sprint work, maps the target architecture, creates isolated branches/worktrees, builds, tests, checks security, captures evidence, commits, opens pull requests, reviews the diff, and reports delivery state in one controlled flow with opt-in LLM code generation and deploy callbacks.
 
-**There is no hosted service, no SaaS tenant, no billing, no subscription.** Everything runs locally under your control: credentials live in your OS keyring, work happens in worktrees on your disk, and any action against a company project is gated by the operator who launched the run. The repo stays public on GitHub so others can install it the same way — but the workflow is yours, not someone else's product.
+**There is no hosted service, no SaaS tenant, no billing, no subscription.** Everything runs locally under your control: credentials live in your OS keyring, work happens in worktrees on your disk, and any action against a company project is gated by the operator who launched the run. The package can be distributed independently of the repository visibility — the workflow is yours, not someone else's product.
 
 The proposal is simple: remove the manual coordination tax between backlog, code, tests, evidence, and PRs. SendSprint gives a single engineer a repeatable execution lane from sprint planning to `develop`, with preflight validation, dry-run planning, resumable runs, branch-per-task delivery, and auditable output.
 
@@ -95,7 +95,7 @@ bootstrap, and Python fallback when the web UI is blocked.
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.20.0 — Release metadata is aligned for the task-understanding and portfolio-routing feature set: deterministic sprint item understanding, confidence-gated multi-repo routing, portfolio/project workspace metadata, read-only route previews in the API/control plane, Web project setup and Azure auth feedback, and plugin profiles for Windsurf, Kiro, and Antigravity. Core delivery still includes local-first `sendsprint sprint`, Jira/Azure DevOps reads, dry-run/resume, evidence bundles, dashboard previews, PR creation, post-PR validation, OSS contribution mode, and yool/tuple runtime hardening.
+> **Status:** v0.21.0 — Console + Web is operational for the current free local-first slice: deterministic task understanding, portfolio/project routing metadata, read-only route previews, Web project setup and Azure auth feedback, frontend route inventory with generated Playwright smokes, robust dev-server readiness handling, version checks in Settings, and plugin profiles for Windsurf, Kiro, and Antigravity. Core delivery still includes local-first `sendsprint sprint`, Jira/Azure DevOps reads, dry-run/resume, evidence bundles, dashboard previews, PR creation, post-PR validation, OSS contribution mode, and yool/tuple runtime hardening.
 
 ---
 
@@ -107,7 +107,7 @@ Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cur
 | 2 | **Architecture mapping** | Inspect repo docs; auto-generate baseline if score < 0.6 |
 | 3 | **Dev** | Detect tech stack, create worktree, install deps + build |
 | 4 | **Lint** | Static analysis per tech (eslint, ruff, clippy, etc.) |
-| 5 | **Tests** | Unit tests + Playwright E2E with screenshot evidence |
+| 5 | **Tests** | Unit tests + Playwright E2E with screenshot evidence; front repos can opt into flow inventory and generated route smokes |
 | 6 | **Security review** | Flag-only scan (secrets, env files, npm audit) |
 | 7 | **Fix loop** | If lint/tests/security fail: re-build + re-run (max 3 rounds) |
 | 8 | **Commit** | `git add -A && git commit` on worktree branch |
@@ -117,6 +117,9 @@ Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cur
 Optional hooks:
 
 - **Step 3.5 — LLM code generation** applies an opt-in unified diff between build and lint.
+- **Step 5.1 — Frontend flow inventory** can start a front repo dev server,
+  crawl declared base URLs, generate Playwright route smoke tests, capture
+  screenshots, and feed route failures back into the same fix loop as lint/tests.
 - **Step 11 — Deploy trigger** posts an opt-in webhook after PR creation and attempts a ticket status update.
 
 Before any mutable delivery step, SendSprint builds a read-only `DeliveryPlan`.
@@ -335,6 +338,12 @@ repos:
     path: frontend-web
     role: front
     tech: angular
+    frontend:
+      base_url: http://localhost:4200
+      dev_server_command: npm start -- --host 127.0.0.1 --port 4200
+      flow_inventory: auto
+      generate_route_smokes: true
+      screenshot_evidence: true
   - name: mobile-app
     path: mobile-app
     role: mobile
@@ -377,12 +386,24 @@ projects:
         path: apps/checkout-web
         role: front
         tech: react
+        frontend:
+          base_url: http://localhost:5173
+          dev_server_command: npm run dev -- --host 127.0.0.1 --port 5173
+          flow_inventory: auto
+          generate_route_smokes: true
+          screenshot_evidence: true
         routing_hints:
           labels: [scope:front]
         validation_commands:
           - npm test
           - npx playwright test
 ```
+
+Frontend repo options are intentionally local-first. When a repo declares
+`frontend.base_url` and `frontend.dev_server_command`, SendSprint can treat the
+running app as part of Step 5: inventory browser routes, generate concise
+Playwright smoke checks for reachable pages, attach screenshot evidence to the
+run report, and return failures to the capped fix loop before PR creation.
 
 Routing uses explicit labels first (`repo:payments-api`, `project:payments`,
 `scope:front`, `surface:api`, `capability:refund`), then structured task
@@ -544,9 +565,9 @@ SendSprint is a personal utility. Practical implications:
 - **Company repos are run under your authority.** When you point SendSprint at a
   company repo, you are using your existing access — same credentials and same
   branches you'd use by hand. No new permission boundary is introduced.
-- **Public utility.** This repo is MIT-licensed on GitHub. Other engineers can
-  install it the same way (`pip install -e .`) and run it on their own machines
-  against their own work. There is no commercial offering planned.
+- **Local utility.** The package can be installed and run on an engineer's own
+  machine against their own repos without any hosted SendSprint control plane.
+  There is still no commercial hosted offering in this release.
 
 If you ever want a hosted/multi-tenant version, fork the repo and build it
 yourself — the architecture is intentionally local-first.

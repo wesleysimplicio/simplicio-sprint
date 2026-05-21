@@ -55,6 +55,12 @@ projects:
         path: apps/storefront-web
         role: front
         tech: react
+        frontend:
+          base_url: http://localhost:5173
+          dev_server_command: npm run dev -- --host 127.0.0.1 --port 5173
+          flow_inventory: auto
+          generate_route_smokes: true
+          screenshot_evidence: true
         components:
           - ui
         owners:
@@ -79,9 +85,14 @@ projects:
         path: apps/admin-web
         role: front
         tech: angular
+        frontend:
+          base_url: http://localhost:4200
+          dev_server_command: npm start -- --host 127.0.0.1 --port 4200
+          flow_inventory: auto
+          generate_route_smokes: true
+          screenshot_evidence: true
         branch_pattern: feature/admin/{number}-{title}
         commit_pattern: "fix(admin): {title}"
         validation_commands:
           - npm test -- --run
           - npx playwright test
-
