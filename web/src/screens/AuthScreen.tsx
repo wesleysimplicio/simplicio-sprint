@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage, getApiErrorStatusLine } from "../api/client";
 import type { AuthResponse, CurrentSprint, SprintDetail } from "../api/types";
 import { Button } from "../components/Button";
+import { Card } from "../components/Card";
 import { Input } from "../components/Input";
 import { Screen } from "../components/Screen";
 import type { RootStackParamList } from "../navigation";
@@ -264,116 +265,148 @@ export const AuthScreen: React.FC = () => {
   if (provider === "jira") {
     return (
       <Screen
-        title="Jira"
-        subtitle="Conecte o Jira e, se houver Sprint URL, importe a sprint imediatamente para o backlog interno do SendSprint."
+        chrome="app"
+        eyebrow="Web 04 · Connect Jira"
+        title="Conectar Jira"
+        subtitle="Conecte seu Jira para importar sprints e issues."
       >
-        <Input
-          label="Base URL"
-          value={jBase}
-          onChangeText={setJBase}
-          placeholder="https://org.atlassian.net"
-          keyboardType="url"
-          monospace
-        />
-        <Input
-          label="Email"
-          value={jEmail}
-          onChangeText={setJEmail}
-          placeholder="dev@org.com"
-          keyboardType="email-address"
-        />
-        <Input
-          label="API Token"
-          value={jToken}
-          onChangeText={setJToken}
-          placeholder="ATATT3xFfGF..."
-          secureTextEntry
-          monospace
-        />
-        <Input
-          label="Board ID (opcional)"
-          value={jBoardId}
-          onChangeText={setJBoard}
-          placeholder="42"
-          keyboardType="numeric"
-          monospace
-        />
-        <Input
-          label="Sprint ID (opcional)"
-          value={jSprintId}
-          onChangeText={setJSprintId}
-          placeholder="131"
-          keyboardType="default"
-          monospace
-        />
-        <Input
-          label="Sprint URL (opcional)"
-          value={jSprintUrl}
-          onChangeText={setJSprintUrl}
-          placeholder="https://org.atlassian.net/jira/software/projects/..."
-          keyboardType="url"
-          monospace
-        />
-        <StatusNotice notice={notice} />
-        <View style={{ height: 8 }} />
-        <Button title="Conectar e importar sprint" onPress={submit} loading={busy} />
-        <Text style={styles.hint}>
-          O token vai para o keyring do sistema. Com Sprint URL, o backend pode degradar para
-          Playwright e browser agents quando a API responder 401.
-        </Text>
+        <View style={styles.split}>
+          <Card style={styles.formCard}>
+            <View style={styles.formGrid}>
+              <Input
+                label="Base URL"
+                value={jBase}
+                onChangeText={setJBase}
+                placeholder="https://org.atlassian.net"
+                keyboardType="url"
+                monospace
+              />
+              <Input
+                label="Board ID"
+                value={jBoardId}
+                onChangeText={setJBoard}
+                placeholder="Ex: 123"
+                keyboardType="numeric"
+                monospace
+              />
+              <Input
+                label="Email"
+                value={jEmail}
+                onChangeText={setJEmail}
+                placeholder="voce@empresa.com"
+                keyboardType="email-address"
+              />
+              <Input
+                label="Sprint ID"
+                value={jSprintId}
+                onChangeText={setJSprintId}
+                placeholder="Ex: 456"
+                keyboardType="default"
+                monospace
+              />
+            </View>
+            <Input
+              label="Token API"
+              value={jToken}
+              onChangeText={setJToken}
+              placeholder="ATATT3xFfGF..."
+              secureTextEntry
+              monospace
+            />
+            <Input
+              label="Sprint URL (opcional)"
+              value={jSprintUrl}
+              onChangeText={setJSprintUrl}
+              placeholder="https://org.atlassian.net/jira/software/projects/..."
+              keyboardType="url"
+              monospace
+            />
+            <StatusNotice notice={notice} />
+            <View style={{ height: 8 }} />
+            <Button title="Conectar" onPress={submit} loading={busy} />
+          </Card>
+
+          <Card style={styles.sideCard}>
+            <Text style={styles.sideCardTitle}>Sobre o fallback</Text>
+            <Text style={styles.sideCardText}>
+              Se a API responder `401`, o backend tenta capturar o contexto da sprint usando
+              Playwright e depois os browser agents instalados.
+            </Text>
+            <Text style={styles.sideCardText}>
+              O token vai para o keyring do sistema. Nenhum segredo fica salvo no navegador.
+            </Text>
+            <Text style={styles.hint}>Transporte fixo: mcp, depois api, depois playwright</Text>
+          </Card>
+        </View>
       </Screen>
     );
   }
 
   return (
     <Screen
-      title="Azure DevOps"
-      subtitle="Informe a Sprint URL atual e o PAT. Se a API responder 401, o backend inicia o fallback de captura e importa a sprint no backlog."
+      chrome="app"
+      eyebrow="Web 05 · Connect Azure DevOps"
+      title="Conectar Azure DevOps"
+      subtitle="Conecte sua organizacao para importar sprints, work items e equipes."
     >
-      <Input
-        label="Sprint URL atual"
-        value={aSprintUrl}
-        onChangeText={setASprintUrl}
-        placeholder="https://dev.azure.com/org/project/_sprints/taskboard/..."
-        keyboardType="url"
-        monospace
-      />
-      <Input
-        label="Personal Access Token"
-        value={aPat}
-        onChangeText={setAPat}
-        placeholder="********"
-        secureTextEntry
-        monospace
-      />
-      <Input
-        label="Organization (opcional)"
-        value={aOrg}
-        onChangeText={setAOrg}
-        placeholder="DigitalProjects-Americas"
-        monospace
-      />
-      <Input
-        label="Project (opcional)"
-        value={aProject}
-        onChangeText={setAProject}
-        placeholder="ONS-16058-MANUTSIS-FORT"
-        monospace
-      />
-      <Input
-        label="Team (opcional)"
-        value={aTeam}
-        onChangeText={setATeam}
-        placeholder="Time_019"
-        monospace
-      />
-      <StatusNotice notice={notice} />
-      <View style={{ height: 8 }} />
-      <Button title="Conectar e importar sprint" onPress={submit} loading={busy} />
-      <Text style={styles.hint}>
-        O PAT fica no keyring do sistema pelo backend local. Com 401, o backend tenta Playwright
-        primeiro e depois Claude, Codex, Hermes e OpenClaw quando instalados/configurados.
-      </Text>
+      <View style={styles.split}>
+        <Card style={styles.formCard}>
+          <Input
+            label="URL da Sprint"
+            value={aSprintUrl}
+            onChangeText={setASprintUrl}
+            placeholder="https://dev.azure.com/org/project/_sprints/taskboard/..."
+            keyboardType="url"
+            monospace
+          />
+          <Input
+            label="Personal Access Token (PAT)"
+            value={aPat}
+            onChangeText={setAPat}
+            placeholder="********"
+            secureTextEntry
+            monospace
+          />
+          <View style={styles.formGrid}>
+            <Input
+              label="Organizacao"
+              value={aOrg}
+              onChangeText={setAOrg}
+              placeholder="Selecione a organizacao"
+              monospace
+            />
+            <Input
+              label="Projeto"
+              value={aProject}
+              onChangeText={setAProject}
+              placeholder="Selecione o projeto"
+              monospace
+            />
+            <Input
+              label="Equipe (opcional)"
+              value={aTeam}
+              onChangeText={setATeam}
+              placeholder="Selecione a equipe"
+              monospace
+            />
+          </View>
+          <StatusNotice notice={notice} />
+          <View style={{ height: 8 }} />
+          <Button title="Conectar" onPress={submit} loading={busy} />
+        </Card>
+
+        <Card style={styles.sideCard}>
+          <Text style={styles.sideCardTitle}>Sobre o fallback</Text>
+          <Text style={styles.sideCardText}>
+            Se a API responder `401`, o backend tenta Playwright primeiro e depois Claude, Codex,
+            Hermes e OpenClaw quando instalados.
+          </Text>
+          <Text style={styles.sideCardText}>
+            O PAT fica apenas no keyring do sistema pelo backend local.
+          </Text>
+          <Text style={styles.hint}>Importacao vai para o backlog interno do SendSprint.</Text>
+        </Card>
+      </View>
     </Screen>
   );
 };
@@ -397,6 +430,38 @@ const StatusNotice: React.FC<{ notice: Notice | null }> = ({ notice }) => {
 };
 
 const styles = StyleSheet.create({
+  split: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    alignItems: "flex-start",
+  },
+  formCard: {
+    flex: 1,
+    minWidth: 420,
+    gap: 12,
+  },
+  sideCard: {
+    width: 280,
+    minWidth: 260,
+    gap: 8,
+    backgroundColor: "rgba(239,245,255,0.9)",
+  },
+  sideCardTitle: {
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  sideCardText: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  formGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
   hint: { color: theme.textMuted, fontSize: 12, fontFamily: theme.fontMono },
   notice: {
     borderRadius: theme.radius,

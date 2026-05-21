@@ -1,9 +1,15 @@
 import type {
   ApiErrorPayload,
+  ArchiveSprintItemRequest,
   AppLoginResponse,
   AuthBootstrap,
   AuthStatus,
   AuthResponse,
+  AgentDashboardResponse,
+  AuditQueryResponse,
+  ActionRequest,
+  ActionResponse,
+  MoveSprintItemRequest,
   ControlPlaneRunDetail,
   ControlPlaneRunSummary,
   DashboardSnapshot,
@@ -13,12 +19,15 @@ import type {
   Provider,
   RoutePreviewResponse,
   RunStatus,
+  SprintItem,
   SprintDetail,
   SprintSummary,
   StartRunRequest,
   StartRunResponse,
+  TupleDashboardResponse,
   ValidationDashboardResponse,
   VersionCheckResponse,
+  YoolDashboardResponse,
 } from "./types";
 
 type ResponseBody = ApiErrorPayload | unknown[] | string | null;
@@ -176,10 +185,43 @@ export class ApiClient {
     });
   }
 
-  getSprint(sprintId: string, provider: Provider, scope?: "mine") {
+  getSprint(
+    sprintId: string,
+    provider: Provider,
+    opts: {
+      scope?: "mine";
+      user_email?: string;
+      include_archived?: boolean;
+    } = {},
+  ) {
     return this.req<SprintDetail>(`/sprints/${encodeURIComponent(sprintId)}`, {
-      query: { provider, scope },
+      query: {
+        provider,
+        scope: opts.scope,
+        user_email: opts.user_email,
+        include_archived: opts.include_archived ? "true" : undefined,
+      },
     });
+  }
+
+  moveSprintItem(sprintId: string, itemKey: string, input: MoveSprintItemRequest) {
+    return this.req<SprintItem>(
+      `/sprints/${encodeURIComponent(sprintId)}/items/${encodeURIComponent(itemKey)}/move`,
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+    );
+  }
+
+  archiveSprintItem(sprintId: string, itemKey: string, input: ArchiveSprintItemRequest) {
+    return this.req<SprintItem>(
+      `/sprints/${encodeURIComponent(sprintId)}/items/${encodeURIComponent(itemKey)}/archive`,
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+    );
   }
 
   importSprints(provider: Provider, opts: { board_id?: string; team_path?: string } = {}) {
@@ -226,6 +268,45 @@ export class ApiClient {
     return this.req<ControlPlaneRunDetail>(`/api/runs/${encodeURIComponent(runId)}`);
   }
 
+  pauseRun(runId: string, input: ActionRequest = {}) {
+    return this.req<ActionResponse>(`/api/runs/${encodeURIComponent(runId)}/actions/pause`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  resumeRun(runId: string, input: ActionRequest = {}) {
+    return this.req<ActionResponse>(`/api/runs/${encodeURIComponent(runId)}/actions/resume`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  cancelRun(runId: string, input: ActionRequest = {}) {
+    return this.req<ActionResponse>(`/api/runs/${encodeURIComponent(runId)}/actions/cancel`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  rerunRun(runId: string, input: ActionRequest = {}) {
+    return this.req<ActionResponse>(`/api/runs/${encodeURIComponent(runId)}/actions/rerun`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  approveRun(runId: string, input: ActionRequest = {}) {
+    return this.req<ActionResponse>(`/api/runs/${encodeURIComponent(runId)}/actions/approve`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  getRunAudit(runId: string) {
+    return this.req<AuditQueryResponse>(`/api/runs/${encodeURIComponent(runId)}/audit`);
+  }
+
   getRunDashboard(runId: string) {
     return this.req<DashboardSnapshot>(`/runs/${encodeURIComponent(runId)}/dashboard`);
   }
@@ -234,12 +315,28 @@ export class ApiClient {
     return this.req<ValidationDashboardResponse>("/api/dashboard/validations");
   }
 
+  getAgentDashboard() {
+    return this.req<AgentDashboardResponse>("/api/dashboard/agents");
+  }
+
+  getTupleDashboard() {
+    return this.req<TupleDashboardResponse>("/api/dashboard/tuples");
+  }
+
+  getYoolDashboard() {
+    return this.req<YoolDashboardResponse>("/api/dashboard/yools");
+  }
+
   evidenceUrl(runId: string, name: string) {
     return `${this.baseUrl}/runs/${encodeURIComponent(runId)}/evidence/${encodeURIComponent(name)}`;
   }
 
   eventsUrl(runId: string) {
     return `${this.baseUrl}/runs/${encodeURIComponent(runId)}/events`;
+  }
+
+  eventsStreamUrl(runId: string) {
+    return `${this.baseUrl}/runs/${encodeURIComponent(runId)}/events/stream`;
   }
 }
 

@@ -172,8 +172,11 @@ export const SprintsScreen: React.FC = () => {
 
   return (
     <Screen
+      chrome="app"
+      eyebrow="Web 06 · Importacao / Sprints"
       title="Sprints ativas"
       subtitle={`Provedor: ${providerLabel}${session.account ? ` | ${session.account}` : ""}`}
+      scroll={false}
       footer={
         <Button
           title={
@@ -188,6 +191,11 @@ export const SprintsScreen: React.FC = () => {
       }
     >
       {importNotice ? <NoticePanel notice={importNotice} /> : null}
+      <ImportPipelineCard
+        providerLabel={providerLabel}
+        importRunning={importRunning}
+        status={importJob?.status?.state ?? null}
+      />
 
       {loading ? (
         <NoticePanel notice={loadNotice ?? loadingNotice(providerLabel, listContext)} />
@@ -303,6 +311,54 @@ const NoticePanel: React.FC<{
   </View>
 );
 
+const ImportPipelineCard: React.FC<{
+  providerLabel: string;
+  importRunning: boolean;
+  status: ImportStatus["state"] | null;
+}> = ({ providerLabel, importRunning, status }) => {
+  const activeStep = importRunning ? 1 : status === "done" ? 2 : 0;
+  const steps = [
+    {
+      label: "Capture",
+      text: `Ler ${providerLabel} com API e fallback de browser quando necessario.`,
+    },
+    {
+      label: "Normalize",
+      text: "Resolver portfolio, projeto, time e colunas internas do SendSprint.",
+    },
+    {
+      label: "Backlog",
+      text: "Publicar cards na sprint interna prontos para drag and drop.",
+    },
+  ];
+  return (
+    <Card style={styles.pipelineCard}>
+      <Text style={styles.pipelineLabel}>IMPORT PIPELINE</Text>
+      <View style={styles.pipelineSteps}>
+        {steps.map((step, index) => {
+          const done = activeStep > index;
+          const current = activeStep === index;
+          return (
+            <View key={step.label} style={styles.pipelineStep}>
+              <View
+                style={[
+                  styles.pipelineDot,
+                  done && styles.pipelineDotDone,
+                  current && styles.pipelineDotCurrent,
+                ]}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pipelineStepLabel}>{step.label}</Text>
+                <Text style={styles.pipelineStepText}>{step.text}</Text>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </Card>
+  );
+};
+
 const styles = StyleSheet.create({
   scroll: { paddingBottom: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -347,4 +403,47 @@ const styles = StyleSheet.create({
   noticeText: { color: theme.textMuted, fontSize: 13, lineHeight: 18 },
   noticeMeta: { color: theme.textMuted, fontSize: 12, fontFamily: theme.fontMono },
   noticeAction: { marginTop: 6 },
+  pipelineCard: {
+    marginBottom: 12,
+    backgroundColor: "rgba(239,245,255,0.9)",
+  },
+  pipelineLabel: {
+    color: theme.primary,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+  pipelineSteps: {
+    gap: 10,
+  },
+  pipelineStep: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  pipelineDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    marginTop: 4,
+    backgroundColor: "rgba(44,107,237,0.16)",
+  },
+  pipelineDotCurrent: {
+    backgroundColor: theme.primary,
+  },
+  pipelineDotDone: {
+    backgroundColor: theme.success,
+  },
+  pipelineStepLabel: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  pipelineStepText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2,
+  },
 });

@@ -17,12 +17,15 @@ from sendsprint.operators.azure_devops_operator import (
     _strip_html,
 )
 from sendsprint.operators.base import TransportUnavailable
+from sendsprint.profile import Profile
 
 
 def test_api_unavailable_without_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("AZURE_DEVOPS_ORG", raising=False)
     monkeypatch.delenv("AZURE_DEVOPS_PROJECT", raising=False)
     monkeypatch.delenv("AZURE_DEVOPS_PAT", raising=False)
+    monkeypatch.setattr("sendsprint.profile.load", lambda: Profile())
+    monkeypatch.setattr("sendsprint.credentials.get_secret", lambda provider, account: "")
     op = AzureDevopsOperator(transport="api")
     assert op._api_available() is False
     with pytest.raises(TransportUnavailable):

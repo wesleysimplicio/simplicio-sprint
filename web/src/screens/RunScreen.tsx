@@ -163,6 +163,8 @@ export const RunScreen: React.FC = () => {
 
   return (
     <Screen
+      chrome="app"
+      eyebrow="Web 09 · Live Run"
       title="Executando sprint"
       subtitle={
         route.params.mode === "all"

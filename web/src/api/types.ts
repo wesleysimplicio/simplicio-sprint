@@ -1,5 +1,13 @@
 export type Provider = "jira" | "azuredevops";
 export type RunMode = "all" | "mine" | "selected";
+export type ColumnKey =
+  | "backlog"
+  | "planning"
+  | "programming"
+  | "testing"
+  | "review"
+  | "awaiting_deploy"
+  | "blocked";
 
 export type ApiErrorPayload = {
   detail?: unknown;
@@ -80,6 +88,9 @@ export type AppLoginResponse = {
   email: string;
   active: boolean;
   display_name?: string | null;
+  permissions?: {
+    can_run_all_backlog?: boolean;
+  } | null;
 };
 
 export type AuthStatus = {
@@ -119,14 +130,67 @@ export type SprintItem = {
   type: string;
   title: string;
   status: string;
+  description?: string | null;
+  revision?: string | number | null;
   assignee?: string | null;
   assignee_email?: string | null;
   story_points?: number | null;
+  parent_key?: string | null;
+  labels: string[];
+  links: Array<{
+    type: string;
+    target_key?: string | null;
+    target_url?: string | null;
+  }>;
+  comments: Array<{
+    author?: string | null;
+    body?: string | null;
+    created_at?: string | null;
+  }>;
+  attachments: Array<{
+    filename?: string | null;
+    url?: string | null;
+    mime_type?: string | null;
+    size_bytes?: number | null;
+  }>;
+  acceptance_criteria?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  source_url?: string | null;
+  board_column?: ColumnKey | null;
+  board_status?: string | null;
+  board_updated_at?: string | null;
+  board_updated_by?: string | null;
+  archived: boolean;
+  history: Array<{
+    action?: string | null;
+    actor_email?: string | null;
+    observed_at?: string | null;
+    from_column?: ColumnKey | null;
+    to_column?: ColumnKey | null;
+    archived?: boolean | null;
+    note?: string | null;
+  }>;
 };
 
 export type SprintDetail = {
   sprint: SprintSummary;
   items: SprintItem[];
+  archived_count: number;
+};
+
+export type MoveSprintItemRequest = {
+  provider: Provider;
+  target_column: ColumnKey;
+  actor_email?: string | null;
+  note?: string | null;
+};
+
+export type ArchiveSprintItemRequest = {
+  provider: Provider;
+  actor_email?: string | null;
+  archived: boolean;
+  note?: string | null;
 };
 
 export type StartRunRequest = {
@@ -294,6 +358,33 @@ export type ControlPlaneRunDetail = {
   timeline: Array<Record<string, unknown>>;
 };
 
+export type ActionRequest = {
+  operator?: string;
+  confirmed?: boolean;
+  payload?: Record<string, unknown>;
+};
+
+export type ActionResponse = {
+  run_id: string;
+  action: string;
+  result: string;
+  detail: Record<string, unknown>;
+};
+
+export type AuditEntry = {
+  operator: string;
+  action: string;
+  run_id: string;
+  timestamp?: string | null;
+  result: string;
+  detail: Record<string, unknown>;
+};
+
+export type AuditQueryResponse = {
+  entries: AuditEntry[];
+  total: number;
+};
+
 export type ValidationLane = {
   lane: string;
   status: string;
@@ -306,6 +397,60 @@ export type ValidationLane = {
 export type ValidationDashboardResponse = {
   lanes: ValidationLane[];
   total_events: number;
+};
+
+export type AgentDashboardEntry = {
+  key: string;
+  name: string;
+  runtime: string;
+  capabilities: string[];
+  active_runs: number;
+  notes: string[];
+};
+
+export type AgentDashboardResponse = {
+  agents: AgentDashboardEntry[];
+  total_active_runs: number;
+};
+
+export type TupleDashboardEntry = {
+  run_id: string;
+  state: string;
+  sprint_id: string;
+  provider: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  failed: boolean;
+  event_count: number;
+  last_event_type?: string | null;
+  progress?: number | null;
+};
+
+export type TupleDashboardResponse = {
+  tuples: TupleDashboardEntry[];
+  total_runs: number;
+  active_runs: number;
+  failed_runs: number;
+};
+
+export type YoolDashboardEntry = {
+  yool_id: string;
+  total_invocations: number;
+  cache_hits: number;
+  cache_misses: number;
+  cache_hit_rate: number;
+  total_retries: number;
+  total_cost_usd: number;
+  total_duration_ms: number;
+  avg_duration_ms: number;
+  last_status: string;
+  errors: string[];
+};
+
+export type YoolDashboardResponse = {
+  yools: YoolDashboardEntry[];
+  cache_stats: Record<string, unknown>;
+  registered_contracts: number;
 };
 
 export type RunEvent = {

@@ -21,6 +21,9 @@ type AppUser = {
   email: string;
   active: boolean;
   displayName?: string | null;
+  permissions?: {
+    canRunAllBacklog: boolean;
+  } | null;
 };
 
 type Session = {
@@ -137,12 +140,25 @@ export const useSession = (): Ctx => {
 const normalizeSession = (stored: Partial<Session>): Session => ({
   ...initial,
   ...stored,
+  appUser: normalizeAppUser(stored.appUser),
   provider:
     stored.provider === "jira" || stored.provider === "azuredevops"
       ? stored.provider
       : initial.provider,
   projectSetup: normalizeProjectSetup(stored.projectSetup),
 });
+
+const normalizeAppUser = (user?: AppUser | null): AppUser | null =>
+  user
+    ? {
+        email: user.email ?? "",
+        active: Boolean(user.active),
+        displayName: user.displayName ?? null,
+        permissions: {
+          canRunAllBacklog: user.permissions?.canRunAllBacklog ?? true,
+        },
+      }
+    : null;
 
 const normalizeProjectSetup = (setup?: ProjectSetup | null): ProjectSetup => ({
   mode: setup?.mode === "portfolio" ? "portfolio" : "single",

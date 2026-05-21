@@ -113,6 +113,9 @@ export const ConnectScreen: React.FC = () => {
         email: user.email,
         active: user.active,
         displayName: user.display_name ?? null,
+        permissions: {
+          canRunAllBacklog: user.permissions?.can_run_all_backlog ?? true,
+        },
       });
       await hydrateKnownProvider(bootstrapState);
       setStatus(bootstrapState);
@@ -126,6 +129,8 @@ export const ConnectScreen: React.FC = () => {
 
   return (
     <Screen
+      chrome="auth"
+      eyebrow="Web 01 · App Login"
       title="SendSprint"
       subtitle="Entre com email e senha da assinatura. Nesta fase local todos os usuarios autenticados ficam ativos."
       footer={
@@ -137,88 +142,128 @@ export const ConnectScreen: React.FC = () => {
         />
       }
     >
-      <Card style={styles.hero}>
-        <Text style={styles.kicker}>LOCAL CONTROL PLANE</Text>
-        <Text style={styles.title}>Entrega de sprint com shell orientado por chat</Text>
-        <Text style={styles.copy}>
-          O login do app valida o acesso ao SendSprint. A conexao com Jira, Azure DevOps ou GitHub
-          acontece depois, a partir do botao iniciar.
-        </Text>
-      </Card>
+      <View style={styles.split}>
+        <Card style={styles.loginCard}>
+          <Text style={styles.brand}>SendSprint</Text>
+          <Text style={styles.brandSub}>AI Sprint Delivery Control Plane</Text>
+          <View style={{ height: 18 }} />
+          <Input
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="voce@empresa.com"
+            keyboardType="email-address"
+          />
+          <Input
+            label="Senha"
+            value={password}
+            onChangeText={setPassword}
+            placeholder="********"
+            secureTextEntry
+          />
+          <Text style={styles.metaText}>Login do app primeiro. Conexao com provider depois.</Text>
+        </Card>
 
-      <Input
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="voce@empresa.com"
-        keyboardType="email-address"
-      />
-      <Input
-        label="Senha"
-        value={password}
-        onChangeText={setPassword}
-        placeholder="********"
-        secureTextEntry
-      />
-
-      <Card style={styles.backendCard}>
-        <Text style={styles.backendLabel}>BACKEND LOCAL</Text>
-        <Input
-          label="URL do backend"
-          value={url}
-          onChangeText={setUrl}
-          placeholder="http://127.0.0.1:8765"
-          keyboardType="url"
-          autoCapitalize="none"
-          monospace
-        />
-        {booting ? (
-          <View style={styles.statusRow}>
-            <ActivityIndicator color={theme.primary} size="small" />
-            <Text style={styles.statusText}>Validando endpoint e recuperando token local...</Text>
-          </View>
-        ) : error ? (
-          <Text style={styles.errorText}>{error}</Text>
-        ) : (
-          <Text style={styles.okText}>
-            Backend pronto. Provider padrao: {status?.default_provider ?? "nenhum"}.
+        <Card style={styles.backendCard}>
+          <Text style={styles.kicker}>STATUS DO BACKEND LOCAL</Text>
+          <Text style={styles.sideTitle}>Tudo pronto para o shell web</Text>
+          <Text style={styles.copy}>
+            O backend local valida o endpoint, recupera o token operador e exibe a disponibilidade
+            do plano de controle antes do onboarding da sprint.
           </Text>
-        )}
-      </Card>
+          <Input
+            label="API"
+            value={url}
+            onChangeText={setUrl}
+            placeholder="http://127.0.0.1:8765"
+            keyboardType="url"
+            autoCapitalize="none"
+            monospace
+          />
+          {booting ? (
+            <View style={styles.statusRow}>
+              <ActivityIndicator color={theme.primary} size="small" />
+              <Text style={styles.statusText}>Validando endpoint e recuperando token local...</Text>
+            </View>
+          ) : error ? (
+            <Text style={styles.errorText}>{error}</Text>
+          ) : (
+            <View style={styles.statusList}>
+              <StatusLine label="Control Plane" value="Online" tone="success" />
+              <StatusLine label="Auth Local" value="Online" tone="success" />
+              <StatusLine label="Provider padrao" value={status?.default_provider ?? "nenhum"} />
+              <StatusLine label="Versao" value="local" />
+            </View>
+          )}
+        </Card>
+      </View>
     </Screen>
   );
 };
 
+const StatusLine: React.FC<{
+  label: string;
+  value: string;
+  tone?: "default" | "success";
+}> = ({ label, value, tone = "default" }) => (
+  <View style={styles.statusLine}>
+    <Text style={styles.statusLineLabel}>{label}</Text>
+    <Text style={[styles.statusLineValue, tone === "success" && styles.statusLineValueSuccess]}>
+      {value}
+    </Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
-  hero: {
-    backgroundColor: "#eef5ff",
-    gap: 8,
+  split: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 18,
+    alignItems: "stretch",
   },
-  kicker: {
-    color: theme.primary,
-    fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "800",
+  loginCard: {
+    flex: 1,
+    minWidth: 320,
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    paddingVertical: 28,
   },
-  title: {
+  backendCard: {
+    width: 360,
+    minWidth: 320,
+    backgroundColor: "rgba(255,255,255,0.88)",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 24,
+  },
+  brand: {
     color: theme.text,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 32,
     fontWeight: "800",
+  },
+  brandSub: {
+    color: theme.textMuted,
+    fontSize: 14,
+    marginTop: 6,
   },
   copy: {
     color: theme.textMuted,
     fontSize: 14,
     lineHeight: 21,
   },
-  backendCard: {
-    gap: 10,
-  },
-  backendLabel: {
+  kicker: {
     color: theme.textMuted,
     fontSize: 11,
     letterSpacing: 2,
     fontWeight: "700",
+  },
+  sideTitle: {
+    color: theme.text,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: "800",
+    marginTop: 6,
+    marginBottom: 8,
   },
   statusRow: {
     flexDirection: "row",
@@ -239,5 +284,36 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.fontMono,
     lineHeight: 18,
+  },
+  metaText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    marginTop: 6,
+  },
+  statusList: {
+    gap: 10,
+    marginTop: 10,
+  },
+  statusLine: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(215,228,245,0.9)",
+  },
+  statusLineLabel: {
+    color: theme.textMuted,
+    fontSize: 12,
+  },
+  statusLineValue: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: theme.fontMono,
+  },
+  statusLineValueSuccess: {
+    color: theme.success,
   },
 });

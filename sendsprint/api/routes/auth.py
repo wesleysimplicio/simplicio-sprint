@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import subprocess
 from typing import cast
 
@@ -44,7 +45,12 @@ def app_login(req: AppLoginRequest) -> AppLoginResponse:
     if not req.password.strip():
         raise HTTPException(status_code=400, detail="Password is required.")
     display_name = email.split("@", 1)[0].replace(".", " ").replace("_", " ").title()
-    return AppLoginResponse(email=email, active=True, display_name=display_name)
+    return AppLoginResponse(
+        email=email,
+        active=True,
+        display_name=display_name,
+        permissions={"can_run_all_backlog": _can_run_all_backlog(email)},
+    )
 
 
 @router.post("/jira", response_model=AuthResponse)
@@ -257,6 +263,14 @@ def _has_any(provider: str, account: str) -> bool:
         return bool(credentials.get_secret(cast(CredentialProvider, provider), account))
     except credentials.CredentialError:
         return False
+
+
+def _can_run_all_backlog(email: str) -> bool:
+    allowlist = os.getenv("SENDSPRINT_RUN_ALL_BACKLOG_EMAILS", "").strip()
+    if not allowlist:
+        return True
+    allowed = {item.strip().lower() for item in allowlist.split(",") if item.strip()}
+    return email.strip().lower() in allowed
 
 
 def _github_cli_authenticated() -> bool:

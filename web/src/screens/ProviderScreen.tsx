@@ -1,7 +1,7 @@
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
 import type { Provider } from "../api/types";
@@ -12,11 +12,10 @@ import { theme } from "../theme";
 type Nav = NativeStackNavigationProp<RootStackParamList, "Provider">;
 
 type ProviderOption = {
-  id: Provider | "github";
+  id: Provider;
   name: string;
   initial: string;
   desc: string;
-  available: boolean;
 };
 
 const PROVIDERS: ProviderOption[] = [
@@ -25,21 +24,12 @@ const PROVIDERS: ProviderOption[] = [
     name: "Jira / Atlassian",
     initial: "J",
     desc: "Cloud ou Server. Auth via email + API token.",
-    available: true,
   },
   {
     id: "azuredevops",
     name: "Azure DevOps",
     initial: "A",
     desc: "Sprint URL atual + Personal Access Token.",
-    available: true,
-  },
-  {
-    id: "github",
-    name: "GitHub",
-    initial: "G",
-    desc: "Ja visivel na origem do trabalho. Intake completo entra quando o backend expor issues e projects.",
-    available: false,
   },
 ];
 
@@ -49,45 +39,71 @@ export const ProviderScreen: React.FC = () => {
 
   return (
     <Screen
-      title="De onde vem o trabalho?"
-      subtitle="Escolha a origem que o backend vai consultar. GitHub aparece no fluxo web mesmo antes do intake completo."
+      chrome="app"
+      eyebrow="Web 03 · Provider Picker"
+      title="Conecte seu provider de trabalho"
+      subtitle="Escolha a ferramenta que voce usa para gerenciar sprints e issues."
     >
-      {PROVIDERS.map((provider) => (
-        <Card
-          key={provider.id}
-          onPress={() => {
-            if (!provider.available) {
-              Alert.alert(
-                "GitHub em preparo",
-                "A autenticacao do CLI ja aparece no painel. A captura completa de issues e projects ainda depende do backend.",
-              );
-              return;
-            }
-            setProvider(provider.id as Provider);
-            nav.navigate("Auth");
-          }}
-        >
-          <View style={styles.row}>
+      <View style={styles.grid}>
+        {PROVIDERS.map((provider) => (
+          <Card
+            key={provider.id}
+            style={styles.providerCard}
+            onPress={() => {
+              setProvider(provider.id);
+              nav.navigate("Auth");
+            }}
+          >
             <View style={styles.badge}>
               <Text style={styles.badgeText}>{provider.initial}</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{provider.name}</Text>
-              <Text style={styles.desc}>{provider.desc}</Text>
-            </View>
-            <Text style={styles.chev}>{provider.available ? ">" : "i"}</Text>
-          </View>
-        </Card>
-      ))}
+            <Text style={styles.name}>{provider.name}</Text>
+            <Text style={styles.desc}>{provider.desc}</Text>
+            <Text style={styles.cta}>{`Conectar ${provider.name.split(" ")[0]}`}</Text>
+          </Card>
+        ))}
+      </View>
+      <Card style={styles.infoCard}>
+        <Text style={styles.infoTitle}>GitHub continua visivel no shell</Text>
+        <Text style={styles.infoText}>
+          O CLI autenticado e o contexto de repo seguem expostos em Configuracoes. O intake completo de issues e projects do GitHub fica fora deste fluxo ate o backend expor essa origem de sprint.
+        </Text>
+      </Card>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: 12 },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+  },
+  providerCard: {
+    width: 260,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 28,
+  },
+  infoCard: {
+    marginTop: 16,
+    maxWidth: 720,
+    backgroundColor: "rgba(239,245,255,0.9)",
+  },
+  infoTitle: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  infoText: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
   badge: {
-    width: 36,
-    height: 36,
+    width: 54,
+    height: 54,
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
@@ -97,10 +113,10 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: theme.primary,
-    fontSize: 14,
+    fontSize: 22,
     fontWeight: "800",
   },
-  name: { color: theme.text, fontSize: 17, fontWeight: "700" },
-  desc: { color: theme.textMuted, fontSize: 13, marginTop: 4, lineHeight: 18 },
-  chev: { color: theme.primarySoft, fontSize: 22, fontWeight: "700" },
+  name: { color: theme.text, fontSize: 19, fontWeight: "700", textAlign: "center" },
+  desc: { color: theme.textMuted, fontSize: 13, lineHeight: 20, textAlign: "center" },
+  cta: { color: theme.primary, fontSize: 13, fontWeight: "800", marginTop: 4 },
 });

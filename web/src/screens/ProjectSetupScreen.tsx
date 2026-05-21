@@ -181,7 +181,9 @@ const ScreenLayout: React.FC<{
 }> = ({ children, onBack, onSave, saving }) => {
   return (
     <Screen
-      title="Project setup"
+      chrome="app"
+      eyebrow="Web 11 · Project Setup"
+      title="Configuracao do projeto"
       subtitle="Escolha single-project ou portfolio e registre os repositorios que o run loop deve considerar."
       footer={
         <View style={{ gap: 10 }}>

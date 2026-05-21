@@ -1,4 +1,4 @@
-"""Sprints endpoints: list active sprints + fetch a sprint's items."""
+"""Sprints endpoints: list active sprints + fetch backlog-enriched sprint items."""
 
 from __future__ import annotations
 
@@ -11,25 +11,39 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
 from sendsprint import credentials
 from sendsprint import profile as profile_mod
+from sendsprint.api.backlog_state import BacklogCardState, BacklogStateStore
 from sendsprint.api.schemas import (
+    ArchiveSprintItemRequest,
     ImportSprintsRequest,
     ImportSprintsResponse,
+    MoveSprintItemRequest,
     Provider,
     SprintDetail,
     SprintItemSummary,
     SprintSummary,
 )
 from sendsprint.operators import AzureDevopsOperator, JiraOperator
+from sendsprint.scope import build_scope
 
 router = APIRouter(prefix="/sprints", tags=["sprints"])
+_backlog_store = BacklogStateStore()
+_BOARD_STATUS_LABELS = {
+    "backlog": "Backlog",
+    "planning": "Planning",
+    "programming": "Programming",
+    "testing": "Testing",
+    "review": "Review Humana",
+    "awaiting_deploy": "Awaiting Deploy",
+    "blocked": "Blocked",
+}
 
-# Background imports: job_id → state
+# Background imports: job_id -> state
 _imports: dict[str, dict[str, Any]] = {}
 
 
 @router.get("", response_model=list[SprintSummary])
 def list_sprints(
-    provider: Provider = Query(...),  # noqa: B008 — FastAPI dependency idiom
+    provider: Provider = Query(...),  # noqa: B008
     board_id: str | None = Query(None, description="Jira board id"),  # noqa: B008
     team_path: str | None = Query(None, description="ADO team iteration path"),  # noqa: B008
 ) -> list[SprintSummary]:
@@ -41,29 +55,30 @@ def list_sprints(
 @router.get("/{sprint_id}", response_model=SprintDetail)
 def get_sprint(
     sprint_id: str,
-    provider: Provider = Query(...),  # noqa: B008 — FastAPI dependency idiom
+    provider: Provider = Query(...),  # noqa: B008
     scope: str | None = Query(None, description="'mine' filters to current user"),  # noqa: B008
+    user_email: str | None = Query(None, description="Optional app user email filter"),  # noqa: B008
+    include_archived: bool = Query(False, description="Include archived cards"),  # noqa: B008
 ) -> SprintDetail:
-    op: Any
-    if provider == "jira":
-        op = JiraOperator(transport="auto")
-    else:
-        op = AzureDevopsOperator(transport="auto")
-    try:
-        if provider == "jira":
-            sprint = op.read_sprint(sprint_id=sprint_id)
-        else:
-            sprint = op.read_sprint(iteration_path=sprint_id)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"failed to read sprint: {exc}") from exc
+    sprint = _read_sprint(provider, sprint_id)
+    items = list(sprint.items)
 
-    items = sprint.items
     if scope == "mine":
-        from sendsprint.scope import build_scope
+        scope_email = (user_email or _default_scope_email(provider)).strip().lower()
+        if scope_email:
+            identity_scope = build_scope(mode="mine", user_email=scope_email, allowed_statuses=[])
+            items = [item for item in items if identity_scope.matches(item)]
 
-        s = build_scope(mode="mine")
-        if s is not None:
-            items = [i for i in items if s.matches(i)]
+    sprint_state = _backlog_store.get_sprint_state(provider, sprint_id)
+    archived_count = 0
+    serialized_items: list[SprintItemSummary] = []
+    for item in items:
+        card_state = sprint_state.items.get(item.key)
+        if card_state and card_state.archived:
+            archived_count += 1
+            if not include_archived:
+                continue
+        serialized_items.append(_serialize_item(item, card_state))
 
     return SprintDetail(
         sprint=SprintSummary(
@@ -73,28 +88,68 @@ def get_sprint(
             provider=provider,
             start_date=sprint.start_date.isoformat() if sprint.start_date else None,
             end_date=sprint.end_date.isoformat() if sprint.end_date else None,
-            item_count=len(items),
+            item_count=len(serialized_items),
             goal=sprint.goal,
         ),
-        items=[
-            SprintItemSummary(
-                id=i.id,
-                key=i.key,
-                type=i.type,
-                title=i.title,
-                status=i.status,
-                assignee=i.assignee,
-                assignee_email=i.assignee_email,
-                story_points=i.story_points,
-            )
-            for i in items
-        ],
+        items=serialized_items,
+        archived_count=archived_count,
     )
+
+
+@router.post("/{sprint_id}/items/{item_key}/move", response_model=SprintItemSummary)
+def move_sprint_item(
+    sprint_id: str,
+    item_key: str,
+    req: MoveSprintItemRequest,
+) -> SprintItemSummary:
+    sprint = _read_sprint(req.provider, sprint_id)
+    item = _find_item(sprint.items, item_key)
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"card {item_key!r} not found in sprint {sprint_id!r}",
+        )
+    actor_email = _require_actor_email(req.actor_email, req.provider)
+    card_state = _backlog_store.record_move(
+        req.provider,
+        sprint_id,
+        item.key,
+        target_column=req.target_column,
+        actor_email=actor_email,
+        note=req.note,
+    )
+    return _serialize_item(item, card_state)
+
+
+@router.post("/{sprint_id}/items/{item_key}/archive", response_model=SprintItemSummary)
+def archive_sprint_item(
+    sprint_id: str,
+    item_key: str,
+    req: ArchiveSprintItemRequest,
+) -> SprintItemSummary:
+    sprint = _read_sprint(req.provider, sprint_id)
+    item = _find_item(sprint.items, item_key)
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"card {item_key!r} not found in sprint {sprint_id!r}",
+        )
+    actor_email = _require_actor_email(req.actor_email, req.provider)
+    card_state = _backlog_store.record_archive(
+        req.provider,
+        sprint_id,
+        item.key,
+        archived=req.archived,
+        actor_email=actor_email,
+        note=req.note,
+    )
+    return _serialize_item(item, card_state)
 
 
 @router.post("/import", response_model=ImportSprintsResponse)
 def import_sprints(req: ImportSprintsRequest, bg: BackgroundTasks) -> ImportSprintsResponse:
     """Kick off a background import of every sprint item (cached locally)."""
+
     job_id = uuid.uuid4().hex[:10]
     _imports[job_id] = {"state": "running", "fetched": 0, "total": None}
     bg.add_task(_import_worker, job_id, req)
@@ -122,12 +177,12 @@ def _import_worker(job_id: str, req: ImportSprintsRequest) -> None:
             if req.provider == "jira"
             else AzureDevopsOperator(transport="auto")
         )
-        for s in sprints:
+        for sprint in sprints:
             try:
                 if req.provider == "jira":
-                    op.read_sprint(sprint_id=s.id)
+                    op.read_sprint(sprint_id=sprint.id)
                 else:
-                    op.read_sprint(iteration_path=s.id)
+                    op.read_sprint(iteration_path=sprint.id)
                 _imports[job_id]["fetched"] += 1
             except Exception:
                 continue
@@ -137,7 +192,103 @@ def _import_worker(job_id: str, req: ImportSprintsRequest) -> None:
         _imports[job_id]["error"] = str(exc)
 
 
-# ---------- internal helpers ----------
+def _read_sprint(provider: Provider, sprint_id: str) -> Any:
+    op: Any = (
+        JiraOperator(transport="auto")
+        if provider == "jira"
+        else AzureDevopsOperator(transport="auto")
+    )
+    try:
+        if provider == "jira":
+            return op.read_sprint(sprint_id=sprint_id)
+        return op.read_sprint(iteration_path=sprint_id)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"failed to read sprint: {exc}") from exc
+
+
+def _find_item(items: list[Any], item_key: str) -> Any | None:
+    target = item_key.strip().lower()
+    for item in items:
+        if item.key.strip().lower() == target or item.id.strip().lower() == target:
+            return item
+    return None
+
+
+def _default_scope_email(provider: Provider) -> str:
+    profile = profile_mod.load()
+    if provider == "jira":
+        return profile.jira.email or ""
+    return ""
+
+
+def _require_actor_email(actor_email: str | None, provider: Provider) -> str:
+    email = (actor_email or _default_scope_email(provider)).strip().lower()
+    if not email:
+        raise HTTPException(status_code=400, detail="actor_email is required for backlog mutations")
+    return email
+
+
+def _serialize_item(item: Any, card_state: BacklogCardState | None) -> SprintItemSummary:
+    return SprintItemSummary(
+        id=item.id,
+        key=item.key,
+        type=item.type,
+        title=item.title,
+        status=item.status,
+        description=item.description,
+        revision=item.revision,
+        assignee=item.assignee,
+        assignee_email=item.assignee_email,
+        story_points=item.story_points,
+        parent_key=item.parent_key,
+        labels=list(item.labels or []),
+        links=[
+            {
+                "type": link.type,
+                "target_key": link.target_key,
+                "target_url": link.target_url,
+            }
+            for link in item.links
+        ],
+        comments=[
+            {
+                "author": comment.author,
+                "body": comment.body,
+                "created_at": comment.created_at.isoformat(),
+            }
+            for comment in item.comments
+        ],
+        attachments=[
+            {
+                "filename": attachment.filename,
+                "url": attachment.url,
+                "mime_type": attachment.mime_type,
+                "size_bytes": attachment.size_bytes,
+            }
+            for attachment in item.attachments
+        ],
+        acceptance_criteria=item.acceptance_criteria,
+        created_at=item.created_at.isoformat() if item.created_at else None,
+        updated_at=item.updated_at.isoformat() if item.updated_at else None,
+        source_url=item.source_url,
+        board_column=card_state.board_column if card_state else None,
+        board_status=_BOARD_STATUS_LABELS.get(card_state.board_column) if card_state else None,
+        board_updated_at=card_state.updated_at.isoformat() if card_state else None,
+        board_updated_by=card_state.updated_by if card_state else None,
+        archived=card_state.archived if card_state else False,
+        history=[
+            {
+                "action": entry.action,
+                "actor_email": entry.actor_email,
+                "observed_at": entry.observed_at.isoformat(),
+                "from_column": entry.from_column,
+                "to_column": entry.to_column,
+                "archived": entry.archived,
+                "note": entry.note,
+            }
+            for entry in (card_state.history if card_state else [])
+        ],
+    )
 
 
 def _list_jira_active(board_id: str | None) -> list[SprintSummary]:
@@ -164,16 +315,16 @@ def _list_jira_active(board_id: str | None) -> list[SprintSummary]:
         return _demo_sprints("jira")
 
     out: list[SprintSummary] = []
-    for s in data.get("values", []):
+    for sprint in data.get("values", []):
         out.append(
             SprintSummary(
-                id=str(s.get("id")),
-                name=s.get("name", ""),
-                state=s.get("state", "active"),
+                id=str(sprint.get("id")),
+                name=sprint.get("name", ""),
+                state=sprint.get("state", "active"),
                 provider="jira",
-                start_date=s.get("startDate"),
-                end_date=s.get("endDate"),
-                goal=s.get("goal"),
+                start_date=sprint.get("startDate"),
+                end_date=sprint.get("endDate"),
+                goal=sprint.get("goal"),
             )
         )
     return out
@@ -197,15 +348,15 @@ def _list_ado_active(team_path: str | None) -> list[SprintSummary]:
         return _demo_sprints("azuredevops")
 
     out: list[SprintSummary] = []
-    for s in data.get("value", []):
-        attrs = s.get("attributes", {})
-        sprint_id = s.get("path") or _infer_iteration_path(
-            project, resolved_team_path, s.get("name")
+    for sprint in data.get("value", []):
+        attrs = sprint.get("attributes", {})
+        sprint_id = sprint.get("path") or _infer_iteration_path(
+            project, resolved_team_path, sprint.get("name")
         )
         out.append(
             SprintSummary(
-                id=sprint_id or s.get("id", ""),
-                name=s.get("name", ""),
+                id=sprint_id or sprint.get("id", ""),
+                name=sprint.get("name", ""),
                 state="active",
                 provider="azuredevops",
                 start_date=attrs.get("startDate"),
@@ -244,25 +395,26 @@ def _infer_iteration_path(
 
 def _demo_sprints(provider: Provider) -> list[SprintSummary]:
     """Stub data so the web flow is always demoable, even without creds."""
+
     return [
         SprintSummary(
             id="42",
-            name="Sprint 42 — Onboarding rework",
+            name="Sprint 42 - Onboarding rework",
             state="active",
             provider=provider,
             start_date="2026-05-01T00:00:00Z",
             end_date="2026-05-15T00:00:00Z",
             item_count=12,
-            goal="Reduzir fricção no signup",
+            goal="Reduzir friccao no signup",
         ),
         SprintSummary(
             id="43",
-            name="Sprint 43 — Push notifications",
+            name="Sprint 43 - Push notifications",
             state="active",
             provider=provider,
             start_date="2026-05-08T00:00:00Z",
             end_date="2026-05-22T00:00:00Z",
             item_count=8,
-            goal="Lançar push notifications",
+            goal="Lancar push notifications",
         ),
     ]

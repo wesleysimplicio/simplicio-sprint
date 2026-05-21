@@ -48,6 +48,8 @@ export const SettingsScreen: React.FC = () => {
 
   return (
     <Screen
+      chrome="app"
+      eyebrow="Web 12 · Configuracoes / Conexoes"
       title="Configuracoes"
       subtitle="Parametros locais, backend conectado e contexto persistido do CLI."
       footer={

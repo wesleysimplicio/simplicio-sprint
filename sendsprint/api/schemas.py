@@ -9,6 +9,15 @@ from pydantic import BaseModel, Field
 Provider = Literal["jira", "azuredevops"]
 RunMode = Literal["all", "mine", "selected"]
 RouteConfidence = Literal["high", "medium", "low"]
+ColumnKey = Literal[
+    "backlog",
+    "planning",
+    "programming",
+    "testing",
+    "review",
+    "awaiting_deploy",
+    "blocked",
+]
 
 
 class HealthResponse(BaseModel):
@@ -64,6 +73,7 @@ class AppLoginResponse(BaseModel):
     email: str
     active: bool = True
     display_name: str | None = None
+    permissions: dict[str, bool] = Field(default_factory=lambda: {"can_run_all_backlog": True})
 
 
 class AuthBootstrapResponse(BaseModel):
@@ -91,14 +101,50 @@ class SprintItemSummary(BaseModel):
     type: str
     title: str
     status: str
+    description: str | None = None
+    revision: int | str | None = None
     assignee: str | None = None
     assignee_email: str | None = None
     story_points: float | None = None
+    parent_key: str | None = None
+    labels: list[str] = Field(default_factory=list)
+    links: list[dict[str, str | None]] = Field(default_factory=list)
+    comments: list[dict[str, str | None]] = Field(default_factory=list)
+    attachments: list[dict[str, str | int | None]] = Field(default_factory=list)
+    acceptance_criteria: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    source_url: str | None = None
+    board_column: ColumnKey | None = None
+    board_status: str | None = None
+    board_updated_at: str | None = None
+    board_updated_by: str | None = None
+    archived: bool = False
+    history: list[dict[str, str | bool | None]] = Field(default_factory=list)
 
 
 class SprintDetail(BaseModel):
     sprint: SprintSummary
     items: list[SprintItemSummary]
+    archived_count: int = 0
+
+
+class MoveSprintItemRequest(BaseModel):
+    provider: Provider
+    target_column: ColumnKey
+    actor_email: str | None = None
+    note: str | None = None
+
+
+class ArchiveSprintItemRequest(BaseModel):
+    provider: Provider
+    actor_email: str | None = None
+    archived: bool = True
+    note: str | None = None
+
+
+class SprintItemMutationResponse(BaseModel):
+    ok: bool = True
 
 
 class StartRunRequest(BaseModel):
