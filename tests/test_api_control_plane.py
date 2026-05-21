@@ -105,13 +105,13 @@ def test_start_run_materializes_workspace_from_project_setup(monkeypatch):
             "provider": "jira",
             "sprint_id": "cp-202",
             "project_setup": {
+                "deployTargetBranch": "dev",
                 "repositories": [
                     {
                         "name": "web",
                         "repoPath": "C:/workspace/web",
                         "role": "frontend",
                         "project": "Portal",
-                        "deployTargetBranch": "dev",
                     }
                 ]
             },

@@ -24,7 +24,7 @@ const PROVIDERS: ProviderOption[] = [
   {
     id: "jira",
     name: "Jira / Atlassian",
-    initial: "J",
+    initial: "<>",
     desc: "Cloud ou Server. Auth via email + API token com fallback por browser quando necessario.",
     available: true,
     status: "Pronto",
@@ -32,7 +32,7 @@ const PROVIDERS: ProviderOption[] = [
   {
     id: "azuredevops",
     name: "Azure DevOps",
-    initial: "A",
+    initial: "[]",
     desc: "Sprint URL atual + Personal Access Token com capture assistida por Playwright e browser agents.",
     available: true,
     status: "Pronto",
@@ -40,7 +40,7 @@ const PROVIDERS: ProviderOption[] = [
   {
     id: "github",
     name: "GitHub Projects",
-    initial: "G",
+    initial: "{}",
     desc: "Entrada por issues, projects e milestones fica visivel no shell, mas o intake completo ainda depende do backend.",
     available: false,
     status: "Em breve",
@@ -52,12 +52,13 @@ export const ProviderScreen: React.FC = () => {
   const { setProvider } = useSession();
 
   return (
-    <Screen
-      chrome="app"
-      eyebrow="Web 03 - Provider Picker"
-      title="Conecte seu provider de trabalho"
-      subtitle="Escolha a origem da sprint. O shell web segue o mesmo fluxo visual em Jira, Azure e no futuro GitHub."
-    >
+    <Screen chrome="app">
+      <View style={styles.pageIntro}>
+        <Text style={styles.pageTitle}>Conecte seu provider de trabalho</Text>
+        <Text style={styles.pageSubtitle}>
+          Escolha a ferramenta que voce usa para gerenciar sprints e issues.
+        </Text>
+      </View>
       <View style={styles.grid}>
         {PROVIDERS.map((provider) => (
           <Card
@@ -109,16 +110,36 @@ export const ProviderScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  pageIntro: {
+    alignItems: "center",
+    gap: 8,
+    paddingTop: 52,
+    paddingBottom: 24,
+  },
+  pageTitle: {
+    color: theme.text,
+    fontSize: 26,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  pageSubtitle: {
+    color: theme.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
+  },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 16,
+    justifyContent: "center",
   },
   providerCard: {
-    width: 280,
-    minHeight: 236,
+    width: 238,
+    minHeight: 198,
     gap: 12,
     justifyContent: "space-between",
+    alignItems: "center",
   },
   providerCardDisabled: {
     backgroundColor: "rgba(248,251,255,0.92)",
@@ -128,10 +149,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
+    width: "100%",
   },
   infoCard: {
     marginTop: 16,
     maxWidth: 760,
+    alignSelf: "center",
     backgroundColor: "rgba(239,245,255,0.9)",
   },
   infoTitle: {
@@ -147,7 +170,7 @@ const styles = StyleSheet.create({
   badge: {
     width: 54,
     height: 54,
-    borderRadius: 18,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: theme.surfaceAlt,
@@ -156,7 +179,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: theme.primary,
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "800",
   },
   statusPill: {
@@ -177,13 +200,15 @@ const styles = StyleSheet.create({
   },
   name: {
     color: theme.text,
-    fontSize: 19,
+    fontSize: 16,
     fontWeight: "700",
+    textAlign: "center",
   },
   desc: {
     color: theme.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
   },
   cta: {
     color: theme.primary,

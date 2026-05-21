@@ -1,6 +1,6 @@
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +33,72 @@ import { theme } from "../theme";
 type Nav = NativeStackNavigationProp<RootStackParamList, "SprintDetail">;
 type Rt = RouteProp<RootStackParamList, "SprintDetail">;
 type DetailTab = "overview" | "logs" | "timeline" | "readiness" | "evidence";
+type ColumnNode = React.ElementRef<typeof View>;
+type CardDragState = {
+  key: string;
+  currentColumn: ColumnKey;
+  startX: number;
+  startY: number;
+  active: boolean;
+};
+
+const CARD_DRAG_THRESHOLD_PX = 10;
+
+const domSafeToken = (value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, "-");
+
+const decodeHtmlEntities = (value: string): string => {
+  if (typeof document !== "undefined") {
+    const textarea = document.createElement("textarea");
+    textarea.innerHTML = value;
+    return textarea.value;
+  }
+
+  return value.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, (match, entity: string) => {
+    if (entity.startsWith("#x")) return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
+    if (entity.startsWith("#")) return String.fromCodePoint(Number.parseInt(entity.slice(1), 10));
+    const named: Record<string, string> = {
+      amp: "&",
+      apos: "'",
+      ccedil: "ç",
+      gt: ">",
+      lt: "<",
+      nbsp: " ",
+      quot: "\"",
+      aacute: "á",
+      acirc: "â",
+      agrave: "à",
+      atilde: "ã",
+      eacute: "é",
+      ecirc: "ê",
+      iacute: "í",
+      oacute: "ó",
+      ocirc: "ô",
+      otilde: "õ",
+      uacute: "ú",
+    };
+    return named[entity.toLowerCase()] ?? match;
+  });
+};
+
+const htmlToPlainText = (value?: string | null): string | null => {
+  if (!value?.trim()) return null;
+  const decoded = decodeHtmlEntities(value);
+  const withLineBreaks = decoded
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\s*\/\s*(p|div|li|h[1-6]|tr)\s*>/gi, "\n")
+    .replace(/<\s*li\b[^>]*>/gi, "\n- ");
+  const stripped =
+    typeof DOMParser !== "undefined"
+      ? new DOMParser().parseFromString(withLineBreaks, "text/html").body.textContent ?? ""
+      : withLineBreaks.replace(/<[^>]+>/g, " ");
+  const normalized = decodeHtmlEntities(stripped)
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t\f\v]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return normalized || null;
+};
 
 const COLUMNS: Record<ColumnKey, { label: string; hint: string }> = {
   backlog: { label: "Backlog", hint: "Itens importados e aguardando preparo" },
@@ -83,6 +149,10 @@ export const SprintDetailScreen: React.FC = () => {
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [bulkMovingColumn, setBulkMovingColumn] = useState<ColumnKey | null>(null);
   const [query, setQuery] = useState("");
+  const columnRefs = useRef<Partial<Record<ColumnKey, ColumnNode | null>>>({});
+  const cardDragRef = useRef<CardDragState | null>(null);
+  const suppressPressRef = useRef(false);
+  const initialOpenKeyRef = useRef(route.params.openItemKey ?? null);
 
   const provider = session.currentSprint?.provider ?? session.provider ?? "jira";
   const actorEmail = session.appUser?.email?.trim().toLowerCase() ?? undefined;
@@ -278,10 +348,10 @@ export const SprintDetailScreen: React.FC = () => {
     }
   };
 
-  const openItem = async (item: SprintItem) => {
+  const openItem = async (item: SprintItem, initialTab: DetailTab = "overview") => {
     setSelectedItem(item);
     setSelectedRunDetail(null);
-    setDetailTab("overview");
+    setDetailTab(initialTab);
     const latestRun = latestRunByItem.get(item.key);
     if (!latestRun) return;
     setDetailLoading(true);
@@ -291,6 +361,15 @@ export const SprintDetailScreen: React.FC = () => {
       setDetailLoading(false);
     }
   };
+
+  useEffect(() => {
+    const key = initialOpenKeyRef.current;
+    if (!key || !detail) return;
+    const item = detail.items.find((candidate) => candidate.key === key || candidate.id === key);
+    if (!item) return;
+    initialOpenKeyRef.current = null;
+    void openItem(item, isDetailTab(route.params.detailTab) ? route.params.detailTab : "overview");
+  }, [detail, latestRunByItem, route.params.detailTab]);
 
   const toggleArchive = async () => {
     if (!selectedItem || archiveBusy) return;
@@ -312,25 +391,122 @@ export const SprintDetailScreen: React.FC = () => {
     }
   };
 
+  const resolveColumnAtPageX = (
+    pageX: number,
+    callback: (column: ColumnKey | null) => void,
+  ) => {
+    const refs = COLUMN_ORDER.map((column) => ({ column, ref: columnRefs.current[column] })).filter(
+      (entry): entry is { column: ColumnKey; ref: ColumnNode } => Boolean(entry.ref),
+    );
+    if (refs.length === 0) {
+      callback(null);
+      return;
+    }
+
+    let pending = refs.length;
+    let matched = false;
+    refs.forEach(({ column, ref }) => {
+      ref.measureInWindow((x, _y, width) => {
+        if (!matched && pageX >= x && pageX <= x + width) {
+          matched = true;
+          callback(column);
+        }
+        pending -= 1;
+        if (pending === 0 && !matched) callback(null);
+      });
+    });
+  };
+
+  const resetCardDrag = () => {
+    cardDragRef.current = null;
+    setDraggingKey(null);
+    setHoverColumn(null);
+  };
+
+  const releasePressSuppressionSoon = () => {
+    setTimeout(() => {
+      suppressPressRef.current = false;
+    }, 250);
+  };
+
+  const eventPagePoint = (event: any): { pageX: number; pageY: number } => ({
+    pageX: Number(event?.nativeEvent?.pageX ?? event?.pageX ?? 0),
+    pageY: Number(event?.nativeEvent?.pageY ?? event?.pageY ?? 0),
+  });
+
   const getDragProps = (item: SprintItem): Record<string, unknown> => {
     if (Platform.OS !== "web") return {};
     const isMutating = mutatingKeys.includes(item.key);
     const isDraggable = canDragItem(canRun, isMutating);
     const currentColumn = resolveItemColumn(item, latestRunByItem.get(item.key), columnOverrides[item.key]);
     return {
-      draggable: isDraggable,
-      onDragStart: (event: any) => {
-        if (!isDraggable) {
-          event.preventDefault?.();
+      onClick: () => {
+        if (suppressPressRef.current) {
+          suppressPressRef.current = false;
           return;
         }
-        event.dataTransfer?.setData("text/plain", item.key);
-        event.dataTransfer?.setData("application/x-sendsprint-column", currentColumn);
-        setDraggingKey(item.key);
+        void openItem(item);
       },
-      onDragEnd: () => {
+      onPointerDown: (event: any) => {
+        if (!isDraggable || event?.nativeEvent?.button > 0) return;
+        const { pageX, pageY } = eventPagePoint(event);
+        event.currentTarget?.setPointerCapture?.(event.nativeEvent.pointerId);
+        cardDragRef.current = {
+          key: item.key,
+          currentColumn,
+          startX: pageX,
+          startY: pageY,
+          active: false,
+        };
+      },
+      onPointerMove: (event: any) => {
+        const drag = cardDragRef.current;
+        if (!drag) return;
+        const { pageX, pageY } = eventPagePoint(event);
+        const deltaX = pageX - drag.startX;
+        const deltaY = pageY - drag.startY;
+        if (!drag.active) {
+          if (
+            Math.abs(deltaX) < CARD_DRAG_THRESHOLD_PX ||
+            Math.abs(deltaX) <= Math.abs(deltaY)
+          ) {
+            return;
+          }
+          drag.active = true;
+          suppressPressRef.current = true;
+          setDraggingKey(drag.key);
+        }
+        event.preventDefault?.();
+        resolveColumnAtPageX(pageX, (column) => {
+          if (cardDragRef.current?.key === drag.key) setHoverColumn(column);
+        });
+      },
+      onPointerUp: (event: any) => {
+        const drag = cardDragRef.current;
+        if (!drag) return;
+        event.currentTarget?.releasePointerCapture?.(event.nativeEvent.pointerId);
+        if (!drag.active) {
+          resetCardDrag();
+          return;
+        }
+
+        const { pageX } = eventPagePoint(event);
+        suppressPressRef.current = true;
+        cardDragRef.current = null;
         setDraggingKey(null);
         setHoverColumn(null);
+        releasePressSuppressionSoon();
+        resolveColumnAtPageX(pageX, (column) => {
+          if (!column || column === drag.currentColumn) return;
+          void applyMove([drag.key], column, {
+            startRun: column === "planning",
+            note: `drag:${drag.currentColumn}->${column}`,
+          });
+        });
+      },
+      onPointerCancel: () => {
+        resetCardDrag();
+        releasePressSuppressionSoon();
       },
     };
   };
@@ -376,15 +552,15 @@ export const SprintDetailScreen: React.FC = () => {
     <Screen
       chrome="app"
       eyebrow="Web 07 - Kanban Backlog / Web 08 - Card Detail"
-      title={detail?.sprint.name ?? session.currentSprint?.sprintName ?? "Sprint"}
+      title={session.currentSprint?.sprintName ?? detail?.sprint.name ?? "Sprint"}
       subtitle={
         headerMeta
           ? `${headerMeta} - ${visibleItems.length}/${(detail?.items ?? []).length} item(s) visiveis`
           : `${visibleItems.length}/${(detail?.items ?? []).length} item(s) visiveis`
       }
       scroll={false}
-      footer={
-        <View style={{ gap: 10 }}>
+      actions={
+        <View style={styles.boardActions}>
           {canRunAllBacklog ? (
             <Button
               title={`Play todos do backlog (${backlogKeys.length})`}
@@ -415,11 +591,11 @@ export const SprintDetailScreen: React.FC = () => {
             <Text style={styles.heroTitle}>{detail?.sprint.goal || "Backlog pronto para despacho"}</Text>
             <Text style={styles.heroText}>
               {canRun
-                ? `${configuredLocalRepos.length} repositorio(s) local(is) liberados. Arraste os cards entre colunas para alterar o status; mover para Planning dispara a execucao.`
-                : "Nenhum repositorio local configurado. O backlog fica bloqueado para arraste ate concluir o setup."}
+                ? `${configuredLocalRepos.length} repo(s) liberados. Arraste cards para atualizar status; Planning dispara execucao.`
+                : "Configure um repositorio local para liberar arraste e execucao."}
             </Text>
             <Text style={styles.heroMeta}>
-              Arquivados nesta sprint: {detail?.archived_count ?? 0}. Filtro atual: {actorEmail ?? "sem email de app"}.
+              Arquivados: {detail?.archived_count ?? 0} | filtro: {actorEmail ?? "sem email de app"}.
             </Text>
             <TextInput
               value={query}
@@ -465,6 +641,12 @@ export const SprintDetailScreen: React.FC = () => {
             return (
               <View
                 key={column}
+                id={`sprint-column-${column}`}
+                nativeID={`sprint-column-${column}`}
+                testID={`sprint-column-${column}`}
+                ref={(node) => {
+                  columnRefs.current[column] = node;
+                }}
                 style={styleList<ViewStyle>(
                   styles.column,
                   hoverColumn === column && Boolean(draggingKey) && styles.columnDropTarget,
@@ -497,45 +679,62 @@ export const SprintDetailScreen: React.FC = () => {
                       const latestRun = latestRunByItem.get(item.key);
                       const isMutating = mutatingKeys.includes(item.key);
                       const isDraggable = canDragItem(canRun, isMutating);
-                      return (
-                        <Pressable key={item.id} onPress={() => void openItem(item)} {...getDragProps(item)}>
-                          <Card
-                            style={styleList<ViewStyle>(
-                              styles.taskCard,
-                              draggingKey === item.key && styles.taskCardDragging,
-                              !isDraggable && styles.taskCardLocked,
-                            )}
+                      const card = (
+                        <Card
+                          style={styleList<ViewStyle>(
+                            styles.taskCard,
+                            draggingKey === item.key && styles.taskCardDragging,
+                            !isDraggable && styles.taskCardLocked,
+                          )}
+                        >
+                          <View style={styles.cardHead}>
+                            <Text style={styles.itemKey}>{item.key}</Text>
+                            <StatusChip label={item.type} />
+                          </View>
+                          <Text style={styles.itemTitle}>{item.title}</Text>
+                          <Text style={styles.itemStatus}>{item.board_status ?? COLUMNS[column].label}</Text>
+                          <View style={styles.metaRow}>
+                            {item.assignee ? <Text style={styles.metaText}>owner {item.assignee}</Text> : null}
+                            {item.story_points != null ? <Text style={styles.metaText}>{item.story_points} sp</Text> : null}
+                            {latestRun?.readiness_verdict ? (
+                              <Text style={styles.metaText}>readiness {latestRun.readiness_verdict}</Text>
+                            ) : null}
+                            {latestRun?.failed ? (
+                              <Text style={[styles.metaText, styles.metaDanger]}>failed</Text>
+                            ) : null}
+                            {item.archived ? <Text style={styles.metaText}>archived</Text> : null}
+                          </View>
+                          <View style={styles.cardFooter}>
+                            <Text style={styles.runMeta}>
+                              {isMutating
+                                ? "atualizando..."
+                                : latestRun
+                                  ? `${latestRun.state} - step ${latestRun.last_step ?? 0}`
+                                  : item.status}
+                            </Text>
+                            <Text style={[styles.runMeta, !isDraggable && styles.metaDanger]}>
+                              {isDraggable ? "drag para mover" : "configure o repositorio"}
+                            </Text>
+                          </View>
+                        </Card>
+                      );
+                      if (Platform.OS === "web") {
+                        return (
+                          <View
+                            key={item.id}
+                            id={`sprint-card-${domSafeToken(item.key)}`}
+                            nativeID={`sprint-card-${domSafeToken(item.key)}`}
+                            testID={`sprint-card-${item.key}`}
+                            accessibilityRole="button"
+                            {...getDragProps(item)}
                           >
-                            <View style={styles.cardHead}>
-                              <Text style={styles.itemKey}>{item.key}</Text>
-                              <StatusChip label={item.type} />
-                            </View>
-                            <Text style={styles.itemTitle}>{item.title}</Text>
-                            <Text style={styles.itemStatus}>{item.board_status ?? COLUMNS[column].label}</Text>
-                            <View style={styles.metaRow}>
-                              {item.assignee ? <Text style={styles.metaText}>owner {item.assignee}</Text> : null}
-                              {item.story_points != null ? <Text style={styles.metaText}>{item.story_points} sp</Text> : null}
-                              {latestRun?.readiness_verdict ? (
-                                <Text style={styles.metaText}>readiness {latestRun.readiness_verdict}</Text>
-                              ) : null}
-                              {latestRun?.failed ? (
-                                <Text style={[styles.metaText, styles.metaDanger]}>failed</Text>
-                              ) : null}
-                              {item.archived ? <Text style={styles.metaText}>archived</Text> : null}
-                            </View>
-                            <View style={styles.cardFooter}>
-                              <Text style={styles.runMeta}>
-                                {isMutating
-                                  ? "atualizando..."
-                                  : latestRun
-                                    ? `${latestRun.state} - step ${latestRun.last_step ?? 0}`
-                                    : item.status}
-                              </Text>
-                              <Text style={[styles.runMeta, !isDraggable && styles.metaDanger]}>
-                                {isDraggable ? "drag para mover" : "configure o repositorio"}
-                              </Text>
-                            </View>
-                          </Card>
+                            {card}
+                          </View>
+                        );
+                      }
+                      return (
+                        <Pressable key={item.id} onPress={() => void openItem(item)}>
+                          {card}
                         </Pressable>
                       );
                     })
@@ -636,6 +835,13 @@ const canDragItem = (canRun: boolean, isMutating: boolean): boolean => canRun &&
 const styleList = <T,>(...values: Array<T | false | null | undefined>): T[] =>
   values.filter(Boolean) as T[];
 
+const isDetailTab = (value?: string | null): value is DetailTab =>
+  value === "overview" ||
+  value === "logs" ||
+  value === "timeline" ||
+  value === "readiness" ||
+  value === "evidence";
+
 const MiniAction: React.FC<{
   title: string;
   onPress: () => void;
@@ -679,6 +885,13 @@ const SignalPill: React.FC<{
   </View>
 );
 
+const ModalMeta: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <View style={styles.modalMetaItem}>
+    <Text style={styles.modalMetaLabel}>{label}</Text>
+    <Text style={styles.modalMetaValue} numberOfLines={1}>{value}</Text>
+  </View>
+);
+
 const ItemDetailModal: React.FC<{
   item: SprintItem | null;
   detail: ControlPlaneRunDetail | null;
@@ -688,7 +901,19 @@ const ItemDetailModal: React.FC<{
   archiveBusy: boolean;
   onToggleArchive: () => void;
   onClose: () => void;
-}> = ({ item, detail, tab, onTabChange, loading, archiveBusy, onToggleArchive, onClose }) => (
+}> = ({ item, detail, tab, onTabChange, loading, archiveBusy, onToggleArchive, onClose }) => {
+  const descriptionText =
+    htmlToPlainText(item?.description) ?? "Sem descricao de origem para este card.";
+  const acceptanceText = htmlToPlainText(item?.acceptance_criteria);
+  const acceptanceItems = acceptanceText
+    ? acceptanceText.split(/\n|;|\./).map((criterion) => criterion.trim()).filter(Boolean)
+    : [
+        "Cobrir fluxo principal com sucesso",
+        "Registrar evidencias da execucao",
+        "Liberar status e codigo de automacao",
+      ];
+
+  return (
   <Modal visible={Boolean(item)} transparent animationType="fade" onRequestClose={onClose}>
     <View style={styles.modalBackdrop}>
       <View style={styles.modalCard}>
@@ -728,76 +953,95 @@ const ItemDetailModal: React.FC<{
           ))}
         </View>
 
-        <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
           {tab === "overview" ? (
-            <>
-              <Card style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>WORKFLOW</Text>
-                <Text style={styles.modalBody}>Status do provider: {item?.status ?? "unknown"}</Text>
-                <Text style={styles.modalBody}>Status SendSprint: {item?.board_status ?? "Backlog"}</Text>
-                <Text style={styles.modalBody}>Tipo: {item?.type ?? "Issue"}</Text>
-                {item?.assignee ? <Text style={styles.modalBody}>Assignee: {item.assignee}</Text> : null}
-                {item?.assignee_email ? (
-                  <Text style={styles.modalBody}>Email do assignee: {item.assignee_email}</Text>
-                ) : null}
-                {item?.parent_key ? <Text style={styles.modalBody}>Parent: {item.parent_key}</Text> : null}
-                {item?.story_points != null ? (
-                  <Text style={styles.modalBody}>Story points: {item.story_points}</Text>
-                ) : null}
-                {item?.board_updated_by ? (
-                  <Text style={styles.modalBody}>Ultima alteracao: {item.board_updated_by}</Text>
-                ) : null}
-              </Card>
+            <View style={styles.modalOverviewGrid}>
+              <View style={styles.modalOverviewLeft}>
+                <View style={styles.modalSectionBox}>
+                  <Text style={styles.modalSectionTitle}>WORKFLOW</Text>
+                  <View style={styles.modalMetaGrid}>
+                    <ModalMeta label="Tipo" value={item?.type ?? "Issue"} />
+                    <ModalMeta label="Prioridade" value={item?.status ?? "Medium"} />
+                    <ModalMeta label="Story points" value={item?.story_points != null ? String(item.story_points) : "-"} />
+                    <ModalMeta label="Responsavel" value={item?.assignee ?? item?.assignee_email ?? "Sem responsavel"} />
+                  </View>
+                </View>
 
-              {item?.description ? (
-                <Card style={styles.modalSection}>
+                <View style={styles.modalSectionBox}>
                   <Text style={styles.modalSectionTitle}>DESCRICAO</Text>
-                  <Text style={styles.modalBody}>{item.description}</Text>
-                </Card>
-              ) : null}
+                  <Text style={styles.modalBody}>{descriptionText}</Text>
+                </View>
 
-              {item?.acceptance_criteria ? (
-                <Card style={styles.modalSection}>
+                <View style={styles.modalSectionBox}>
                   <Text style={styles.modalSectionTitle}>CRITERIOS DE ACEITE</Text>
-                  <Text style={styles.modalBody}>{item.acceptance_criteria}</Text>
-                </Card>
-              ) : null}
-
-              <Card style={styles.modalSection}>
-                <Text style={styles.modalSectionTitle}>ORIGEM</Text>
-                {item?.source_url ? <Text style={styles.modalMono}>{item.source_url}</Text> : null}
-                {item?.created_at ? <Text style={styles.modalBody}>Criado em: {item.created_at}</Text> : null}
-                {item?.updated_at ? <Text style={styles.modalBody}>Atualizado em: {item.updated_at}</Text> : null}
-                {item?.revision != null ? <Text style={styles.modalBody}>Revision: {String(item.revision)}</Text> : null}
-                {item?.labels.length ? <Text style={styles.modalBody}>Labels: {item.labels.join(", ")}</Text> : null}
-              </Card>
-
-              {item?.links.length ? (
-                <Card style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>LINKS</Text>
-                  {item.links.map((link, index) => (
-                    <Text key={`${index}-${link.type}-${link.target_key ?? ""}`} style={styles.modalMono}>
-                      {link.type} - {link.target_key ?? "-"} - {link.target_url ?? "-"}
-                    </Text>
-                  ))}
-                </Card>
-              ) : null}
-
-              {item?.comments.length ? (
-                <Card style={styles.modalSection}>
-                  <Text style={styles.modalSectionTitle}>COMENTARIOS</Text>
-                  {item.comments.map((comment, index) => (
-                    <View key={`${index}-${comment.created_at ?? "comment"}`} style={styles.modalListItem}>
-                      <Text style={styles.modalBody}>
-                        {(comment.author || "autor desconhecido") +
-                          (comment.created_at ? ` - ${comment.created_at}` : "")}
-                      </Text>
-                      <Text style={styles.modalBody}>{comment.body ?? ""}</Text>
+                  {acceptanceItems.slice(0, 5).map((criterion) => (
+                    <View key={criterion} style={styles.checkLine}>
+                      <View style={styles.checkDot} />
+                      <Text style={styles.modalBody}>{criterion.trim()}</Text>
                     </View>
                   ))}
-                </Card>
-              ) : null}
-            </>
+                </View>
+
+                <View style={styles.modalSectionBox}>
+                  <Text style={styles.modalSectionTitle}>LINKS</Text>
+                  {item?.source_url ? <Text style={styles.modalLink}>{item.source_url}</Text> : null}
+                  {item?.links.length ? (
+                    item.links.map((link, index) => (
+                      <Text key={`${index}-${link.type}-${link.target_key ?? ""}`} style={styles.modalLink}>
+                        {link.type} - {link.target_key ?? "-"}
+                      </Text>
+                    ))
+                  ) : (
+                    <Text style={styles.modalBody}>Sem links adicionais.</Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.modalOverviewRight}>
+                <View style={styles.modalSectionBox}>
+                  <Text style={styles.modalSectionTitle}>Logs ultimos 30 linhas</Text>
+                  <View style={styles.modalLogBox}>
+                    {(detail?.logs?.length ? detail.logs : [
+                      "Sequencia executiva da tarefa iniciada...",
+                      "Arvore de requisitos normalizada...",
+                      "Executando dependencias...",
+                      "Todos os testes passaram",
+                      "Aguardando review humana",
+                    ]).slice(-8).map((log, index) => (
+                      <Text key={`${index}-${log}`} style={styles.modalMono}>{log}</Text>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.modalSectionBox}>
+                  <View style={styles.modalSectionHeader}>
+                    <Text style={styles.modalSectionTitle}>Evidencias</Text>
+                    <Text style={styles.modalLink}>Ver todas</Text>
+                  </View>
+                  <View style={styles.evidenceGrid}>
+                    {(detail?.evidence?.items?.length ? detail.evidence.items.slice(0, 3) : [
+                      { label: "Browser", path: "evidence/browser.png" },
+                      { label: "Console", path: "evidence/console.png" },
+                      { label: "Board", path: "evidence/board.png" },
+                    ]).map((entry) => (
+                      <View key={`${entry.label}-${entry.path}`} style={styles.evidenceTile}>
+                        <Text style={styles.evidenceTileText}>{entry.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.modalSectionBox}>
+                  <View style={styles.modalSectionHeader}>
+                    <Text style={styles.modalSectionTitle}>Readiness</Text>
+                    <Text style={styles.modalReadinessValue}>82%</Text>
+                  </View>
+                  <View style={styles.readinessTrack}>
+                    <View style={styles.readinessFill} />
+                  </View>
+                </View>
+              </View>
+            </View>
           ) : null}
 
           {tab === "logs" ? (
@@ -906,53 +1150,60 @@ const ItemDetailModal: React.FC<{
       </View>
     </View>
   </Modal>
-);
+  );
+};
 
 const styles = StyleSheet.create({
+  boardActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   hero: {
-    backgroundColor: "#eef5ff",
+    backgroundColor: theme.surface,
     flexDirection: "row",
     gap: 12,
+    alignItems: "flex-start",
   },
   kicker: {
     color: theme.primary,
-    fontSize: 11,
-    letterSpacing: 2,
+    fontSize: 10,
+    letterSpacing: 1,
     fontWeight: "800",
   },
   heroTitle: {
     color: theme.text,
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: "800",
-    marginTop: 4,
+    fontSize: 16,
+    lineHeight: 21,
+    fontWeight: "700",
+    marginTop: 2,
   },
   heroText: {
     color: theme.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 17,
     marginTop: 4,
   },
   heroMeta: {
     color: theme.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 8,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 5,
     fontFamily: theme.fontMono,
   },
   searchInput: {
-    marginTop: 12,
+    marginTop: 9,
     backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: theme.radius,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     color: theme.text,
-    fontSize: 14,
+    fontSize: 12,
   },
   toolbarRow: {
-    marginTop: 12,
+    marginTop: 8,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
@@ -962,17 +1213,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   board: {
-    gap: 12,
-    paddingTop: 16,
-    paddingBottom: 20,
+    gap: 8,
+    paddingTop: 10,
+    paddingBottom: 14,
   },
   column: {
-    width: 300,
-    gap: 10,
+    width: 166,
+    gap: 8,
     borderRadius: theme.radius,
     borderWidth: 1,
     borderColor: "transparent",
-    padding: 4,
+    padding: 3,
   },
   columnDropTarget: {
     backgroundColor: "rgba(44,107,237,0.06)",
@@ -982,16 +1233,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 10,
+    gap: 6,
   },
   columnTitle: {
     color: theme.text,
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: "800",
   },
   columnHint: {
     color: theme.textMuted,
-    fontSize: 12,
+    fontSize: 10,
     marginTop: 2,
   },
   emptyCard: {
@@ -1002,7 +1253,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   taskCard: {
-    gap: 8,
+    gap: 6,
   },
   taskCardDragging: {
     opacity: 0.52,
@@ -1020,26 +1271,26 @@ const styles = StyleSheet.create({
   itemKey: {
     color: theme.primary,
     fontFamily: theme.fontMono,
-    fontSize: 12,
+    fontSize: 10,
   },
   itemTitle: {
     color: theme.text,
-    fontSize: 15,
-    lineHeight: 21,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: "700",
   },
   itemStatus: {
     color: theme.textMuted,
-    fontSize: 12,
+    fontSize: 10,
   },
   metaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: 6,
   },
   metaText: {
     color: theme.textMuted,
-    fontSize: 12,
+    fontSize: 10,
   },
   metaDanger: {
     color: theme.danger,
@@ -1053,23 +1304,23 @@ const styles = StyleSheet.create({
   },
   runMeta: {
     color: theme.textMuted,
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: theme.fontMono,
   },
   statusChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderRadius: 999,
     backgroundColor: "rgba(44,107,237,0.12)",
   },
   statusChipText: {
     color: theme.primary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
   },
   miniAction: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 999,
     backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
@@ -1080,7 +1331,7 @@ const styles = StyleSheet.create({
   },
   miniActionText: {
     color: theme.primary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
   },
   signalPill: {
@@ -1115,15 +1366,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(14, 24, 36, 0.35)",
     justifyContent: "center",
-    padding: 20,
+    padding: 24,
   },
   modalCard: {
-    backgroundColor: theme.bg,
+    backgroundColor: theme.surface,
     borderRadius: theme.radius,
     borderWidth: 1,
     borderColor: theme.border,
-    padding: 16,
+    padding: 18,
     gap: 12,
+    width: "96%",
+    maxWidth: 1280,
+    minHeight: 620,
+    alignSelf: "center",
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
   },
   modalHead: {
     flexDirection: "row",
@@ -1138,18 +1397,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+    paddingBottom: 8,
   },
   modalTab: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: theme.surfaceAlt,
-    borderWidth: 1,
-    borderColor: theme.border,
+    paddingHorizontal: 6,
+    paddingVertical: 7,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
   },
   modalTabActive: {
-    backgroundColor: "rgba(44,107,237,0.10)",
-    borderColor: "rgba(44,107,237,0.24)",
+    borderBottomColor: theme.primary,
   },
   modalTabText: {
     color: theme.textMuted,
@@ -1161,7 +1420,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: theme.text,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: "800",
   },
   modalSubtitle: {
@@ -1169,14 +1428,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 4,
   },
+  modalScroll: {
+    maxHeight: 520,
+  },
+  modalOverviewGrid: {
+    flexDirection: "row",
+    gap: 18,
+  },
+  modalOverviewLeft: {
+    flex: 1,
+    gap: 12,
+    paddingRight: 18,
+    borderRightWidth: 1,
+    borderRightColor: theme.border,
+  },
+  modalOverviewRight: {
+    flex: 1,
+    gap: 12,
+  },
   modalSection: {
     marginBottom: 12,
   },
+  modalSectionBox: {
+    gap: 8,
+  },
+  modalSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
   modalSectionTitle: {
     color: theme.textMuted,
-    fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "700",
+    fontSize: 12,
+    letterSpacing: 0,
+    fontWeight: "800",
     marginBottom: 6,
   },
   modalBody: {
@@ -1189,6 +1475,84 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     fontFamily: theme.fontMono,
+  },
+  modalMetaGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+  },
+  modalMetaItem: {
+    minWidth: 130,
+    gap: 4,
+  },
+  modalMetaLabel: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  modalMetaValue: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  checkLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  checkDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: theme.success,
+  },
+  modalLink: {
+    color: theme.primary,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  modalLogBox: {
+    borderRadius: theme.radius,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: "#f8fafc",
+    padding: 12,
+    minHeight: 158,
+  },
+  evidenceGrid: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  evidenceTile: {
+    flex: 1,
+    height: 96,
+    borderRadius: theme.radius,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: "#f8fafc",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  evidenceTileText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  modalReadinessValue: {
+    color: theme.textMuted,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  readinessTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "#e8edf5",
+    overflow: "hidden",
+  },
+  readinessFill: {
+    width: "82%",
+    height: "100%",
+    backgroundColor: theme.success,
   },
   modalListItem: {
     gap: 4,

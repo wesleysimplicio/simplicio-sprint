@@ -129,6 +129,7 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
     org = (req.organization or (parsed.organization if parsed else "")).strip("/")
     project = (req.project or (parsed.project if parsed else "")).strip("/")
     team = (req.team or (parsed.team if parsed else "")).strip("/") or None
+    user_email = (req.user_email or "").strip().lower() or None
     account = f"{org}/{project}" if org and project else ""
     pat = (req.pat or "").strip()
     if not org or not project:
@@ -170,6 +171,7 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
                     "azuredevops.organization": org,
                     "azuredevops.project": project,
                     "azuredevops.team": team,
+                    "azuredevops.user_email": user_email,
                     "azuredevops.last_sprint_url": req.sprint_url or None,
                     "azuredevops.default_iteration": fallback["iteration_path"],
                 },
@@ -200,6 +202,7 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
             "azuredevops.organization": org,
             "azuredevops.project": project,
             "azuredevops.team": team,
+            "azuredevops.user_email": user_email,
             "azuredevops.last_sprint_url": req.sprint_url or None,
             "azuredevops.default_iteration": (
                 "\\".join(part for part in (project, team, parsed.iteration_name) if part)
@@ -230,19 +233,23 @@ def status() -> dict:
     ado_org = profile.azuredevops.organization or ""
     ado_project = profile.azuredevops.project or ""
     ado_team = profile.azuredevops.team or ""
+    ado_user_email = profile.azuredevops.user_email or ""
     jira_account = profile.jira.email or ""
+    jira_configured = _has_any("jira", jira_account) or bool(profile.jira.base_url and jira_account)
+    azure_configured = _has_any("azuredevops", ado_org) or bool(ado_org and ado_project)
     return {
         "default_provider": profile.default_provider,
-        "jira_configured": _has_any("jira", jira_account),
-        "azuredevops_configured": _has_any("azuredevops", ado_org),
+        "jira_configured": jira_configured,
+        "azuredevops_configured": azure_configured,
         "providers": {
             "jira": {
-                "configured": _has_any("jira", jira_account),
+                "configured": jira_configured,
                 "account": jira_account or None,
             },
             "azuredevops": {
-                "configured": _has_any("azuredevops", ado_org),
+                "configured": azure_configured,
                 "account": f"{ado_org}/{ado_project}" if ado_org and ado_project else None,
+                "user_email": ado_user_email or None,
                 "team_path": "/".join(part for part in (ado_org, ado_project, ado_team) if part)
                 or None,
                 "iteration_path": profile.azuredevops.default_iteration,

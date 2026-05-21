@@ -124,40 +124,29 @@ export const DashboardScreen: React.FC = () => {
         eyebrow="Web 02 · Shell Pos-login"
         title="Pronto para orquestrar seu proximo sprint"
         subtitle="Conecte um provider, importe a sprint e depois aponte ao menos um repositorio local para liberar execucao."
-        footer={
-          <View style={{ gap: 10 }}>
-            <Button title="Iniciar" onPress={() => nav.navigate("Provider")} icon="+" />
-            <Button title="Configurar projeto" variant="secondary" onPress={() => nav.navigate("ProjectSetup")} />
-            <Button title="Conexoes e parametros" variant="secondary" onPress={() => nav.navigate("Settings")} />
-          </View>
-        }
       >
         <Card style={styles.centerHero}>
           <View style={styles.heroOrb}>
-            <Text style={styles.heroOrbText}>+</Text>
+            <Text style={styles.heroOrbText}>{">"}</Text>
           </View>
           <Text style={styles.centerHeroTitle}>Nenhuma sprint ativa no shell web ainda</Text>
           <Text style={styles.centerHeroText}>
             O login do app ja foi validado. O proximo passo e escolher Jira ou Azure DevOps,
             importar a sprint e abrir o backlog interno do SendSprint.
           </Text>
-          <Button title="Iniciar" onPress={() => nav.navigate("Provider")} />
+          <Button title="Iniciar" onPress={() => nav.navigate("Provider")} icon=">" />
         </Card>
 
         <View style={styles.quickGrid}>
-          <Card style={styles.quickCard}>
+          <Card style={styles.quickCard} onPress={() => nav.navigate("ProjectSetup")}>
             <Text style={styles.quickLabel}>Configurar projeto</Text>
             <Text style={styles.quickValue}>Repositorios, papeis e branches</Text>
-            <Pressable onPress={() => nav.navigate("ProjectSetup")}>
-              <Text style={styles.quickLink}>Configurar agora</Text>
-            </Pressable>
+            <Text style={styles.quickLink}>Configurar agora</Text>
           </Card>
-          <Card style={styles.quickCard}>
+          <Card style={styles.quickCard} onPress={() => nav.navigate("Settings")}>
             <Text style={styles.quickLabel}>Conexoes</Text>
             <Text style={styles.quickValue}>Jira, Azure DevOps e GitHub</Text>
-            <Pressable onPress={() => nav.navigate("Settings")}>
-              <Text style={styles.quickLink}>Abrir conexoes</Text>
-            </Pressable>
+            <Text style={styles.quickLink}>Abrir conexoes</Text>
           </Card>
         </View>
 
@@ -412,16 +401,16 @@ const chipTone = (run: ControlPlaneRunSummary): "default" | "success" | "danger"
 
 const styles = StyleSheet.create({
   centerHero: {
-    minHeight: 280,
+    minHeight: 180,
     alignItems: "center",
     justifyContent: "center",
-    gap: 12,
-    paddingVertical: 36,
+    gap: 10,
+    paddingVertical: 26,
   },
   heroOrb: {
-    width: 72,
-    height: 72,
-    borderRadius: 999,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "rgba(44,107,237,0.10)",
     borderWidth: 1,
     borderColor: "rgba(44,107,237,0.18)",
@@ -430,20 +419,20 @@ const styles = StyleSheet.create({
   },
   heroOrbText: {
     color: theme.primary,
-    fontSize: 28,
+    fontSize: 19,
     fontWeight: "800",
   },
   centerHeroTitle: {
     color: theme.text,
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: "800",
     textAlign: "center",
   },
   centerHeroText: {
     color: theme.textMuted,
-    fontSize: 14,
-    lineHeight: 22,
+    fontSize: 12,
+    lineHeight: 17,
     textAlign: "center",
     maxWidth: 620,
   },
@@ -455,16 +444,17 @@ const styles = StyleSheet.create({
   quickCard: {
     flex: 1,
     minWidth: 280,
+    minHeight: 76,
   },
   quickLabel: {
     color: theme.text,
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "700",
   },
   quickValue: {
     color: theme.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 17,
     marginTop: 4,
   },
   quickLink: {
@@ -479,10 +469,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   statPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.82)",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: theme.radius,
+    backgroundColor: theme.surface,
     borderWidth: 1,
     borderColor: theme.border,
     minWidth: 180,

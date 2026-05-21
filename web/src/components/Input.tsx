@@ -43,12 +43,14 @@ export const Input: React.FC<Props> = ({
 };
 
 const styles = StyleSheet.create({
-  wrap: { gap: 6 },
+  wrap: { gap: 5 },
   label: {
     color: theme.textMuted,
-    fontSize: 12,
-    letterSpacing: 1.5,
+    fontSize: 10,
+    letterSpacing: 0.4,
     textTransform: "uppercase",
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
   input: {
     backgroundColor: theme.surface,
@@ -56,8 +58,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.border,
     borderRadius: theme.radius,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
   },
 });

@@ -22,6 +22,7 @@ type Props = {
   height?: number;
   startDelay?: number;
   showCursor?: boolean;
+  className?: string;
 };
 
 export const Terminal: React.FC<Props> = ({
@@ -31,6 +32,7 @@ export const Terminal: React.FC<Props> = ({
   height = 520,
   startDelay = 0,
   showCursor = true,
+  className,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -49,6 +51,7 @@ export const Terminal: React.FC<Props> = ({
 
   return (
     <div
+      className={className}
       style={{
         width,
         height,

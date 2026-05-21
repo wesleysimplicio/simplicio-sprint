@@ -95,7 +95,7 @@ bootstrap, and Python fallback when the web UI is blocked.
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
 
-> **Status:** v0.21.0 — Console + Web is operational for the current free local-first slice: deterministic task understanding, portfolio/project routing metadata, read-only route previews, Web project setup and Azure auth feedback, frontend route inventory with generated Playwright smokes, robust dev-server readiness handling, version checks in Settings, and plugin profiles for Windsurf, Kiro, and Antigravity. Core delivery still includes local-first `sendsprint sprint`, Jira/Azure DevOps reads, dry-run/resume, evidence bundles, dashboard previews, PR creation, post-PR validation, OSS contribution mode, and yool/tuple runtime hardening.
+> **Status:** v0.22.0 — Console + Web is operational for the current free local-first slice: deterministic task understanding, portfolio/project routing metadata, read-only route previews, Web project setup and Azure auth feedback, frontend route inventory with generated Playwright smokes, robust dev-server readiness handling, version checks in Settings, and plugin profiles for Windsurf, Kiro, and Antigravity. Core delivery still includes local-first `sendsprint sprint`, Jira/Azure DevOps reads, dry-run/resume, evidence bundles, dashboard previews, PR creation, post-PR validation, OSS contribution mode, and yool/tuple runtime hardening.
 
 ---
 

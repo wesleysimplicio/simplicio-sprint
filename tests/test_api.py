@@ -271,6 +271,7 @@ def test_auth_azure_accepts_sprint_url_and_returns_inferred_paths(monkeypatch):
             "https://dev.azure.com/DigitalProjects-Americas/ONS-16058-MANUTSIS-FORT/"
             "_sprints/taskboard/Time_019/ONS-16058-MANUTSIS-FORT/Time_019/T019_Sprint_98"
         ),
+        "user_email": "Operator@Example.COM",
         "pat": "redacted-test-pat",
     }
     resp = client.post("/auth/azuredevops", json=payload)
@@ -282,6 +283,7 @@ def test_auth_azure_accepts_sprint_url_and_returns_inferred_paths(monkeypatch):
     assert updates[0]["azuredevops.organization"] == "DigitalProjects-Americas"
     assert updates[0]["azuredevops.project"] == "ONS-16058-MANUTSIS-FORT"
     assert updates[0]["azuredevops.team"] == "Time_019"
+    assert updates[0]["azuredevops.user_email"] == "operator@example.com"
     assert updates[0]["azuredevops.last_sprint_url"] == payload["sprint_url"]
     assert secrets[0][:2] == ("azuredevops", "DigitalProjects-Americas")
 
@@ -330,6 +332,7 @@ def test_auth_azure_allows_manual_project_context_override(monkeypatch):
         "organization": "myorg",
         "project": "ManualProject",
         "team": "CustomTeam",
+        "user_email": "dev@example.com",
         "pat": "redacted-test-pat",
     }
     resp = client.post("/auth/azuredevops", json=payload)
@@ -339,6 +342,7 @@ def test_auth_azure_allows_manual_project_context_override(monkeypatch):
     assert body["ado_team_path"] == "myorg/ManualProject/CustomTeam"
     assert body["ado_iteration_path"] == "ManualProject\\CustomTeam\\Sprint 12"
     assert updates[0]["azuredevops.team"] == "CustomTeam"
+    assert updates[0]["azuredevops.user_email"] == "dev@example.com"
     assert updates[0]["azuredevops.last_sprint_url"] == payload["sprint_url"]
     assert secrets[0][:2] == ("azuredevops", "myorg")
 
@@ -407,6 +411,38 @@ def test_list_ado_sprints_uses_profile_context_and_iteration_path_id(monkeypatch
     assert body[0]["id"] == "ONS-16058-MANUTSIS-FORT\\Time_019\\T019_Sprint_98"
 
 
+def test_auth_status_marks_azure_configured_from_profile_without_keyring(monkeypatch):
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth.profile_mod.load",
+        lambda: Profile.model_validate(
+            {
+                "default_provider": "azuredevops",
+                "azuredevops": {
+                    "organization": "Acme",
+                    "project": "Payments",
+                    "team": "Team Falcon",
+                    "user_email": "operator@example.com",
+                    "default_iteration": "Payments\\Team Falcon\\Sprint 7",
+                },
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "sendsprint.api.routes.auth.credentials.get_secret",
+        lambda provider, account: None,
+    )
+
+    resp = client.get("/auth/status")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["default_provider"] == "azuredevops"
+    assert body["azuredevops_configured"] is True
+    assert body["providers"]["azuredevops"]["configured"] is True
+    assert body["providers"]["azuredevops"]["account"] == "Acme/Payments"
+    assert body["providers"]["azuredevops"]["iteration_path"] == "Payments\\Team Falcon\\Sprint 7"
+
+
 def test_get_ado_sprint_uses_iteration_path(monkeypatch):
     calls: list[str] = []
 
@@ -439,6 +475,94 @@ def test_get_ado_sprint_uses_iteration_path(monkeypatch):
 
     assert resp.status_code == 200, resp.text
     assert calls == ["ONS-16058-MANUTSIS-FORT\\Time_019\\T019_Sprint_98"]
+
+
+def test_get_ado_sprint_deduplicates_items_by_key(monkeypatch):
+    class FakeOperator:
+        def __init__(self, *args, **kwargs):
+            del args, kwargs
+
+        def read_sprint(self, **kwargs):
+            del kwargs
+            return type(
+                "SprintStub",
+                (),
+                {
+                    "id": "Payments\\Team Falcon\\Sprint 7",
+                    "name": "Sprint 7",
+                    "state": "active",
+                    "start_date": None,
+                    "end_date": None,
+                    "goal": None,
+                    "items": [
+                        type(
+                            "SprintItemStub",
+                            (),
+                            {
+                                "id": "101",
+                                "key": "AZ-101",
+                                "type": "Task",
+                                "title": "Implement onboarding",
+                                "status": "To Do",
+                                "description": None,
+                                "revision": "1",
+                                "assignee": None,
+                                "assignee_email": None,
+                                "story_points": None,
+                                "parent_key": None,
+                                "labels": [],
+                                "links": [],
+                                "comments": [],
+                                "attachments": [],
+                                "acceptance_criteria": None,
+                                "created_at": None,
+                                "updated_at": None,
+                                "source_url": None,
+                            },
+                        )(),
+                        type(
+                            "SprintItemStub",
+                            (),
+                            {
+                                "id": "101",
+                                "key": "AZ-101",
+                                "type": "Task",
+                                "title": "Implement onboarding",
+                                "status": "In Progress",
+                                "description": "Richer duplicate payload",
+                                "revision": "2",
+                                "assignee": "Operator",
+                                "assignee_email": "operator@example.com",
+                                "story_points": 5,
+                                "parent_key": None,
+                                "labels": ["web"],
+                                "links": [],
+                                "comments": [],
+                                "attachments": [],
+                                "acceptance_criteria": "Keep one card",
+                                "created_at": None,
+                                "updated_at": None,
+                                "source_url": "https://dev.azure.com/acme/payments/_workitems/edit/101",
+                            },
+                        )(),
+                    ],
+                },
+            )()
+
+    monkeypatch.setattr("sendsprint.api.routes.sprints.AzureDevopsOperator", FakeOperator)
+
+    resp = client.get(
+        "/sprints/Payments%5CTeam%20Falcon%5CSprint%207",
+        params={"provider": "azuredevops"},
+    )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["sprint"]["item_count"] == 1
+    assert len(body["items"]) == 1
+    assert body["items"][0]["key"] == "AZ-101"
+    assert body["items"][0]["description"] == "Richer duplicate payload"
+    assert body["items"][0]["assignee_email"] == "operator@example.com"
 
 
 def test_start_run_returns_run_id_and_emits_events():

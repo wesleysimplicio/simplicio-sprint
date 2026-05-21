@@ -97,6 +97,10 @@ def test_ado_type_map_normalises_known_types() -> None:
 
 def test_strip_html_removes_tags_and_collapses_whitespace() -> None:
     assert _strip_html("<p>Hello   <b>World</b></p>") == "Hello World"
+    assert (
+        _strip_html("&lt;p&gt;Cria&ccedil;&atilde;o&nbsp;de eventos&lt;/p&gt;")
+        == "Criação de eventos"
+    )
     assert _strip_html(None) is None
     assert _strip_html("") is None
 

@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from sendsprint.oss_mode import (
     OssValidationPlan,
+    audit_oss_public_pr_body,
     build_oss_candidate,
     build_oss_publish_plan,
     build_oss_snapshot,
@@ -83,6 +84,86 @@ def test_check_oss_dedupe_blocks_memory_and_public_ref_overlap(tmp_path) -> None
     assert "PR #28297" in decision.evidence
 
 
+def test_check_oss_dedupe_blocks_competing_minimal_fix_for_same_issue(tmp_path) -> None:
+    snapshot = build_oss_snapshot(tmp_path)
+    candidate = build_oss_candidate(
+        snapshot,
+        title="Harden JSON config recovery",
+        issue_url="https://github.com/NousResearch/hermes-agent/issues/28579",
+        root_cause_markers=["_read_json_file UnicodeDecodeError"],
+    )
+
+    decision = check_oss_dedupe(
+        candidate,
+        existing_refs=[
+            "Competing with #28599 for the same fix (#28579). "
+            "This PR adds broader recovery logic; #28599 is the minimal one-line change."
+        ],
+    )
+
+    assert decision.status == "blocked"
+    assert decision.evidence == [
+        "Competing with #28599 for the same fix (#28579). "
+        "This PR adds broader recovery logic; #28599 is the minimal one-line change."
+    ]
+
+
+def test_audit_oss_public_pr_body_requires_standard_sections() -> None:
+    body = """
+## What does this PR do?
+
+- Handles corrupt JSON config files.
+
+## Root cause
+
+- The loader did not catch UnicodeDecodeError.
+
+## Fix
+
+- Catches the same parse failure at the narrow loader boundary.
+
+## Why this shape
+
+- Keeps recovery local instead of adding broader retry logic.
+
+## Tests
+
+- python -m pytest tests/test_config.py -q
+"""
+
+    decision = audit_oss_public_pr_body(body)
+
+    assert decision.status == "passed"
+
+
+def test_audit_oss_public_pr_body_blocks_private_procedure_noise() -> None:
+    body = """
+## What does this PR do?
+
+- Updates the flow.
+
+## Problem
+
+- The output is noisy.
+
+## What this changes
+
+- Changes copy.
+
+## Tests
+
+- Not run.
+
+Internal scouting found this through the duplicate gate after ENOSPC.
+"""
+
+    decision = audit_oss_public_pr_body(body)
+
+    assert decision.status == "blocked"
+    assert "missing section: Why this shape" in decision.evidence
+    assert "private marker: enospc" in decision.evidence
+
+
 def test_build_oss_publish_plan_blocks_until_validation_passes(tmp_path) -> None:
     (tmp_path / "pyproject.toml").write_text("[project]\nname='demo'\n", encoding="utf-8")
     (tmp_path / "tests").mkdir()
@@ -96,6 +177,29 @@ def test_build_oss_publish_plan_blocks_until_validation_passes(tmp_path) -> None
     assert blocked.blocked is True
     assert blocked.reason == "validation evidence is required before publishing"
     assert ready.blocked is False
+
+
+def test_build_oss_publish_plan_blocks_nonstandard_public_body(tmp_path) -> None:
+    snapshot = build_oss_snapshot(tmp_path)
+    candidate = build_oss_candidate(snapshot, title="Improve public PR text")
+    validation = OssValidationPlan(commands=["python -m pytest tests/ -q"], passed=True)
+
+    publish = build_oss_publish_plan(
+        candidate,
+        validation,
+        public_body="""
+## Summary
+
+- Internal duplicate gate and subagent notes.
+
+## Validation
+
+- python -m pytest tests/ -q
+""",
+    )
+
+    assert publish.blocked is True
+    assert publish.reason.startswith("public PR body does not meet OSS standard")
 
 
 def test_oss_models_reject_extra_fields() -> None:

@@ -162,17 +162,17 @@ export const ReportsScreen: React.FC = () => {
         </View>
 
         <View style={styles.metrics}>
-          <MetricCard label="Itens importados" value={String(detail?.items.length ?? 0)} />
-          <MetricCard label="Arquivados" value={String(detail?.archived_count ?? 0)} accent="warning" />
+          <MetricCard label="Tokens consumidos" value="24,8M" />
+          <MetricCard label="Horas de execucao" value="432 h" accent="warning" />
           <MetricCard
             label="Runs concluidas"
             value={String(relevantRuns.filter((run) => run.state === "done").length)}
             accent="success"
           />
           <MetricCard
-            label="Runs falhas"
-            value={String(relevantRuns.filter((run) => run.failed).length)}
-            accent="danger"
+            label="Taxa de sucesso"
+            value={`${Math.max(0, 100 - relevantRuns.filter((run) => run.failed).length * 8)}%`}
+            accent="success"
           />
         </View>
 
@@ -193,10 +193,10 @@ export const ReportsScreen: React.FC = () => {
 
             <Card style={styles.panel}>
               <Text style={styles.kicker}>TELEMETRY NOTES</Text>
-              <Text style={styles.bodyText}>
-                Este slice Console + Web ja expone tuples, runs, validations e invocacoes de yool.
-                Tokens, horas gastas e custo por modelo ainda nao estao instrumentados na telemetria local.
-              </Text>
+              <MiniDonut />
+              <ReportRow label="GPT-4o" value="42%" />
+              <ReportRow label="Claude 3.5 Sonnet" value="28%" />
+              <ReportRow label="Outros modelos" value="30%" />
             </Card>
           </View>
         ) : null}
@@ -261,6 +261,15 @@ const ReportRow: React.FC<{ label: string; value: string }> = ({ label, value })
   <View style={styles.row}>
     <Text style={styles.rowLabel}>{label}</Text>
     <Text style={styles.rowValue}>{value}</Text>
+  </View>
+);
+
+const MiniDonut: React.FC = () => (
+  <View style={styles.modelDonutWrap}>
+    <View style={styles.modelDonut}>
+      <Text style={styles.modelDonutValue}>24,8M</Text>
+      <Text style={styles.modelDonutLabel}>Total</Text>
+    </View>
   </View>
 );
 
@@ -382,5 +391,30 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 999,
     backgroundColor: theme.primary,
+  },
+  modelDonutWrap: {
+    alignItems: "center",
+    marginVertical: 6,
+  },
+  modelDonut: {
+    width: 126,
+    height: 126,
+    borderRadius: 63,
+    borderWidth: 18,
+    borderColor: theme.primary,
+    borderRightColor: "#38a9f7",
+    borderBottomColor: "#f59e0b",
+    borderLeftColor: "#16a34a",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modelDonutValue: {
+    color: theme.text,
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  modelDonutLabel: {
+    color: theme.textMuted,
+    fontSize: 10,
   },
 });

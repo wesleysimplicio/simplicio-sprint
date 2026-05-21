@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -236,6 +237,65 @@ def test_run_worker_pool_replays_pending_tuples_and_returns_stats(tmp_path: Path
     assert inspected["worker_stats"]["dev"]["consumed"] == 1
     assert inspected["worker_stats"]["review"]["consumed"] == 1
     assert len(inspected["receipts"]) == 2
+
+
+def test_worker_pool_runs_same_lane_tuples_concurrently(tmp_path: Path) -> None:
+    catalog = json.loads(_write_catalog(tmp_path).read_text(encoding="utf-8"))
+    bus = TupleBus()
+    tuple_root = tmp_path / ".sendsprint" / "tuples"
+    receipt_root = tmp_path / ".sendsprint" / "receipts"
+    log = TupleLog("run-fast", tuple_root)
+    store = ReceiptStore(receipt_root)
+    lock = threading.Lock()
+    active = 0
+    max_active = 0
+
+    def executor(entry, payload):
+        nonlocal active, max_active
+        del payload
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        try:
+            time.sleep(0.05)
+            return {"handled": entry.yool_id}
+        finally:
+            with lock:
+                active -= 1
+
+    dispatcher = Dispatcher(store=store, executor=executor)
+    worker = Worker(
+        lane="dev",
+        bus=bus,
+        log=log,
+        catalog=catalog,
+        dispatcher=dispatcher,
+        run_id="run-fast",
+    )
+    pool = WorkerPool(default_concurrency=4)
+    pool.add(worker)
+
+    for index in range(4):
+        tup = emit_tuple(
+            yool_id="agent.codex.plan",
+            lane="dev",
+            payload={"task": index},
+            run_id="run-fast",
+        )
+        log.append(tup)
+
+    inspected = run_worker_pool(
+        pool,
+        bus=bus,
+        run_id="run-fast",
+        tuple_root=tuple_root,
+        receipt_root=receipt_root,
+    )
+
+    assert inspected["pending_ids"] == []
+    assert inspected["worker_stats"]["dev"]["consumed"] == 4
+    assert inspected["worker_task_counts"]["dev"] == 4
+    assert max_active >= 2
 
 
 def test_resume_after_kill_replays_pending_tuple(tmp_path: Path) -> None:

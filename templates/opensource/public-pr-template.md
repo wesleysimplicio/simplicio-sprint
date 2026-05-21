@@ -1,4 +1,4 @@
-## Summary
+## What does this PR do?
 
 - 
 
@@ -6,18 +6,20 @@
 
 - 
 
-## Solution
+## What this changes
 
 - 
 
-## Validation
+## Why this shape
 
 - 
 
-## Risk / rollback
+## Tests
 
 - 
 
 ## Related issue / credits
 
 - 
+
+Closes #

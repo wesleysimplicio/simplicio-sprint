@@ -52,12 +52,10 @@ export const CompanyAdminScreen: React.FC = () => {
     () =>
       Array.from(
         new Set(
-          session.projectSetup.repositories
-            .map((repository) => repository.deployTargetBranch.trim())
-            .filter(Boolean),
+          [session.projectSetup.deployTargetBranch.trim()].filter(Boolean),
         ),
       ),
-    [session.projectSetup.repositories],
+    [session.projectSetup.deployTargetBranch],
   );
 
   const validationCommands = useMemo(

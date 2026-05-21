@@ -82,3 +82,27 @@ Result: Rewired `SprintFlow` so the main execution path now bootstraps worker-ro
 Validation: `python -m pytest tests -q`; `python -m ruff check sendsprint tests`; `npm run lint`; `npm run test:e2e`.
 
 Next: close `#84`, `#88`, and `#76`, then commit and push.
+
+### Checkpoint 6
+
+Status: completed
+
+Task: Correct the web layout to match the GPT-image-2 storyboard exports under `telas/exports/screens/01_web_storyboard`.
+
+Result: Reworked the desktop shell density, restored in-canvas headers for app screens, centered the provider picker, converted the sprint import pipeline to the horizontal 8-step storyboard treatment, tightened the 7-column backlog board, and rebuilt the task-detail modal as a wide two-column operational modal with logs, evidence tiles, and readiness.
+
+Validation: `npm --prefix web run typecheck`; `BASE_URL=http://localhost:19006 npx playwright test --project=chromium` (`7 passed`).
+
+Next: use the captured screenshots in `.codex-layout-shots/after2/` for any remaining pixel-level review.
+
+### Checkpoint 7
+
+Status: completed
+
+Task: Save SendSprint web connection context per app user so Azure DevOps does not require reconnecting on each login.
+
+Result: Added a per-email `userProfiles` cache to the web session store. The profile stores non-secret delivery context only: provider, account, Jira board id, Azure DevOps team path, current sprint, and project setup. Login now restores the matching profile after app authentication, while logout saves the active user's profile and clears user-scoped fields from the visible session.
+
+Validation: `npm --prefix web run typecheck`; `BASE_URL=http://localhost:19006 npx playwright test --project=chromium` (`8 passed`).
+
+Next: review the persisted profile behavior in a real Azure DevOps login session.

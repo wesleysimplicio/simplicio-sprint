@@ -7,6 +7,7 @@ type Props = {
   width?: number | string;
   padding?: number;
   glow?: string;
+  className?: string;
   children: React.ReactNode;
   style?: React.CSSProperties;
 };
@@ -16,6 +17,7 @@ export const Card: React.FC<Props> = ({
   width = "auto",
   padding = 28,
   glow = "rgba(124, 92, 255, 0.35)",
+  className,
   children,
   style,
 }) => {
@@ -35,6 +37,7 @@ export const Card: React.FC<Props> = ({
 
   return (
     <div
+      className={className}
       style={{
         width,
         padding,

@@ -36,6 +36,7 @@ class AzureDevopsProfile(BaseModel):
     organization: str | None = None
     project: str | None = None
     team: str | None = None
+    user_email: str | None = None
     default_iteration: str | None = None
     last_sprint_url: str | None = None
 

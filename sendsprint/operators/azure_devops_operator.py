@@ -369,10 +369,23 @@ def _parse_dt(value: Any) -> datetime | None:
 def _strip_html(value: Any) -> str | None:
     if not value:
         return None
+    import html
     import re
 
-    text = re.sub(r"<[^>]+>", " ", str(value))
-    text = re.sub(r"\s+", " ", text).strip()
+    text = str(value)
+    for _ in range(2):
+        decoded = html.unescape(text)
+        if decoded == text:
+            break
+        text = decoded
+    text = re.sub(r"<\s*br\s*/?>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<\s*/\s*(p|div|li|h[1-6]|tr)\s*>", "\n", text, flags=re.IGNORECASE)
+    text = re.sub(r"<\s*li\b[^>]*>", "\n- ", text, flags=re.IGNORECASE)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html.unescape(text).replace("\xa0", " ")
+    text = re.sub(r"[ \t\f\v]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text).strip()
     return text or None
 
 

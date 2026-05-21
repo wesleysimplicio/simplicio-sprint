@@ -2,15 +2,15 @@ import React from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
-  Pressable,
 } from "react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { CommonActions, useNavigation, useRoute } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
@@ -38,19 +38,44 @@ export const Screen: React.FC<Props> = ({
 }) => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { session } = useSession();
+  const { session, setAppUser, setOperatorToken } = useSession();
   const { width } = useWindowDimensions();
   const Body = scroll ? ScrollView : View;
   const showSidebar = chrome === "app" && Platform.OS === "web" && width >= 1100;
   const compact = Platform.OS === "web" && width < 860;
   const currentRoute = route.name as string;
   const isAuthChrome = chrome === "auth";
+  const showInlineHeader = Boolean(title || subtitle || eyebrow || actions);
+  const bodyStyle = scroll
+    ? styles.flex
+    : [
+        styles.flex,
+        styles.scroll,
+        isAuthChrome && styles.scrollAuth,
+        compact && styles.scrollCompact,
+      ];
+  const bodyContentStyle = scroll
+    ? [
+        styles.scroll,
+        isAuthChrome && styles.scrollAuth,
+        compact && styles.scrollCompact,
+      ]
+    : undefined;
+
+  const handleLogout = async () => {
+    await setOperatorToken(null);
+    await setAppUser(null);
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: "Connect" }],
+      }),
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.bgGlowTop} />
-      <View style={styles.bgGlowBottom} />
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
         <View style={styles.shell}>
           {showSidebar ? (
@@ -59,9 +84,9 @@ export const Screen: React.FC<Props> = ({
                 <View style={styles.brandBadge}>
                   <Text style={styles.brandBadgeText}>S</Text>
                 </View>
-                <View>
-                  <Text style={styles.brandName}>SendSprint</Text>
-                  <Text style={styles.brandMeta}>Local Delivery Plane</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.brandName} numberOfLines={1}>SendSprint</Text>
+                  <Text style={styles.brandMeta} numberOfLines={1}>AI Sprint Delivery</Text>
                 </View>
               </View>
 
@@ -70,7 +95,7 @@ export const Screen: React.FC<Props> = ({
                   const active = isRouteActive(item.route, currentRoute);
                   return (
                     <Pressable
-                      key={item.label}
+                      key={`${item.route}-${item.label}`}
                       onPress={() => navigateShellItem(navigation, item.route)}
                       style={({ pressed }) => [
                         styles.navItem,
@@ -89,33 +114,54 @@ export const Screen: React.FC<Props> = ({
                 <Text style={styles.sidebarHelp}>Ajuda</Text>
                 <View style={styles.operatorCard}>
                   <View style={styles.operatorAvatar}>
-                    <Text style={styles.operatorAvatarText}>FS</Text>
+                    <Text style={styles.operatorAvatarText}>{initials(session.appUser?.displayName ?? session.appUser?.email)}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.operatorName}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.operatorName} numberOfLines={1}>
                       {session.appUser?.displayName ?? session.appUser?.email ?? "Operador local"}
                     </Text>
-                    <Text style={styles.operatorMeta}>
+                    <Text style={styles.operatorMeta} numberOfLines={1}>
                       {session.currentSprint?.sprintName ?? "Shell ativa"}
                     </Text>
                   </View>
                 </View>
+                <Pressable
+                  testID="logout-button"
+                  accessibilityRole="button"
+                  accessibilityLabel="Sair"
+                  onPress={() => void handleLogout()}
+                  style={({ pressed }) => [styles.logoutButton, pressed && { opacity: 0.78 }]}
+                >
+                  <Text style={styles.logoutText}>Sair</Text>
+                </Pressable>
               </View>
             </View>
           ) : null}
 
           <View style={[styles.main, isAuthChrome && styles.mainAuth]}>
+            {!isAuthChrome && showSidebar ? (
+              <View style={styles.topBar}>
+                <View style={styles.topBarLeft}>
+                  <Text style={styles.topBarTitle} numberOfLines={1}>SendSprint workspace</Text>
+                  <Text style={styles.topBarSubtitle} numberOfLines={1}>Control plane local</Text>
+                </View>
+                <View style={styles.topBarRight}>
+                  <View style={styles.statusDot} />
+                  <Text style={styles.topBarMeta}>Atualizado agora</Text>
+                  <View style={styles.bellCircle}>
+                    <Text style={styles.bellText}>!</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
             <View style={[styles.mainInner, isAuthChrome && styles.mainInnerAuth]}>
               <Body
-                style={styles.flex}
-                contentContainerStyle={[
-                  styles.scroll,
-                  isAuthChrome && styles.scrollAuth,
-                  compact && styles.scrollCompact,
-                ]}
+                style={bodyStyle}
+                contentContainerStyle={bodyContentStyle}
                 keyboardShouldPersistTaps="handled"
               >
-                {(title || subtitle || eyebrow || actions) ? (
+                {showInlineHeader ? (
                   <View style={styles.headerBlock}>
                     <View style={{ flex: 1 }}>
                       {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
@@ -137,17 +183,20 @@ export const Screen: React.FC<Props> = ({
 };
 
 const NAV_ITEMS = [
-  { label: "Inicio", glyph: "IN", route: "Dashboard" },
-  { label: "Conexoes", glyph: "CN", route: "Provider" },
-  { label: "Sprints", glyph: "SP", route: "Sprints" },
-  { label: "Backlog", glyph: "BK", route: "SprintDetail" },
-  { label: "Projetos", glyph: "PJ", route: "ProjectSetup" },
-  { label: "Manager", glyph: "MG", route: "Manager" },
-  { label: "Saude", glyph: "HL", route: "CompanyHealth" },
-  { label: "Suporte", glyph: "SU", route: "Support" },
-  { label: "Reports", glyph: "RP", route: "Reports" },
-  { label: "Admin", glyph: "AD", route: "CompanyAdmin" },
-  { label: "Configuracoes", glyph: "CF", route: "Settings" },
+  { label: "Inicio", glyph: "H", route: "Dashboard" },
+  { label: "Sprints", glyph: "S", route: "Sprints" },
+  { label: "Execucoes", glyph: "R", route: "Dashboard" },
+  { label: "Backlog", glyph: "B", route: "SprintDetail" },
+  { label: "Projetos", glyph: "P", route: "ProjectSetup" },
+  { label: "Conexoes", glyph: "C", route: "Provider" },
+  { label: "Modelos IA", glyph: "M", route: "Settings" },
+  { label: "Manager", glyph: "G", route: "Manager" },
+  { label: "Saude", glyph: "+", route: "CompanyHealth" },
+  { label: "Portfolio", glyph: "F", route: "Portfolio" },
+  { label: "Suporte", glyph: "?", route: "Support" },
+  { label: "Reports", glyph: "A", route: "Reports" },
+  { label: "Admin", glyph: "K", route: "CompanyAdmin" },
+  { label: "Configuracoes", glyph: "*", route: "Settings" },
 ] as const;
 
 const ROUTE_ALIASES: Record<(typeof NAV_ITEMS)[number]["route"], string[]> = {
@@ -158,6 +207,7 @@ const ROUTE_ALIASES: Record<(typeof NAV_ITEMS)[number]["route"], string[]> = {
   ProjectSetup: ["ProjectSetup"],
   Manager: ["Manager"],
   CompanyHealth: ["CompanyHealth"],
+  Portfolio: ["Portfolio"],
   Support: ["Support"],
   Reports: ["Reports"],
   CompanyAdmin: ["CompanyAdmin"],
@@ -182,6 +232,12 @@ const navigateShellItem = (navigation: any, route: (typeof NAV_ITEMS)[number]["r
   navigation.navigate(route);
 };
 
+const initials = (value?: string | null): string => {
+  if (!value) return "FS";
+  const parts = value.replace(/@.*/, "").split(/[.\s_-]+/).filter(Boolean);
+  return (parts[0]?.[0] ?? "F").toUpperCase() + (parts[1]?.[0] ?? "S").toUpperCase();
+};
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.bg },
   flex: { flex: 1 },
@@ -189,43 +245,25 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
   },
-  bgGlowTop: {
-    position: "absolute",
-    top: -80,
-    right: -40,
-    width: 320,
-    height: 320,
-    borderRadius: 999,
-    backgroundColor: "rgba(44,107,237,0.10)",
-  },
-  bgGlowBottom: {
-    position: "absolute",
-    left: -100,
-    bottom: -120,
-    width: 340,
-    height: 340,
-    borderRadius: 999,
-    backgroundColor: "rgba(109,200,255,0.10)",
-  },
   sidebar: {
-    width: 220,
-    paddingHorizontal: 18,
-    paddingTop: 18,
-    paddingBottom: 18,
+    width: 176,
+    paddingHorizontal: 14,
+    paddingTop: 20,
+    paddingBottom: 14,
     borderRightWidth: 1,
-    borderRightColor: "rgba(215,228,245,0.9)",
-    backgroundColor: "rgba(250,252,255,0.92)",
+    borderRightColor: theme.border,
+    backgroundColor: "#ffffff",
   },
   brandBlock: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 6,
+    gap: 10,
+    paddingHorizontal: 0,
   },
   brandBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 9,
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
@@ -233,46 +271,53 @@ const styles = StyleSheet.create({
   brandBadgeText: {
     color: "#fff",
     fontWeight: "800",
-    fontSize: 18,
+    fontSize: 16,
+    fontFamily: theme.fontSans,
   },
   brandName: {
     color: theme.text,
-    fontSize: 17,
+    fontSize: 14,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
   },
   brandMeta: {
     color: theme.textMuted,
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 10,
+    marginTop: 1,
+    fontFamily: theme.fontSans,
   },
   navStack: {
-    marginTop: 24,
-    gap: 4,
+    marginTop: 34,
+    gap: 5,
   },
   navItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    borderRadius: 8,
   },
   navItemActive: {
-    backgroundColor: "rgba(44,107,237,0.10)",
+    backgroundColor: "rgba(0,94,232,0.08)",
   },
   navGlyph: {
     color: theme.textMuted,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: "900",
-    letterSpacing: 0.8,
+    letterSpacing: 0,
+    width: 16,
+    textAlign: "center",
+    fontFamily: theme.fontSans,
   },
   navGlyphActive: {
     color: theme.primary,
   },
   navLabel: {
     color: theme.textMuted,
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
   },
   navLabelActive: {
     color: theme.primary,
@@ -280,43 +325,62 @@ const styles = StyleSheet.create({
   sidebarFooter: {
     marginTop: "auto",
     gap: 10,
-    paddingHorizontal: 6,
+    paddingHorizontal: 0,
   },
   sidebarHelp: {
     color: theme.textMuted,
     fontSize: 12,
+    fontFamily: theme.fontSans,
   },
   operatorCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    padding: 10,
-    borderRadius: 14,
-    backgroundColor: "rgba(255,255,255,0.9)",
+    gap: 9,
+    padding: 9,
+    borderRadius: 8,
+    backgroundColor: theme.surfaceAlt,
     borderWidth: 1,
     borderColor: theme.border,
   },
   operatorAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: theme.surfaceAlt,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#e8f1ff",
     alignItems: "center",
     justifyContent: "center",
   },
   operatorAvatarText: {
     color: theme.primary,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
   },
   operatorName: {
     color: theme.text,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
   operatorMeta: {
     color: theme.textMuted,
+    fontSize: 10,
+    fontFamily: theme.fontSans,
+  },
+  logoutButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(0,94,232,0.18)",
+    backgroundColor: "rgba(0,94,232,0.06)",
+    paddingVertical: 8,
+  },
+  logoutText: {
+    color: theme.primary,
     fontSize: 11,
+    fontWeight: "800",
+    fontFamily: theme.fontSans,
   },
   main: {
     flex: 1,
@@ -332,64 +396,128 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 1280,
   },
+  topBar: {
+    minHeight: 58,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 14,
+  },
+  topBarLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
+  topBarTitle: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  topBarSubtitle: {
+    color: theme.textMuted,
+    fontSize: 11,
+    marginTop: 2,
+    fontFamily: theme.fontSans,
+  },
+  topBarRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.success,
+  },
+  topBarMeta: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontSans,
+  },
+  bellCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.surface,
+  },
+  bellText: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontWeight: "800",
+    fontFamily: theme.fontSans,
+  },
   scroll: {
     width: "100%",
-    maxWidth: 1180,
+    maxWidth: 1440,
     alignSelf: "center",
     paddingHorizontal: 24,
-    paddingTop: 18,
-    paddingBottom: 32,
+    paddingTop: 22,
+    paddingBottom: 22,
     gap: 14,
   },
   scrollAuth: {
     maxWidth: 1280,
-    paddingTop: 28,
-    paddingBottom: 28,
+    paddingTop: 22,
+    paddingBottom: 22,
   },
   scrollCompact: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 12,
   },
   headerBlock: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: 16,
+    gap: 18,
     marginBottom: 2,
   },
   eyebrow: {
     color: theme.primary,
-    fontSize: 11,
-    letterSpacing: 2,
+    fontSize: 10,
+    letterSpacing: 1.6,
     fontWeight: "800",
     textTransform: "uppercase",
-    marginBottom: 8,
+    marginBottom: 6,
+    fontFamily: theme.fontSans,
   },
   title: {
     color: theme.text,
-    fontSize: 34,
+    fontSize: 24,
     fontWeight: "800",
-    letterSpacing: -0.9,
+    letterSpacing: 0,
+    fontFamily: theme.fontSans,
   },
   subtitle: {
     color: theme.textMuted,
-    fontSize: 15,
-    lineHeight: 22,
-    marginTop: 8,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 5,
     maxWidth: 760,
+    fontFamily: theme.fontSans,
   },
   headerActions: {
     alignItems: "flex-end",
   },
   footer: {
     width: "100%",
-    maxWidth: 1180,
+    maxWidth: 1440,
     alignSelf: "center",
     paddingHorizontal: 24,
-    paddingBottom: 18,
-    paddingTop: 14,
+    paddingBottom: 12,
+    paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(215,228,245,0.9)",
-    backgroundColor: "rgba(255,255,255,0.78)",
-    gap: 10,
+    borderTopColor: theme.border,
+    backgroundColor: "#ffffff",
+    alignItems: "flex-end",
+    gap: 8,
   },
 });

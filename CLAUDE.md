@@ -97,7 +97,7 @@ This section complements the repository-specific guidance already in this file. 
 - Do not rewrite unrelated architecture, fake successful validation, expose secrets, or push without explicit operator instruction for the active session.
 <!-- codex-long-running-agent-overlay:end -->
 
-Use o repo canonico https://github.com/wesleysimplicio/yool-tuple-hamt. 
+Use o repo canonico https://github.com/wesleysimplicio/yool-tuple-hamt.
 Leia antes de editar: YOOL_TUPLE_HAMT.md, kernel/yool_tuple_kernel.py,
 guardrails/cpu_throttle.py, guardrails/disk_gc.py, examples/python/receipts.py
 e scripts/build_hamt.py.
@@ -111,9 +111,9 @@ LaneWorkerPool respeitando YOOL_TUPLE_* env vars.
 Execute:
 python kernel/yool_tuple_kernel.py
 
-Responda SEMPRE exatamente neste formato (sem varia??es):
-[Tuple Space Snapshot] 
+Responda SEMPRE exatamente neste formato (sem variações):
+[Tuple Space Snapshot]
 [Active Agents/Subagents]
 [Total Agents/Subagents]
-[Pr?ximo Yool a executar]
+[Próximo Yool a executar]
 [Resultado parcial]

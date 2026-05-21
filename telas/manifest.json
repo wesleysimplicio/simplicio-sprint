@@ -22,5 +22,11 @@
     "reports-and-analytics"
   ],
   "image_generator": "gpt-image-2",
+  "individual_screen_exports": {
+    "path": "exports/screens",
+    "manifest": "exports/screens/manifest.json",
+    "source": "pixel crops from the gpt-image-2 storyboard exports",
+    "count": 54
+  },
   "visual_direction": "clean functional Codex-Claude inspired SendSprint control plane"
 }

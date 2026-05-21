@@ -17,8 +17,8 @@ def materialize_workspace_from_project_setup(project_setup: dict[str, object]) -
     workspace = {
         "name": "web-session-workspace",
         "root_path": str(Path.cwd()),
-        "default_base_branch": _default_target_branch(repositories),
-        "repos": [_repo_to_workspace_repo(repo) for repo in repositories],
+        "default_base_branch": _default_target_branch(project_setup, repositories),
+        "repos": [_repo_to_workspace_repo(project_setup, repo) for repo in repositories],
     }
     encoded = json.dumps(workspace, ensure_ascii=True, sort_keys=True)
     digest = hashlib.sha1(encoded.encode("utf-8")).hexdigest()[:12]
@@ -29,7 +29,10 @@ def materialize_workspace_from_project_setup(project_setup: dict[str, object]) -
     return str(target)
 
 
-def _default_target_branch(repositories: list[object]) -> str:
+def _default_target_branch(project_setup: dict[str, object], repositories: list[object]) -> str:
+    value = str(project_setup.get("deployTargetBranch") or "").strip()
+    if value:
+        return value
     for repo in repositories:
         if isinstance(repo, dict):
             value = str(repo.get("deployTargetBranch") or "").strip()
@@ -38,7 +41,7 @@ def _default_target_branch(repositories: list[object]) -> str:
     return "dev"
 
 
-def _repo_to_workspace_repo(raw: object) -> dict[str, Any]:
+def _repo_to_workspace_repo(project_setup: dict[str, object], raw: object) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("Invalid repository payload.")
     repo_path = str(raw.get("repoPath") or "").strip()
@@ -54,11 +57,26 @@ def _repo_to_workspace_repo(raw: object) -> dict[str, Any]:
         "path": repo_path,
         "project": str(raw.get("project") or "").strip() or None,
         "role": _map_repo_role(str(raw.get("role") or "other")),
-        "pr_target_branch": str(raw.get("deployTargetBranch") or "").strip() or "dev",
-        "branch_pattern": str(raw.get("branchPattern") or "").strip() or None,
-        "commit_pattern": str(raw.get("commitPattern") or "").strip() or None,
+        "pr_target_branch": _resolve_project_setup_value(project_setup, raw, "deployTargetBranch", "dev"),
+        "branch_pattern": _resolve_project_setup_value(project_setup, raw, "branchPattern"),
+        "commit_pattern": _resolve_project_setup_value(project_setup, raw, "commitPattern"),
         "validation_commands": _string_list(raw.get("validationCommands")),
     }
+
+
+def _resolve_project_setup_value(
+    project_setup: dict[str, object],
+    repo: dict[str, object],
+    key: str,
+    fallback: str | None = None,
+) -> str | None:
+    top_level = str(project_setup.get(key) or "").strip()
+    if top_level:
+        return top_level
+    legacy_repo = str(repo.get(key) or "").strip()
+    if legacy_repo:
+        return legacy_repo
+    return fallback
 
 
 def _map_repo_role(role: str) -> str:

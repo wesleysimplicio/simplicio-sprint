@@ -15,15 +15,15 @@ def test_materialize_workspace_from_project_setup_writes_local_workspace(tmp_pat
 
     workspace_path = materialize_workspace_from_project_setup(
         {
+            "branchPattern": "feature/{item_key}",
+            "commitPattern": "{type}: {summary}",
+            "deployTargetBranch": "dev",
             "repositories": [
                 {
                     "name": "web",
                     "repoPath": str(repo_path),
                     "role": "frontend",
                     "project": "Customer Portal",
-                    "branchPattern": "feature/{item_key}",
-                    "commitPattern": "{type}: {summary}",
-                    "deployTargetBranch": "dev",
                     "validationCommands": ["npm test"],
                 }
             ]

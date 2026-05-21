@@ -34,6 +34,9 @@ htmlcov/
 *.swo
 .DS_Store
 
+# Local JS/runtime installs
+node_modules/
+
 # Env / secrets
 .env
 .env.local
@@ -51,3 +54,7 @@ playwright/.cache/
 sprint-*.json
 arch-report-*.json
 evidence/
+
+# Local Codex/browser run artifacts
+.codex-layout-shots/
+.codex-web-expo.*.log

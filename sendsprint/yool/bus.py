@@ -18,6 +18,7 @@ class TupleBus:
     def __init__(self, *, maxsize: int = 64) -> None:
         self._maxsize = maxsize
         self._lanes: dict[str, asyncio.Queue[Any]] = {}
+        self._subscribers: dict[str, int] = {}
         self._closed = False
 
     def _queue(self, lane: str) -> asyncio.Queue[Any]:
@@ -45,14 +46,22 @@ class TupleBus:
 
     async def subscribe(self, lane: str) -> AsyncIterator[Tuple]:
         queue = self._queue(lane)
-        while True:
-            item = await queue.get()
-            try:
-                if item is SENTINEL:
-                    return
-                yield item
-            finally:
-                queue.task_done()
+        self._subscribers[lane] = self._subscribers.get(lane, 0) + 1
+        try:
+            while True:
+                item = await queue.get()
+                try:
+                    if item is SENTINEL:
+                        return
+                    yield item
+                finally:
+                    queue.task_done()
+        finally:
+            remaining = self._subscribers.get(lane, 1) - 1
+            if remaining > 0:
+                self._subscribers[lane] = remaining
+            else:
+                self._subscribers.pop(lane, None)
 
     async def drain(self) -> None:
         while True:
@@ -67,12 +76,14 @@ class TupleBus:
         if self._closed:
             return
         self._closed = True
-        for queue in self._lanes.values():
-            while True:
-                with contextlib.suppress(asyncio.QueueFull):
-                    queue.put_nowait(SENTINEL)
-                    break
-                await asyncio.sleep(0)
+        for lane, queue in self._lanes.items():
+            subscriber_count = max(1, self._subscribers.get(lane, 0))
+            for _ in range(subscriber_count):
+                while True:
+                    with contextlib.suppress(asyncio.QueueFull):
+                        queue.put_nowait(SENTINEL)
+                        break
+                    await asyncio.sleep(0)
 
     def stats(self) -> dict[str, int]:
         return {lane: q.qsize() for lane, q in self._lanes.items()}

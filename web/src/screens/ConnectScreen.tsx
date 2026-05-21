@@ -131,31 +131,21 @@ export const ConnectScreen: React.FC = () => {
   return (
     <Screen
       chrome="auth"
-      eyebrow="Web 01 - App Login"
       title="SendSprint"
-      subtitle="Entre com email e senha da assinatura. Nesta fase local todos os usuarios autenticados continuam ativos, mas o fluxo ja segue o shell comercial planejado."
-      footer={
-        <View style={styles.footerActions}>
-          <Button
-            title={busy ? "Entrando..." : "Entrar"}
-            onPress={handleLogin}
-            loading={busy}
-            disabled={booting || !email.trim() || !password.trim()}
-          />
-          <Button
-            title="Entrar com Microsoft"
-            onPress={handleLogin}
-            variant="secondary"
-            disabled={booting}
-          />
-        </View>
-      }
+      subtitle="AI Sprint Delivery Control Plane"
     >
       <View style={styles.split}>
         <Card style={styles.loginCard}>
           <Text style={styles.kicker}>LOGIN SENDSPRINT</Text>
-          <Text style={styles.brand}>SendSprint</Text>
-          <Text style={styles.brandSub}>AI Sprint Delivery Control Plane</Text>
+          <View style={styles.logoRow}>
+            <View style={styles.logoMark}>
+              <Text style={styles.logoMarkText}>S</Text>
+            </View>
+            <View>
+              <Text style={styles.brand}>SendSprint</Text>
+              <Text style={styles.brandSub}>AI Sprint Delivery Control Plane</Text>
+            </View>
+          </View>
           <View style={{ height: 18 }} />
           <Input
             label="Email"
@@ -182,20 +172,28 @@ export const ConnectScreen: React.FC = () => {
               <Text style={styles.inlineLink}>Esqueci a senha</Text>
             </Pressable>
           </View>
+          <View style={styles.loginActions}>
+            <Button
+              title={busy ? "Entrando..." : "Entrar"}
+              onPress={handleLogin}
+              loading={busy}
+              disabled={!email.trim() || !password.trim()}
+            />
+            <Text style={styles.orText}>ou continue com SSO</Text>
+            <Button
+              title="Entrar com Microsoft"
+              onPress={handleLogin}
+              variant="secondary"
+            />
+          </View>
           <Text style={styles.metaText}>
-            Login do app primeiro. Conexao com provider, importacao da sprint e fallback por browser acontecem depois do botao Iniciar.
-          </Text>
-          <Text style={styles.sideHint}>
-            SSO Azure e gestao de assinatura entram aqui sem trocar o fluxo principal.
+            (c) 2026 SendSprint. Todos os direitos reservados.
           </Text>
         </Card>
 
         <Card style={styles.backendCard}>
           <Text style={styles.kicker}>STATUS DO BACKEND LOCAL</Text>
-          <Text style={styles.sideTitle}>Tudo pronto para o shell web</Text>
-          <Text style={styles.copy}>
-            O backend local valida o endpoint, recupera o token operador e exibe a disponibilidade do plano de controle antes do onboarding da sprint.
-          </Text>
+          <Text style={styles.sideTitle}>Online</Text>
           <Input
             label="API"
             value={url}
@@ -256,22 +254,42 @@ const styles = StyleSheet.create({
   split: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 18,
+    gap: 46,
     alignItems: "stretch",
+    justifyContent: "center",
   },
   loginCard: {
     flex: 1,
+    maxWidth: 400,
     minWidth: 320,
     paddingHorizontal: 28,
     paddingVertical: 28,
   },
   backendCard: {
-    width: 360,
-    minWidth: 320,
-    backgroundColor: "rgba(255,255,255,0.88)",
+    width: 300,
+    minWidth: 280,
+    backgroundColor: theme.surface,
     justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingVertical: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+  },
+  logoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  logoMark: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoMarkText: {
+    color: "#ffffff",
+    fontSize: 19,
+    fontWeight: "900",
   },
   kicker: {
     color: theme.textMuted,
@@ -281,27 +299,32 @@ const styles = StyleSheet.create({
   },
   brand: {
     color: theme.text,
-    fontSize: 32,
+    fontSize: 23,
     fontWeight: "800",
-    marginTop: 8,
   },
   brandSub: {
     color: theme.textMuted,
-    fontSize: 14,
-    marginTop: 6,
+    fontSize: 11,
+    marginTop: 2,
   },
-  footerActions: {
+  loginActions: {
     gap: 10,
+    marginTop: 14,
+  },
+  orText: {
+    color: theme.textMuted,
+    fontSize: 11,
+    textAlign: "center",
   },
   copy: {
     color: theme.textMuted,
-    fontSize: 14,
-    lineHeight: 21,
+    fontSize: 12,
+    lineHeight: 18,
   },
   sideTitle: {
     color: theme.text,
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 16,
+    lineHeight: 22,
     fontWeight: "800",
     marginTop: 6,
     marginBottom: 8,

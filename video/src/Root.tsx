@@ -4,6 +4,7 @@ import { SendSprintExplainer } from "./Video";
 import { RunLoopVideo, RUN_LOOP_DURATION } from "./RunLoopVideo";
 import { SendSprintBeforeAfter, BEFORE_AFTER_DURATION } from "./BeforeAfterVideo";
 import { FPS, TOTAL_FRAMES } from "./theme";
+import { PROMO_TOTAL_FRAMES, SendSprintLaunchPromo } from "./LaunchPromoVideo";
 
 export const Root: React.FC = () => {
   return (
@@ -67,6 +68,24 @@ export const Root: React.FC = () => {
         component={SendSprintBeforeAfter}
         defaultProps={{ lang: "en" as const }}
         durationInFrames={BEFORE_AFTER_DURATION}
+        fps={FPS}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="SendSprintLaunchPromo"
+        component={SendSprintLaunchPromo}
+        defaultProps={{ lang: "pt" as const }}
+        durationInFrames={PROMO_TOTAL_FRAMES}
+        fps={FPS}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="SendSprintLaunchPromoEN"
+        component={SendSprintLaunchPromo}
+        defaultProps={{ lang: "en" as const }}
+        durationInFrames={PROMO_TOTAL_FRAMES}
         fps={FPS}
         width={1920}
         height={1080}

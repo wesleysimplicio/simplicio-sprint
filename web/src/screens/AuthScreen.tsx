@@ -98,6 +98,7 @@ export const AuthScreen: React.FC = () => {
   const [jSprintUrl, setJSprintUrl] = useState("");
 
   const [aSprintUrl, setASprintUrl] = useState("");
+  const [aUserEmail, setAUserEmail] = useState(session.appUser?.email ?? "");
   const [aPat, setAPat] = useState("");
   const [aOrg, setAOrg] = useState("");
   const [aProject, setAProject] = useState("");
@@ -139,6 +140,7 @@ export const AuthScreen: React.FC = () => {
     const jiraSprintId = jSprintId.trim();
     const jiraSprintUrl = jSprintUrl.trim();
     const sprintUrl = aSprintUrl.trim();
+    const azureUserEmail = aUserEmail.trim().toLowerCase();
     const pat = aPat.trim();
     const organization = aOrg.trim();
     const project = aProject.trim();
@@ -153,12 +155,15 @@ export const AuthScreen: React.FC = () => {
       return;
     }
 
-    if (provider === "azuredevops" && ((!sprintUrl && (!organization || !project)) || !pat)) {
+    if (
+      provider === "azuredevops" &&
+      ((!sprintUrl && (!organization || !project)) || !azureUserEmail || !pat)
+    ) {
       setNotice({
         kind: "error",
         title: "Campos obrigatorios",
         message:
-          "Informe a URL da sprint ou Organization + Project, junto com o Personal Access Token do Azure DevOps.",
+          "Informe o usuario/email, a URL da sprint ou Organization + Project, junto com o Personal Access Token do Azure DevOps.",
       });
       return;
     }
@@ -215,6 +220,7 @@ export const AuthScreen: React.FC = () => {
         const res = await api.authAzure({
           sprint_url: sprintUrl,
           pat,
+          user_email: azureUserEmail,
           organization: organization || undefined,
           project: project || undefined,
           team: team || undefined,
@@ -266,7 +272,7 @@ export const AuthScreen: React.FC = () => {
     return (
       <Screen
         chrome="app"
-        eyebrow="Web 04 · Connect Jira"
+        eyebrow="Web 05 - Connect Jira"
         title="Conectar Jira"
         subtitle="Conecte seu Jira para importar sprints e issues."
       >
@@ -290,7 +296,7 @@ export const AuthScreen: React.FC = () => {
                 monospace
               />
               <Input
-                label="Email"
+                label="Usuario / email Jira"
                 value={jEmail}
                 onChangeText={setJEmail}
                 placeholder="voce@empresa.com"
@@ -345,7 +351,7 @@ export const AuthScreen: React.FC = () => {
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 05 · Connect Azure DevOps"
+      eyebrow="Web 04 - Connect Azure DevOps"
       title="Conectar Azure DevOps"
       subtitle="Conecte sua organizacao para importar sprints, work items e equipes."
     >
@@ -358,6 +364,13 @@ export const AuthScreen: React.FC = () => {
             placeholder="https://dev.azure.com/org/project/_sprints/taskboard/..."
             keyboardType="url"
             monospace
+          />
+          <Input
+            label="Usuario / email Azure DevOps"
+            value={aUserEmail}
+            onChangeText={setAUserEmail}
+            placeholder="voce@empresa.com"
+            keyboardType="email-address"
           />
           <Input
             label="Personal Access Token (PAT)"

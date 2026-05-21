@@ -1,4 +1,4 @@
-model = "gpt-5.4"
+model = "gpt-5.5"
 # Codex CLI config - <PRODUCT_NAME>
 #
 # Lido automaticamente pelo Codex CLI quando rodado nesta pasta de trabalho.
@@ -23,7 +23,7 @@ mode = "workspace-write"
 # destrutivos (rm, git push --force, network call). Para tudo na lista de
 # `safe_commands` abaixo, roda direto sem prompt.
 [approval]
-policy = "on-request"
+policy = "safe_commands"
 
 # ---------------------------------------------------------------------------
 # History

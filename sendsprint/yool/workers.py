@@ -138,20 +138,43 @@ class Worker:
 
 
 class WorkerPool:
-    """Lane-keyed pool that runs each Worker as an asyncio task."""
+    """Lane-keyed pool that runs Workers as asyncio tasks.
 
-    def __init__(self) -> None:
+    A lane can have multiple subscriber tasks. This gives independent tuples in
+    the same lane real parallel execution while preserving the one-Worker API
+    and the lane queue as the ordering/flow-control boundary.
+    """
+
+    def __init__(
+        self,
+        *,
+        default_concurrency: int = 1,
+        lane_concurrency: dict[str, int] | None = None,
+    ) -> None:
+        if default_concurrency < 1:
+            raise ValueError("default_concurrency must be >= 1")
+        self._default_concurrency = default_concurrency
+        self._lane_concurrency = dict(lane_concurrency or {})
         self._workers: dict[str, Worker] = {}
-        self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._tasks: dict[str, list[asyncio.Task[None]]] = {}
 
-    def add(self, worker: Worker) -> None:
+    def add(self, worker: Worker, *, concurrency: int | None = None) -> None:
         if worker.lane in self._workers:
             raise ValueError(f"lane already bound: {worker.lane}")
+        if concurrency is not None:
+            if concurrency < 1:
+                raise ValueError("concurrency must be >= 1")
+            self._lane_concurrency[worker.lane] = concurrency
         self._workers[worker.lane] = worker
 
     def start(self) -> None:
+        if self._tasks:
+            return
         for lane, worker in self._workers.items():
-            self._tasks[lane] = asyncio.create_task(worker.run(), name=f"worker:{lane}")
+            self._tasks[lane] = [
+                asyncio.create_task(worker.run(), name=f"worker:{lane}:{index + 1}")
+                for index in range(self.concurrency_for(lane))
+            ]
 
     async def run_until_idle(self, *, bus: TupleBus, seed: Iterable[Tuple] | None = None) -> None:
         seed = list(seed or ())
@@ -167,18 +190,28 @@ class WorkerPool:
     async def join(self) -> None:
         if not self._tasks:
             return
-        await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+        tasks = [task for lane_tasks in self._tasks.values() for task in lane_tasks]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def shutdown(self) -> None:
-        for task in self._tasks.values():
+        tasks = [task for lane_tasks in self._tasks.values() for task in lane_tasks]
+        for task in tasks:
             task.cancel()
-        for task in self._tasks.values():
+        for task in tasks:
             with contextlib.suppress(asyncio.CancelledError):
                 await task
         self._tasks.clear()
 
     def stats(self) -> dict[str, WorkerStats]:
         return {lane: w.stats for lane, w in self._workers.items()}
+
+    def concurrency_for(self, lane: str) -> int:
+        return max(1, int(self._lane_concurrency.get(lane, self._default_concurrency)))
+
+    def task_counts(self) -> dict[str, int]:
+        if self._tasks:
+            return {lane: len(tasks) for lane, tasks in self._tasks.items()}
+        return {lane: self.concurrency_for(lane) for lane in self._workers}
 
 
 def _receipt_sort_key(receipt: Receipt) -> tuple[str, str, str]:

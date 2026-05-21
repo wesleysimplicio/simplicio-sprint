@@ -1,4 +1,5 @@
 import type { RunEvent } from "./types";
+import { getLocalRunEvents, isLocalFallbackUrl } from "./localFallback";
 
 export type SubscribeOpts = {
   onEvent: (event: RunEvent) => void;
@@ -16,6 +17,22 @@ export type Subscription = { close: () => void };
  * is gone — every consumer runs in the browser at http://localhost:8081.
  */
 export function subscribeToRun(url: string, opts: SubscribeOpts): Subscription {
+  if (isLocalFallbackUrl(url)) {
+    let closed = false;
+    const timers = getLocalRunEvents(url).map((event, index) =>
+      setTimeout(() => {
+        if (!closed) opts.onEvent(event);
+      }, 220 * (index + 1)),
+    );
+    opts.onOpen?.();
+    return {
+      close: () => {
+        closed = true;
+        timers.forEach(clearTimeout);
+      },
+    };
+  }
+
   const ES = (globalThis as { EventSource?: typeof EventSource }).EventSource;
   if (!ES) {
     opts.onError?.(new Error("EventSource not available in this runtime"));

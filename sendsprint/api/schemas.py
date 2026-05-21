@@ -48,6 +48,7 @@ class AzureAuthRequest(BaseModel):
     organization: str | None = None
     project: str | None = None
     team: str | None = None
+    user_email: str | None = None
     pat: str | None = None
     sprint_url: str | None = None
 

@@ -86,35 +86,37 @@ export const SettingsScreen: React.FC = () => {
 
       {tab === "connections" ? (
         <>
-          <Card>
-            <Text style={styles.label}>BACKEND</Text>
-            <Text style={styles.value}>{session.backendUrl}</Text>
+          <Card style={styles.tableCard}>
+            <View style={styles.tableHeader}>
+              <Text style={styles.label}>PROVIDERS CONECTADOS</Text>
+              <Button title="+ Adicionar conexao" onPress={() => nav.navigate("Provider")} />
+            </View>
+            <ConnectionRow
+              provider="Jira"
+              account={status?.providers.jira.account ?? "suaempresa.atlassian.net"}
+              status={status?.providers.jira.configured ? "Conectado" : "Pendente"}
+              onTest={() => nav.navigate("Auth")}
+            />
+            <ConnectionRow
+              provider="Azure DevOps"
+              account={status?.providers.azuredevops.account ?? "dev.azure.com/sua-organizacao"}
+              status={status?.providers.azuredevops.configured ? "Conectado" : "Pendente"}
+              onTest={() => nav.navigate("Auth")}
+            />
+            <ConnectionRow
+              provider="GitHub"
+              account={status?.providers.github.configured ? "github.com/autenticado" : "github.com/suaempresa"}
+              status={status?.providers.github.configured ? "Conectado" : "Pendente"}
+              onTest={() => nav.navigate("Provider")}
+            />
             {statusError ? <Text style={styles.error}>{statusError}</Text> : null}
           </Card>
 
-          <View style={styles.grid}>
-            <Card style={styles.panel}>
-              <Text style={styles.label}>AZURE DEVOPS</Text>
-              <Text style={styles.value}>{status?.providers.azuredevops.account ?? "nao configurado"}</Text>
-              <Text style={styles.meta}>{status?.providers.azuredevops.team_path ?? "sem team path"}</Text>
-              <Text style={styles.meta}>{status?.providers.azuredevops.iteration_path ?? "sem iteration path"}</Text>
-            </Card>
-
-            <Card style={styles.panel}>
-              <Text style={styles.label}>JIRA</Text>
-              <Text style={styles.value}>{status?.providers.jira.account ?? "nao configurado"}</Text>
-              <Text style={styles.meta}>Provider padrao: {status?.default_provider ?? session.provider ?? "nao definido"}</Text>
-            </Card>
-          </View>
-
-          <Card>
-            <Text style={styles.label}>GITHUB</Text>
-            <Text style={styles.value}>
-              {status?.providers.github.configured ? "CLI autenticado" : "nao autenticado"}
-            </Text>
-            <Text style={styles.meta}>
-              Exposto na navegacao web; intake completo ainda depende do backend de issues e projects.
-            </Text>
+          <Card style={styles.tableCard}>
+            <Text style={styles.label}>MODELOS DE IA</Text>
+            <ModelRow name="Modelo padrao" provider="OpenAI" context="128k" status="Ativo" />
+            <ModelRow name="Modelo secundario" provider="Anthropic" context="200k" status="Standby" />
+            <Text style={styles.meta}>Backend: {session.backendUrl}</Text>
           </Card>
         </>
       ) : null}
@@ -180,6 +182,42 @@ export const SettingsScreen: React.FC = () => {
   );
 };
 
+const ConnectionRow: React.FC<{
+  provider: string;
+  account: string;
+  status: string;
+  onTest: () => void;
+}> = ({ provider, account, status, onTest }) => (
+  <View style={styles.tableRow}>
+    <Text style={styles.tableProvider}>{provider}</Text>
+    <Text style={styles.tableAccount} numberOfLines={1}>{account}</Text>
+    <View style={styles.statusCell}>
+      <View style={[styles.statusDot, status !== "Conectado" && styles.statusDotPending]} />
+      <Text style={[styles.statusText, status !== "Conectado" && styles.statusTextPending]}>{status}</Text>
+    </View>
+    <Pressable onPress={onTest} style={styles.rowAction}>
+      <Text style={styles.rowActionText}>Testar</Text>
+    </Pressable>
+  </View>
+);
+
+const ModelRow: React.FC<{
+  name: string;
+  provider: string;
+  context: string;
+  status: string;
+}> = ({ name, provider, context, status }) => (
+  <View style={styles.tableRow}>
+    <Text style={styles.tableProvider}>{name}</Text>
+    <Text style={styles.tableAccount}>{provider}</Text>
+    <Text style={styles.tableAccount}>{context}</Text>
+    <View style={styles.statusCell}>
+      <View style={[styles.statusDot, status !== "Ativo" && styles.statusDotPending]} />
+      <Text style={[styles.statusText, status !== "Ativo" && styles.statusTextPending]}>{status}</Text>
+    </View>
+  </View>
+);
+
 const styles = StyleSheet.create({
   tabRow: {
     flexDirection: "row",
@@ -210,6 +248,72 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 12,
+  },
+  tableCard: {
+    gap: 0,
+  },
+  tableHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 6,
+  },
+  tableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  tableProvider: {
+    flex: 1,
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  tableAccount: {
+    flex: 2,
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontMono,
+  },
+  statusCell: {
+    width: 110,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.success,
+  },
+  statusDotPending: {
+    backgroundColor: theme.textMuted,
+  },
+  statusText: {
+    color: theme.success,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  statusTextPending: {
+    color: theme.textMuted,
+  },
+  rowAction: {
+    minWidth: 72,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: theme.border,
+    paddingVertical: 5,
+    alignItems: "center",
+  },
+  rowActionText: {
+    color: theme.text,
+    fontSize: 11,
+    fontWeight: "700",
   },
   panel: {
     flex: 1,

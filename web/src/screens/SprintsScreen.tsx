@@ -346,7 +346,7 @@ const ImportPipelineCard: React.FC<{
   importRunning: boolean;
   status: ImportStatus["state"] | null;
 }> = ({ providerLabel, importRunning, status }) => {
-  const activeStep = importRunning ? 4 : status === "done" ? 8 : status === "failed" ? 3 : 1;
+  const activeStep = importRunning ? 4 : status === "done" ? 8 : status === "failed" ? 3 : 4;
   const steps = [
     "Selecionar provider",
     "Autenticar e validar conta",
@@ -360,7 +360,13 @@ const ImportPipelineCard: React.FC<{
 
   return (
     <Card style={styles.pipelineCard}>
-      <Text style={styles.pipelineLabel}>IMPORT PIPELINE</Text>
+      <View style={styles.pipelineHeader}>
+        <View>
+          <Text style={styles.pipelineLabel}>IMPORT PIPELINE</Text>
+          <Text style={styles.pipelineTitle}>Importando Sprint: Sprint 24 - Plataforma</Text>
+        </View>
+        <Button title="Ver logs" variant="secondary" onPress={() => undefined} />
+      </View>
       <View style={styles.pipelineSteps}>
         {steps.map((step, index) => {
           const done = activeStep > index + 1;
@@ -373,20 +379,35 @@ const ImportPipelineCard: React.FC<{
                   done && styles.pipelineDotDone,
                   current && styles.pipelineDotCurrent,
                 ]}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.pipelineStepLabel}>{step}</Text>
-                <Text style={styles.pipelineStepText}>
-                  {done
-                    ? "Concluido."
-                    : current
-                      ? "Etapa em andamento no backend local."
-                      : "Aguardando liberar a proxima fase."}
+              >
+                <Text style={[styles.pipelineDotText, (done || current) && styles.pipelineDotTextActive]}>
+                  {done ? "OK" : String(index + 1)}
                 </Text>
               </View>
+              <Text style={styles.pipelineStepLabel}>{step}</Text>
             </View>
           );
         })}
+      </View>
+      <View style={styles.pipelineProgressRow}>
+        <Text style={styles.pipelineProgressLabel}>Progresso geral</Text>
+        <Text style={styles.pipelineProgressMeta}>Tempo decorrido 00:01:36</Text>
+      </View>
+      <View style={styles.pipelineBar}>
+        <View style={[styles.pipelineBarFill, { width: `${Math.min(100, activeStep * 12.5)}%` }]} />
+      </View>
+      <View style={styles.pipelineLogBox}>
+        <Text style={styles.pipelineLogTitle}>Log em tempo real</Text>
+        {[
+          "[INFO] Sequencia executiva de tarefas...",
+          "[YML] 24 itens encontrados",
+          "[DATA] Normalizando campos e relacionamentos...",
+          "[INT] Enriquecendo contexto com descricoes, comentarios e links...",
+          "[IDX] Processando item 18/24",
+          "[DONE] Salvando epicos e workitems...",
+        ].map((line) => (
+          <Text key={line} style={styles.pipelineLogLine}>{line}</Text>
+        ))}
       </View>
     </Card>
   );
@@ -469,7 +490,14 @@ const styles = StyleSheet.create({
   },
   pipelineCard: {
     marginBottom: 12,
-    backgroundColor: "rgba(239,245,255,0.9)",
+    backgroundColor: theme.surface,
+    gap: 18,
+  },
+  pipelineHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 16,
   },
   pipelineLabel: {
     color: theme.primary,
@@ -478,36 +506,97 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginBottom: 4,
   },
+  pipelineTitle: {
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: "800",
+  },
   pipelineSteps: {
-    gap: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
   },
   pipelineStep: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
+    flex: 1,
+    alignItems: "center",
+    gap: 9,
   },
   pipelineDot: {
-    width: 12,
-    height: 12,
+    width: 38,
+    height: 38,
     borderRadius: 999,
-    marginTop: 4,
-    backgroundColor: "rgba(44,107,237,0.16)",
+    backgroundColor: "#eef2f7",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   pipelineDotCurrent: {
     backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   pipelineDotDone: {
     backgroundColor: theme.success,
+    borderColor: theme.success,
+  },
+  pipelineDotText: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  pipelineDotTextActive: {
+    color: "#ffffff",
   },
   pipelineStepLabel: {
     color: theme.text,
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 17,
     fontWeight: "700",
+    textAlign: "center",
   },
-  pipelineStepText: {
+  pipelineProgressRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  pipelineProgressLabel: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  pipelineProgressMeta: {
     color: theme.textMuted,
     fontSize: 12,
-    lineHeight: 18,
-    marginTop: 2,
+    fontWeight: "700",
+  },
+  pipelineBar: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: "#e8edf5",
+    overflow: "hidden",
+  },
+  pipelineBarFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: theme.primary,
+  },
+  pipelineLogBox: {
+    borderRadius: theme.radius,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 14,
+    backgroundColor: "#fbfdff",
+  },
+  pipelineLogTitle: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "800",
+    marginBottom: 10,
+  },
+  pipelineLogLine: {
+    color: theme.text,
+    fontSize: 12,
+    lineHeight: 20,
+    fontFamily: theme.fontMono,
   },
 });

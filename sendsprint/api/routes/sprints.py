@@ -61,7 +61,7 @@ def get_sprint(
     include_archived: bool = Query(False, description="Include archived cards"),  # noqa: B008
 ) -> SprintDetail:
     sprint = _read_sprint(provider, sprint_id)
-    items = list(sprint.items)
+    items = _dedupe_sprint_items(list(sprint.items))
 
     if scope == "mine":
         scope_email = (user_email or _default_scope_email(provider)).strip().lower()
@@ -214,11 +214,114 @@ def _find_item(items: list[Any], item_key: str) -> Any | None:
     return None
 
 
+def _dedupe_sprint_items(items: list[Any]) -> list[Any]:
+    deduped: dict[str, Any] = {}
+    order: list[str] = []
+    for item in items:
+        identity = _item_identity(item)
+        if not identity:
+            identity = f"__anon__:{len(order)}"
+        if identity not in deduped:
+            deduped[identity] = item
+            order.append(identity)
+            continue
+        deduped[identity] = _prefer_richer_item(deduped[identity], item)
+    return [deduped[key] for key in order]
+
+
+def _item_identity(item: Any) -> str:
+    key = str(getattr(item, "key", "") or "").strip().lower()
+    if key:
+        return key
+    return str(getattr(item, "id", "") or "").strip().lower()
+
+
+def _prefer_richer_item(current: Any, candidate: Any) -> Any:
+    current_score = _item_score(current)
+    candidate_score = _item_score(candidate)
+    winner = candidate if candidate_score > current_score else current
+    loser = current if winner is candidate else candidate
+    updates: dict[str, Any] = {}
+    for field in (
+        "description",
+        "assignee",
+        "assignee_email",
+        "assignee_account_id",
+        "assignee_descriptor",
+        "story_points",
+        "parent_key",
+        "acceptance_criteria",
+        "created_at",
+        "updated_at",
+        "source_url",
+    ):
+        if getattr(winner, field, None) in (None, "", []):
+            fallback = getattr(loser, field, None)
+            if fallback not in (None, "", []):
+                updates[field] = fallback
+    for field in ("labels", "links", "comments", "attachments"):
+        updates[field] = _merge_unique_sequence(
+            getattr(current, field, []) or [],
+            getattr(candidate, field, []) or [],
+        )
+    if not updates:
+        return winner
+    if hasattr(winner, "model_copy"):
+        return winner.model_copy(update=updates)
+    for field, value in updates.items():
+        setattr(winner, field, value)
+    return winner
+
+
+def _item_score(item: Any) -> tuple[float, int, int, int]:
+    revision = _revision_score(getattr(item, "revision", None))
+    updated = getattr(item, "updated_at", None)
+    updated_score = int(updated.timestamp()) if updated else 0
+    text_score = sum(
+        1
+        for field in (
+            "description",
+            "assignee",
+            "assignee_email",
+            "parent_key",
+            "acceptance_criteria",
+            "source_url",
+        )
+        if getattr(item, field, None)
+    )
+    relation_score = sum(
+        len(getattr(item, field, []) or [])
+        for field in ("labels", "links", "comments", "attachments")
+    )
+    return (revision, updated_score, text_score, relation_score)
+
+
+def _revision_score(value: Any) -> float:
+    if value in (None, ""):
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _merge_unique_sequence(left: list[Any], right: list[Any]) -> list[Any]:
+    seen: set[str] = set()
+    merged: list[Any] = []
+    for item in [*left, *right]:
+        marker = repr(item)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        merged.append(item)
+    return merged
+
+
 def _default_scope_email(provider: Provider) -> str:
     profile = profile_mod.load()
     if provider == "jira":
         return profile.jira.email or ""
-    return ""
+    return profile.azuredevops.user_email or ""
 
 
 def _require_actor_email(actor_email: str | None, provider: Provider) -> str:

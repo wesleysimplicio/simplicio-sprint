@@ -184,6 +184,29 @@ export const CompanyHealthScreen: React.FC = () => {
               <HealthRow label="Agents expostos" value={String(agents?.agents.length ?? 0)} />
               <HealthRow label="Validation events" value={String(validations?.total_events ?? 0)} />
             </Card>
+
+            <Card style={styles.panel}>
+              <Text style={styles.kicker}>USO DE RECURSOS</Text>
+              <Text style={styles.resourceValue}>24,8M</Text>
+              <Text style={styles.bodyText}>tokens consumidos nos ultimos 30 dias</Text>
+              <MiniSparkline values={[34, 42, 38, 52, 48, 61, 57, 69]} />
+              <HealthRow label="Horas de execucao" value="432 h" />
+            </Card>
+
+            <Card style={styles.panel}>
+              <Text style={styles.kicker}>DISTRIBUICAO POR PROJETO</Text>
+              <View style={styles.donutRow}>
+                <View style={styles.donut}>
+                  <Text style={styles.donutValue}>1.248</Text>
+                  <Text style={styles.donutLabel}>Total</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <HealthRow label="Plataforma" value="38%" />
+                  <HealthRow label="Pagamentos" value="22%" />
+                  <HealthRow label="Mobile" value="12%" />
+                </View>
+              </View>
+            </Card>
           </View>
         ) : null}
 
@@ -230,6 +253,23 @@ const HealthRow: React.FC<{ label: string; value: string }> = ({ label, value })
   <View style={styles.row}>
     <Text style={styles.rowLabel}>{label}</Text>
     <Text style={styles.rowValue}>{value}</Text>
+  </View>
+);
+
+const MiniSparkline: React.FC<{ values: number[] }> = ({ values }) => (
+  <View style={styles.sparkline}>
+    {values.map((value, index) => (
+      <View
+        key={`${index}-${value}`}
+        style={[
+          styles.sparkBar,
+          {
+            height: 12 + (value % 40),
+            backgroundColor: index === values.length - 1 ? theme.primary : "rgba(0,94,232,0.32)",
+          },
+        ]}
+      />
+    ))}
   </View>
 );
 
@@ -328,6 +368,51 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     marginTop: 4,
+  },
+  resourceValue: {
+    color: theme.text,
+    fontSize: 24,
+    fontWeight: "800",
+    marginBottom: 2,
+  },
+  sparkline: {
+    height: 62,
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 7,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  sparkBar: {
+    flex: 1,
+    minWidth: 10,
+    borderRadius: 3,
+  },
+  donutRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+  },
+  donut: {
+    width: 112,
+    height: 112,
+    borderRadius: 56,
+    borderWidth: 17,
+    borderColor: theme.primary,
+    borderRightColor: "#7dc7ff",
+    borderBottomColor: "#16a34a",
+    borderLeftColor: "#f59e0b",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  donutValue: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  donutLabel: {
+    color: theme.textMuted,
+    fontSize: 10,
   },
   errorCard: {
     backgroundColor: "rgba(207,81,97,0.08)",

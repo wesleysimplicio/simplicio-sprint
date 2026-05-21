@@ -61,18 +61,20 @@ export const Button: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   base: {
-    paddingVertical: 14,
-    paddingHorizontal: 22,
+    minHeight: 32,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     borderRadius: theme.radius,
     alignItems: "center",
+    justifyContent: "center",
   },
   primary: {
     backgroundColor: theme.primary,
     shadowColor: theme.primary,
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   secondary: {
     backgroundColor: theme.surfaceAlt,
@@ -88,9 +90,9 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   disabled: { opacity: 0.4 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
-  icon: { color: "#ffffff", fontSize: 18 },
+  icon: { color: "#ffffff", fontSize: 14 },
   iconAlt: { color: theme.text },
-  label: { color: "#ffffff", fontSize: 16, fontWeight: "700" },
+  label: { color: "#ffffff", fontSize: 12, fontWeight: "700", fontFamily: theme.fontSans },
   labelAlt: { color: theme.text },
   labelGhost: { color: theme.primary },
 });

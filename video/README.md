@@ -5,10 +5,21 @@ Vídeo animado em React/Remotion que explica, em ~56 segundos, como o
 escuro com partículas leves, terminais animados, ícones SVG, transições por
 spring/fade.
 
-> Stack: Remotion 4 + React 19 + TypeScript. 1920×1080 @ 30fps. Saída MP4 (h264) ou WebM.
+> Stack: Remotion 4 + React 19 + TypeScript + Tailwind CSS 4. 1920×1080 @ 30fps. Saída MP4 (h264) ou WebM.
 > Os MP4s em `preview/` incluem trilha musical gerada localmente e efeitos sonoros para transição, erro, correção e sucesso.
+> O layer visual do promo usa `src/tailwind.css` e gera `src/tailwind.generated.css` via `npm run build:css`.
 
 ## Previews
+
+### Launch promo (29s)
+
+Peça mais comercial para divulgação do produto: shell estilo Codex/Claude,
+intake com fallback real, backlog operacional, execução com logs e visão de
+gestão.
+
+| Preview |
+|---|
+| [▶️ MP4 PT-BR (8.8 MB)](./preview/sendsprint-launch-promo-pt.mp4) |
 
 ### Productivity before/after (47s)
 
@@ -68,13 +79,16 @@ o run loop tem timeline própria em [`src/scenes/RunLoopScene.tsx`](./src/scenes
 cd video
 npm install
 npm run audio             # gera trilha e efeitos em public/audio/
+npm run build:css         # recompila o CSS do Tailwind usado pelas cenas
 npm start                 # abre o Remotion Studio (preview interativo)
 npm run build             # renderiza out/sendsprint-explainer.mp4
+npm run build:promo       # renderiza a peça promocional pt + en
 npm run build:before-after # renderiza before/after pt + en
 npm run build:runloop     # renderiza o fluxo de trabalho pt + en
 npm run build:preview     # regenera áudio + MP4s de preview pt/en
 npm run build:webm        # renderiza out/sendsprint-explainer.webm (vp9)
 npm run still             # exporta um frame estático em out/poster.png
+npm run still:promo       # exporta posters da peça promocional pt + en
 npm run still:before-after # exporta posters before/after pt + en
 npm run typecheck         # valida tipos
 ```
@@ -93,6 +107,8 @@ inspeciona props, edita e vê o reload na hora.
 | `SendSprintRunLoopEN` | en | 1920×1080 | README EN — demo do loop |
 | `SendSprintBeforeAfter` | pt | 1920×1080 | Antes/depois para empresas |
 | `SendSprintBeforeAfterEN` | en | 1920×1080 | Company before/after explainer |
+| `SendSprintLaunchPromo` | pt | 1920×1080 | Vídeo promocional principal |
+| `SendSprintLaunchPromoEN` | en | 1920×1080 | Promo internacional / landing |
 
 Render manual:
 

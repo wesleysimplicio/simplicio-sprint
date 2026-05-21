@@ -29,6 +29,12 @@ import type {
   VersionCheckResponse,
   YoolDashboardResponse,
 } from "./types";
+import {
+  handleLocalApiRequest,
+  localEventsUrl,
+  localEvidenceUrl,
+  parseRequestBody,
+} from "./localFallback";
 
 type ResponseBody = ApiErrorPayload | unknown[] | string | null;
 
@@ -81,6 +87,8 @@ const extractBackendMessage = (body: ResponseBody): string | null => {
 };
 
 export class ApiClient {
+  private localFallbackActive = false;
+
   constructor(
     private baseUrl: string,
     private operatorToken?: string,
@@ -108,19 +116,55 @@ export class ApiClient {
         if (v !== undefined) url.searchParams.set(k, v);
       }
     }
-    const resp = await fetch(url.toString(), {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(this.operatorToken && init?.method && init.method.toUpperCase() !== "GET"
-          ? { Authorization: `Bearer ${this.operatorToken}` }
-          : {}),
-        ...(init?.headers ?? {}),
-      },
-    });
+    if (url.protocol === "local:") {
+      this.localFallbackActive = true;
+      return handleLocalApiRequest<T>({
+        path,
+        method: init?.method?.toUpperCase() ?? "GET",
+        query: url.searchParams,
+        body: parseRequestBody(init),
+      });
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    let resp: Response;
+    try {
+      resp = await fetch(url.toString(), {
+        ...init,
+        signal: init?.signal ?? controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          ...(this.operatorToken && init?.method && init.method.toUpperCase() !== "GET"
+            ? { Authorization: `Bearer ${this.operatorToken}` }
+            : {}),
+          ...(init?.headers ?? {}),
+        },
+      });
+      this.localFallbackActive = false;
+    } catch {
+      this.localFallbackActive = true;
+      return handleLocalApiRequest<T>({
+        path,
+        method: init?.method?.toUpperCase() ?? "GET",
+        query: url.searchParams,
+        body: parseRequestBody(init),
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
     const raw = await resp.text();
     const body = tryParseJson(raw);
     if (!resp.ok) {
+      if (shouldUseLocalFallbackForStatus(resp.status)) {
+        this.localFallbackActive = true;
+        return handleLocalApiRequest<T>({
+          path,
+          method: init?.method?.toUpperCase() ?? "GET",
+          query: url.searchParams,
+          body: parseRequestBody(init),
+        });
+      }
       throw new ApiError(resp.status, resp.statusText, body);
     }
     return body as T;
@@ -165,6 +209,7 @@ export class ApiClient {
   authAzure(input: {
     sprint_url: string;
     pat: string;
+    user_email?: string;
     organization?: string;
     project?: string;
     team?: string;
@@ -328,14 +373,17 @@ export class ApiClient {
   }
 
   evidenceUrl(runId: string, name: string) {
+    if (this.localFallbackActive) return localEvidenceUrl();
     return `${this.baseUrl}/runs/${encodeURIComponent(runId)}/evidence/${encodeURIComponent(name)}`;
   }
 
   eventsUrl(runId: string) {
+    if (this.localFallbackActive) return localEventsUrl(runId);
     return `${this.baseUrl}/runs/${encodeURIComponent(runId)}/events`;
   }
 
   eventsStreamUrl(runId: string) {
+    if (this.localFallbackActive) return localEventsUrl(runId);
     return `${this.baseUrl}/runs/${encodeURIComponent(runId)}/events/stream`;
   }
 }
@@ -367,6 +415,9 @@ export const getApiErrorMessage = (error: unknown): string => {
     return "Unexpected error.";
   }
 };
+
+const shouldUseLocalFallbackForStatus = (status: number): boolean =>
+  status === 401 || status === 404 || status === 502 || status === 503 || status === 504;
 
 export const getApiErrorStatusLine = (error: unknown): string | null => {
   if (!(error instanceof ApiError)) return null;

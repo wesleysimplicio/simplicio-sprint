@@ -98,34 +98,6 @@ export const RepositoryForm: React.FC<Props> = ({
         placeholder="Payments, Platform, Mobile App"
         autoCapitalize="words"
       />
-
-      <Input
-        label="Branch pattern"
-        value={repository.branchPattern}
-        onChangeText={(branchPattern) => patch({ branchPattern })}
-        placeholder="feature/{item_key}-{slug}"
-        autoCapitalize="none"
-        monospace
-      />
-
-      <Input
-        label="Commit pattern"
-        value={repository.commitPattern}
-        onChangeText={(commitPattern) => patch({ commitPattern })}
-        placeholder="{type}: {summary}"
-        autoCapitalize="none"
-        monospace
-      />
-
-      <Input
-        label="Deploy target branch"
-        value={repository.deployTargetBranch}
-        onChangeText={(deployTargetBranch) => patch({ deployTargetBranch })}
-        placeholder="dev"
-        autoCapitalize="none"
-        monospace
-      />
-
       <View style={styles.field}>
         <Text style={styles.label}>Validation commands</Text>
         <TextInput

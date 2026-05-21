@@ -9,6 +9,7 @@ import type {
 } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Input } from "../components/Input";
 import { Screen } from "../components/Screen";
 import { ModeChoiceCard } from "../components/setup/ModeChoiceCard";
 import { RepositoryForm } from "../components/setup/RepositoryForm";
@@ -105,13 +106,44 @@ export const ProjectSetupScreen: React.FC = () => {
         <Text style={styles.noticeLabel}>LOCAL-FIRST SETUP</Text>
         <Text style={styles.noticeTitle}>Modele como o SendSprint deve abrir branches, commits e gates.</Text>
         <Text style={styles.noticeText}>
-          Esta tela salva apenas metadados nao secretos no navegador: repositorios,
-          papeis, projetos, padroes e comandos. Tokens, PATs e API keys continuam
+          Esta tela salva apenas metadados nao secretos no navegador: portfolio,
+          repositorios, papeis, projetos, padroes globais e comandos. Tokens, PATs e API keys continuam
           indo direto para o backend local e keyring do sistema.
         </Text>
         <Text style={styles.noticeText}>
           Para liberar play por task, use caminhos locais reais. URLs remotas servem apenas como
           referencia e nao destravam a execucao.
+        </Text>
+      </Card>
+
+      <Text style={styles.section}>PORTFOLIO RULES</Text>
+      <Card style={styles.rulesCard}>
+        <Input
+          label="Branch pattern"
+          value={draft.branchPattern}
+          onChangeText={(branchPattern) => setDraft((current) => ({ ...current, branchPattern }))}
+          placeholder="feature/{item_key}-{slug}"
+          autoCapitalize="none"
+          monospace
+        />
+        <Input
+          label="Commit pattern"
+          value={draft.commitPattern}
+          onChangeText={(commitPattern) => setDraft((current) => ({ ...current, commitPattern }))}
+          placeholder="{type}: {summary}"
+          autoCapitalize="none"
+          monospace
+        />
+        <Input
+          label="Deploy target branch"
+          value={draft.deployTargetBranch}
+          onChangeText={(deployTargetBranch) => setDraft((current) => ({ ...current, deployTargetBranch }))}
+          placeholder="dev"
+          autoCapitalize="none"
+          monospace
+        />
+        <Text style={styles.sectionHint}>
+          Esses tres campos sao definidos uma vez no portfolio e todos os repositorios respeitam a mesma configuracao geral.
         </Text>
       </Card>
 
@@ -141,7 +173,7 @@ export const ProjectSetupScreen: React.FC = () => {
           <Text style={styles.sectionHint}>
             {draft.mode === "single"
               ? "Single-project mode usa somente o primeiro repositorio."
-              : "Portfolio mode permite um mapa por projeto, papel e validacao."}
+              : "Portfolio mode permite um mapa por projeto, papel e validacao. Branch, commit e deploy seguem o portfolio."}
           </Text>
         </View>
         {draft.mode === "portfolio" ? (
@@ -201,6 +233,9 @@ const ensureSetup = (setup: ProjectSetup): ProjectSetup => {
   const repositories = setup.repositories.length ? setup.repositories : [createRepository()];
   return {
     ...setup,
+    branchPattern: setup.branchPattern?.trim() || "feature/{item_key}-{slug}",
+    commitPattern: setup.commitPattern?.trim() || "{type}: {summary}",
+    deployTargetBranch: setup.deployTargetBranch?.trim() || "dev",
     repositories: setup.mode === "single" ? repositories.slice(0, 1) : repositories,
   };
 };
@@ -211,9 +246,6 @@ const createRepository = (index = 0): RepositoryRegistration => ({
   repoPath: "",
   role: index === 0 ? "fullstack" : "backend",
   project: "",
-  branchPattern: "feature/{item_key}-{slug}",
-  commitPattern: "{type}: {summary}",
-  deployTargetBranch: "dev",
   validationCommands: ["npm run typecheck", "npm test"],
 });
 
@@ -222,9 +254,6 @@ const cleanRepository = (repo: RepositoryRegistration): RepositoryRegistration =
   name: repo.name.trim() || repo.repoPath.trim().split(/[\\/]/).filter(Boolean).pop() || "repo",
   repoPath: repo.repoPath.trim(),
   project: repo.project.trim(),
-  branchPattern: repo.branchPattern.trim() || "feature/{item_key}-{slug}",
-  commitPattern: repo.commitPattern.trim() || "{type}: {summary}",
-  deployTargetBranch: repo.deployTargetBranch.trim() || "dev",
   validationCommands: repo.validationCommands.map((cmd) => cmd.trim()).filter(Boolean),
 });
 
@@ -266,6 +295,9 @@ const styles = StyleSheet.create({
   modeGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
+    gap: 12,
+  },
+  rulesCard: {
     gap: 12,
   },
   sectionRow: {

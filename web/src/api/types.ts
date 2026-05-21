@@ -34,14 +34,14 @@ export type RepositoryRegistration = {
   repoPath: string;
   role: RepositoryRole;
   project: string;
-  branchPattern: string;
-  commitPattern: string;
-  deployTargetBranch: string;
   validationCommands: string[];
 };
 
 export type ProjectSetup = {
   mode: ProjectMode;
+  branchPattern: string;
+  commitPattern: string;
+  deployTargetBranch: string;
   repositories: RepositoryRegistration[];
   updatedAt?: string | null;
 };
@@ -102,6 +102,7 @@ export type AuthStatus = {
     azuredevops: {
       configured: boolean;
       account?: string | null;
+      user_email?: string | null;
       team_path?: string | null;
       iteration_path?: string | null;
     };

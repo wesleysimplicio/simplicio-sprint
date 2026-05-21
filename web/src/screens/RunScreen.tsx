@@ -2,12 +2,13 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/nativ
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useRef, useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { subscribeToRun, type Subscription } from "../api/sse";
+import type { RunEvent } from "../api/types";
 import { Button } from "../components/Button";
+import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
 import { StepRow } from "../components/StepRow";
 import type { RootStackParamList } from "../navigation";
-import { subscribeToRun, type Subscription } from "../api/sse";
-import type { RunEvent } from "../api/types";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
 
@@ -15,16 +16,16 @@ type Nav = NativeStackNavigationProp<RootStackParamList, "Run">;
 type Rt = RouteProp<RootStackParamList, "Run">;
 
 const STEP_LABELS: Record<number, string> = {
-  1: "Lê a sprint",
+  1: "Le a sprint",
   2: "Mapeia arquitetura",
   3: "Dev: install + build",
   4: "Lint",
-  5: "Testes (unit + E2E + regressão)",
-  6: "Segurança",
+  5: "Testes unitarios + E2E",
+  6: "Seguranca",
   7: "Fix loop",
   8: "Commit + push",
   9: "Cria PR",
-  10: "Revisa e entrega",
+  10: "Review e entrega",
 };
 
 type StepState = {
@@ -79,10 +80,7 @@ export const RunScreen: React.FC = () => {
           sprint_id: route.params.sprintId,
           mode: route.params.mode,
           item_keys: route.params.itemKeys,
-          repo_path:
-            primaryRepo && !looksRemote(primaryRepo) && !session.projectSetup.repositories.length
-              ? primaryRepo
-              : undefined,
+          repo_path: primaryRepo && !looksRemote(primaryRepo) ? primaryRepo : undefined,
           project_setup: session.projectSetup.repositories.length ? session.projectSetup : null,
         });
         setRunId(res.run_id);
@@ -91,7 +89,7 @@ export const RunScreen: React.FC = () => {
           onError: (e) => console.warn("sse error", e),
         });
       } catch (e) {
-        setLogs((l) => [...l, "✗ falha ao iniciar: " + String((e as Error).message ?? e)]);
+        setLogs((current) => [...current, "X falha ao iniciar: " + String((e as Error).message ?? e)]);
         setFailed(true);
       }
     })();
@@ -113,11 +111,11 @@ export const RunScreen: React.FC = () => {
     } else if (ev.type === "loop") {
       if (typeof ev.iteration === "number") setIteration(ev.iteration);
       if (typeof ev.max_iterations === "number") setMaxIterations(ev.max_iterations);
-      setLogs((l) => [...l, `↻ ${ev.message ?? `round ${ev.iteration}`}`]);
+      setLogs((current) => [...current, `round ${ev.iteration}: ${ev.message ?? "fix loop"}`]);
     } else if (ev.type === "regression") {
       if (typeof ev.iteration === "number") {
-        setRegressions((r) => [
-          ...r.filter((x) => x.iteration !== ev.iteration),
+        setRegressions((current) => [
+          ...current.filter((item) => item.iteration !== ev.iteration),
           {
             iteration: ev.iteration!,
             status: (ev.status === "ok" ? "ok" : "failed") as "ok" | "failed",
@@ -126,13 +124,13 @@ export const RunScreen: React.FC = () => {
         ]);
       }
     } else if (ev.type === "log") {
-      setLogs((l) => [...l, ev.message ?? ""]);
+      setLogs((current) => [...current, ev.message ?? ""]);
     } else if (ev.type === "evidence") {
       const path = ev.evidence_path ?? "";
       const name = path.split("/").pop() ?? path;
       const iter = ev.iteration ?? 1;
-      setEvidence((e) => [
-        ...e,
+      setEvidence((current) => [
+        ...current,
         {
           name,
           iteration: iter,
@@ -140,7 +138,7 @@ export const RunScreen: React.FC = () => {
           url: api.evidenceUrl(currentRunId, name),
         },
       ]);
-      setLogs((l) => [...l, `📸 ${ev.evidence_label ?? name}`]);
+      setLogs((current) => [...current, `evidence: ${ev.evidence_label ?? name}`]);
     } else if (ev.type === "done") {
       setDone(true);
       setFailed(Boolean(ev.failed));
@@ -151,20 +149,21 @@ export const RunScreen: React.FC = () => {
       );
     } else if (ev.type === "error") {
       setFailed(true);
-      setLogs((l) => [...l, "✗ erro: " + (ev.message ?? "")]);
+      setLogs((current) => [...current, "X erro: " + (ev.message ?? "")]);
     }
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
   };
 
   const goToResult = () => runId && nav.navigate("Result", { runId });
-
-  const evidenceByIteration = groupBy(evidence, (e) => e.iteration);
+  const activeStep = steps.find((step) => step.status === "running") ?? steps.find((step) => step.status === "pending") ?? steps[steps.length - 1];
+  const completedSteps = steps.filter((step) => step.status === "ok" || step.status === "skipped").length;
   const lastRegression = regressions[regressions.length - 1];
+  const provider = session.currentSprint?.provider ?? session.provider ?? "jira";
+  const primaryRepo = session.projectSetup.repositories[0];
 
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 09 · Live Run"
       title="Executando sprint"
       subtitle={
         route.params.mode === "all"
@@ -178,117 +177,121 @@ export const RunScreen: React.FC = () => {
         done ? (
           <Button title={failed ? "Ver detalhes da falha" : "Ver resultado"} onPress={goToResult} />
         ) : (
-          <View>
+          <View style={styles.footerProgress}>
             <View style={styles.progressBar}>
               <View style={[styles.progressFill, { width: `${Math.round(progress * 100)}%` }]} />
             </View>
             <Text style={styles.iterTag}>
-              ↻ round {iteration} / {maxIterations} · {Math.round(progress * 100)}%
+              round {iteration} / {maxIterations} - {Math.round(progress * 100)}%
             </Text>
           </View>
         )
       }
     >
-      <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 24, gap: 4 }}>
-        {steps.map((s) => (
-          <StepRow key={s.num} num={s.num} name={STEP_LABELS[s.num]} status={s.status} message={s.message} />
-        ))}
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.runBoard}>
+        <Card style={styles.stepsPane}>
+          <View style={styles.paneHeader}>
+            <Text style={styles.sectionTitle}>Fluxo de execucao (10 passos)</Text>
+            <Text style={styles.sectionMeta}>{completedSteps}/10 completos</Text>
+          </View>
+          <View style={styles.stepList}>
+            {steps.map((step) => (
+              <StepRow key={step.num} num={step.num} name={STEP_LABELS[step.num]} status={step.status} message={step.message} />
+            ))}
+          </View>
+        </Card>
 
-        {regressions.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>REGRESSÃO</Text>
-            <View style={{ paddingHorizontal: 12, gap: 8 }}>
-              {regressions.map((r) => (
-                <View
-                  key={r.iteration}
-                  style={[
-                    styles.regBox,
-                    r.status === "ok" ? styles.regOk : styles.regFail,
-                  ]}
-                >
-                  <View style={styles.regHead}>
-                    <Text
-                      style={[
-                        styles.regBadge,
-                        r.status === "ok" ? styles.regBadgeOk : styles.regBadgeFail,
-                      ]}
-                    >
-                      ROUND {r.iteration}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.regStatus,
-                        { color: r.status === "ok" ? theme.success : theme.danger },
-                      ]}
-                    >
-                      {r.status === "ok" ? "✓ verde — todos passaram" : `✗ ${r.failingTests.length} falhas`}
-                    </Text>
-                  </View>
-                  {r.failingTests.length > 0 ? (
-                    <View style={{ marginTop: 6, gap: 2 }}>
-                      {r.failingTests.map((t) => (
-                        <Text key={t} style={styles.failingTest}>
-                          ✗ {t}
-                        </Text>
-                      ))}
+        <View style={styles.activityPane}>
+          <Card style={styles.activityCard}>
+            <View style={styles.paneHeader}>
+              <View>
+                <Text style={styles.sectionTitle}>Atividade atual</Text>
+                <Text style={styles.activityTitle}>
+                  {activeStep ? STEP_LABELS[activeStep.num] : "Aguardando eventos"}
+                </Text>
+              </View>
+              <Text style={styles.timer}>{runId ? runId.slice(0, 10) : "iniciando"}</Text>
+            </View>
+            <View style={styles.evidenceStrip}>
+              {(evidence.length ? evidence.slice(-3) : placeholderEvidence).map((shot) => (
+                <View key={`${shot.url}-${shot.name}`} style={styles.shotCard}>
+                  {shot.url ? (
+                    <Image source={{ uri: shot.url }} style={styles.evidence} />
+                  ) : (
+                    <View style={styles.evidencePlaceholder}>
+                      <Text style={styles.placeholderText}>{shot.label}</Text>
                     </View>
-                  ) : null}
+                  )}
+                  <Text style={styles.shotLabel} numberOfLines={1}>{shot.label}</Text>
                 </View>
               ))}
             </View>
-          </View>
-        ) : null}
+          </Card>
 
-        {evidence.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>EVIDÊNCIAS</Text>
-            {Array.from(evidenceByIteration.entries()).map(([iter, shots]) => (
-              <View key={iter} style={{ marginBottom: 14 }}>
-                <Text style={styles.iterHeader}>round {iter}</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 10, paddingHorizontal: 12 }}
-                >
-                  {shots.map((s) => (
-                    <View key={s.url + s.name} style={styles.shotCard}>
-                      <Image source={{ uri: s.url }} style={styles.evidence} />
-                      <Text style={styles.shotLabel} numberOfLines={2}>
-                        {s.label}
-                      </Text>
-                    </View>
-                  ))}
-                </ScrollView>
-              </View>
-            ))}
-          </View>
-        ) : null}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>LOG</Text>
-          <View style={styles.logBox}>
-            {logs.length === 0 ? (
-              <Text style={styles.logEmpty}>aguardando eventos…</Text>
-            ) : (
-              logs.map((l, i) => (
-                <Text key={i} style={styles.logLine}>
-                  {l}
-                </Text>
-              ))
-            )}
-          </View>
+          <Card style={styles.logCard}>
+            <View style={styles.paneHeader}>
+              <Text style={styles.sectionTitle}>LOG</Text>
+              <Text style={styles.sectionMeta}>{logs.length} eventos</Text>
+            </View>
+            <View style={styles.logBox}>
+              {logs.length === 0 ? (
+                <Text style={styles.logEmpty}>aguardando eventos...</Text>
+              ) : (
+                logs.slice(-12).map((line, index) => (
+                  <Text key={`${index}-${line}`} style={styles.logLine}>
+                    {line}
+                  </Text>
+                ))
+              )}
+            </View>
+          </Card>
         </View>
 
-        {prUrl ? (
-          <View style={[styles.prBox, failed ? styles.prFailed : styles.prOk]}>
-            <Text style={styles.prTitle}>{failed ? "✗ entrega falhou" : "✓ PR criado"}</Text>
-            <Text style={styles.prUrl}>{prUrl}</Text>
-          </View>
-        ) : null}
+        <Card style={styles.contextPane}>
+          <Text style={styles.sectionTitle}>Contexto</Text>
+          <ContextRow label="Branch" value={renderPattern(session.projectSetup.branchPattern, route.params.itemKeys[0])} />
+          <ContextRow label="Repositorio" value={primaryRepo?.repoPath || "nao configurado"} />
+          <ContextRow label="Provider" value={provider} />
+          <ContextRow label="Executor" value="SendSprint Agent" />
+          <ContextRow label="Modelo" value="GPT-4o / local policy" />
+
+          {lastRegression ? (
+            <View style={[styles.regBox, lastRegression.status === "ok" ? styles.regOk : styles.regFail]}>
+              <Text style={styles.regTitle}>Regressao round {lastRegression.iteration}</Text>
+              <Text style={styles.regText}>
+                {lastRegression.status === "ok"
+                  ? "Todos os testes passaram."
+                  : `${lastRegression.failingTests.length} falha(s) pendente(s).`}
+              </Text>
+            </View>
+          ) : null}
+
+          {prUrl ? (
+            <View style={[styles.prBox, failed ? styles.prFailed : styles.prOk]}>
+              <Text style={styles.prTitle}>{failed ? "Entrega falhou" : "PR criado"}</Text>
+              <Text style={styles.prUrl}>{prUrl}</Text>
+            </View>
+          ) : null}
+
+          <Button title="Ver detalhes da execucao" variant="secondary" onPress={goToResult} disabled={!runId} />
+        </Card>
       </ScrollView>
     </Screen>
   );
 };
+
+const ContextRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <View style={styles.contextRow}>
+    <Text style={styles.contextLabel}>{label}</Text>
+    <Text style={styles.contextValue} numberOfLines={2}>{value}</Text>
+  </View>
+);
+
+const placeholderEvidence: EvidenceShot[] = [
+  { name: "mapper", iteration: 1, label: "Arquitetura", url: "" },
+  { name: "tests", iteration: 1, label: "Testes", url: "" },
+  { name: "pr", iteration: 1, label: "PR", url: "" },
+];
 
 const looksRemote = (repoPath: string): boolean =>
   repoPath.startsWith("http://") ||
@@ -296,100 +299,215 @@ const looksRemote = (repoPath: string): boolean =>
   repoPath.startsWith("git@") ||
   repoPath.startsWith("ssh://");
 
-function groupBy<T, K extends string | number>(arr: T[], keyOf: (t: T) => K): Map<K, T[]> {
-  const m = new Map<K, T[]>();
-  for (const item of arr) {
-    const k = keyOf(item);
-    const list = m.get(k);
-    if (list) list.push(item);
-    else m.set(k, [item]);
-  }
-  return m;
-}
+const renderPattern = (pattern: string, itemKey?: string): string => {
+  const key = itemKey || "ITEM-1";
+  return pattern.replace("{item_key}", key).replace("{slug}", "task");
+};
 
 const styles = StyleSheet.create({
-  section: { marginTop: 16, gap: 8 },
-  sectionTitle: { color: theme.textMuted, fontSize: 11, letterSpacing: 2, paddingHorizontal: 12 },
-  iterHeader: {
-    color: theme.primarySoft,
+  runBoard: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    paddingBottom: 18,
+  },
+  stepsPane: {
+    width: 260,
+    minHeight: 520,
+  },
+  activityPane: {
+    flex: 1,
+    minWidth: 520,
+    gap: 12,
+  },
+  contextPane: {
+    width: 250,
+    minHeight: 520,
+    gap: 12,
+  },
+  paneHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  sectionTitle: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  sectionMeta: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontSans,
+  },
+  stepList: {
+    gap: 2,
+    marginTop: 8,
+  },
+  activityCard: {
+    minHeight: 190,
+  },
+  activityTitle: {
+    color: theme.textMuted,
+    fontSize: 12,
+    marginTop: 4,
+    fontFamily: theme.fontSans,
+  },
+  timer: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontMono,
+  },
+  evidenceStrip: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  shotCard: {
+    flex: 1,
+    minWidth: 130,
+    gap: 6,
+  },
+  evidence: {
+    width: "100%",
+    height: 110,
+    borderRadius: theme.radius,
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  evidencePlaceholder: {
+    height: 110,
+    borderRadius: theme.radius,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  placeholderText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  shotLabel: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontMono,
+  },
+  logCard: {
+    minHeight: 300,
+  },
+  logBox: {
+    backgroundColor: "#f8fafc",
+    borderRadius: theme.radius,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    minHeight: 230,
+    gap: 4,
+    marginTop: 10,
+  },
+  logEmpty: {
+    color: theme.textMuted,
     fontFamily: theme.fontMono,
     fontSize: 12,
-    paddingHorizontal: 12,
-    marginBottom: 6,
-    letterSpacing: 1,
   },
-  shotCard: { width: 220, gap: 6 },
-  evidence: {
-    width: 220,
-    height: 140,
-    borderRadius: theme.radius,
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
+  logLine: {
+    color: theme.text,
+    fontFamily: theme.fontMono,
+    fontSize: 11,
+    lineHeight: 16,
   },
-  shotLabel: { color: theme.textMuted, fontSize: 12, fontFamily: theme.fontMono },
-  logBox: {
-    backgroundColor: theme.bgDeep,
-    borderRadius: theme.radius,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-    minHeight: 100,
+  contextRow: {
     gap: 4,
-    marginHorizontal: 12,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
-  logEmpty: { color: theme.textMuted, fontFamily: theme.fontMono, fontSize: 12 },
-  logLine: { color: theme.text, fontFamily: theme.fontMono, fontSize: 12 },
-  prBox: {
-    marginTop: 14,
-    marginHorizontal: 12,
-    padding: 14,
+  contextLabel: {
+    color: theme.textMuted,
+    fontSize: 10,
+    textTransform: "uppercase",
+    fontFamily: theme.fontSans,
+  },
+  contextValue: {
+    color: theme.text,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: theme.fontSans,
+  },
+  regBox: {
+    padding: 10,
     borderRadius: theme.radius,
     borderWidth: 1,
   },
-  prOk: { backgroundColor: "rgba(52, 211, 153, 0.12)", borderColor: theme.success },
-  prFailed: { backgroundColor: "rgba(248, 113, 113, 0.12)", borderColor: theme.danger },
-  prTitle: { color: theme.text, fontWeight: "700", fontSize: 14 },
-  prUrl: { color: theme.primarySoft, fontFamily: theme.fontMono, fontSize: 12, marginTop: 4 },
+  regOk: {
+    backgroundColor: "rgba(22,163,74,0.08)",
+    borderColor: "rgba(22,163,74,0.24)",
+  },
+  regFail: {
+    backgroundColor: "rgba(220,38,38,0.08)",
+    borderColor: "rgba(220,38,38,0.24)",
+  },
+  regTitle: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  regText: {
+    color: theme.textMuted,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 4,
+    fontFamily: theme.fontSans,
+  },
+  prBox: {
+    padding: 10,
+    borderRadius: theme.radius,
+    borderWidth: 1,
+  },
+  prOk: {
+    backgroundColor: "rgba(22,163,74,0.08)",
+    borderColor: theme.success,
+  },
+  prFailed: {
+    backgroundColor: "rgba(220,38,38,0.08)",
+    borderColor: theme.danger,
+  },
+  prTitle: {
+    color: theme.text,
+    fontWeight: "700",
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  prUrl: {
+    color: theme.primary,
+    fontFamily: theme.fontMono,
+    fontSize: 11,
+    marginTop: 4,
+  },
+  footerProgress: {
+    width: 260,
+  },
   progressBar: {
     height: 8,
     borderRadius: 999,
-    backgroundColor: theme.surface,
+    backgroundColor: theme.surfaceAlt,
     overflow: "hidden",
   },
-  progressFill: { height: "100%", backgroundColor: theme.primary },
+  progressFill: {
+    height: "100%",
+    backgroundColor: theme.primary,
+  },
   iterTag: {
     color: theme.textMuted,
     fontFamily: theme.fontMono,
     fontSize: 11,
     textAlign: "center",
-    marginTop: 8,
-    letterSpacing: 1,
-  },
-  regBox: {
-    padding: 12,
-    borderRadius: theme.radius,
-    borderWidth: 1,
-  },
-  regOk: { backgroundColor: "rgba(52, 211, 153, 0.10)", borderColor: theme.success },
-  regFail: { backgroundColor: "rgba(248, 113, 113, 0.10)", borderColor: theme.danger },
-  regHead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  regBadge: {
-    fontFamily: theme.fontMono,
-    fontSize: 11,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-    overflow: "hidden",
-    color: "white",
-  },
-  regBadgeOk: { backgroundColor: theme.success },
-  regBadgeFail: { backgroundColor: theme.danger },
-  regStatus: { fontWeight: "700", fontSize: 13, flex: 1 },
-  failingTest: {
-    color: theme.danger,
-    fontFamily: theme.fontMono,
-    fontSize: 12,
-    paddingLeft: 8,
+    marginTop: 6,
   },
 });

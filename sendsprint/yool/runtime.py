@@ -173,6 +173,7 @@ async def run_worker_pool_async(
     inspected["worker_stats"] = {
         lane: worker_stats_summary(stats) for lane, stats in pool.stats().items()
     }
+    inspected["worker_task_counts"] = pool.task_counts()
     return inspected
 
 

@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.22.0] - 2026-05-21
+
+### Added
+
+- Added OSS contribution guardrails for active minimal-fix duplicates, standard public PR body audits, and private/public evidence separation.
+- Updated open-source contribution templates and skill guidance with competing-PR no-go triggers before publication.
+
 ## [0.21.0] - 2026-05-20
 
 ### Added

@@ -22,6 +22,45 @@ OssGateStatus = Literal["passed", "blocked", "needs-review", "skipped"]
 OssCandidateStrategy = Literal["new-pr", "review", "salvage", "abandon"]
 OssPrivacyLevel = Literal["internal", "public", "sensitive"]
 
+OSS_PUBLIC_PR_SECTION_GROUPS: tuple[tuple[str, ...], ...] = (
+    ("What does this PR do?",),
+    ("Problem", "Root cause"),
+    ("What this changes", "Fix"),
+    ("Why this shape",),
+    ("Tests",),
+)
+OSS_PUBLIC_PR_SECTIONS = [
+    "What does this PR do?",
+    "Problem / Root cause",
+    "What this changes / Fix",
+    "Why this shape",
+    "Tests",
+]
+OSS_PRIVATE_PR_MARKERS = (
+    "agent volume",
+    "agent-volume",
+    "codex_home",
+    "dedupe gate",
+    "duplicate gate",
+    "enospc",
+    "internal scoring",
+    "missing venv",
+    "private procedure",
+    "scouting",
+    "subagent",
+    "worktree failure",
+    "$codex_home",
+    "c:\\users",
+)
+OSS_MINIMAL_ACTIVE_FIX_MARKERS = (
+    "competing with",
+    "minimal",
+    "minimal one-line",
+    "one-line",
+    "same fix",
+    "smaller",
+)
+
 
 class OssContributorMode(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -74,6 +113,7 @@ class OssContributionCandidate(BaseModel):
     changed_paths: list[str] = Field(default_factory=list)
     public_summary: str = ""
     dedupe_markers: list[str] = Field(default_factory=list)
+    root_cause_markers: list[str] = Field(default_factory=list)
     risk_level: Literal["low", "medium", "high"] = "low"
 
 
@@ -90,6 +130,7 @@ class OssDedupeMatch(BaseModel):
         "issue",
         "branch",
         "memory",
+        "minimal-fix",
         "path",
         "title",
     ]
@@ -116,16 +157,7 @@ class OssPublishPlan(BaseModel):
     dry_run: bool = True
     blocked: bool = True
     reason: str = ""
-    public_sections: list[str] = Field(
-        default_factory=lambda: [
-            "Summary",
-            "What changed",
-            "Validation",
-            "Risk / rollback",
-            "Screenshots / logs",
-            "Credits / salvage",
-        ]
-    )
+    public_sections: list[str] = Field(default_factory=lambda: list(OSS_PUBLIC_PR_SECTIONS))
 
 
 class OssMonitorPlan(BaseModel):
@@ -207,13 +239,16 @@ def build_oss_candidate(
     issue_url: str | None = None,
     changed_paths: list[str] | None = None,
     dedupe_markers: list[str] | None = None,
+    root_cause_markers: list[str] | None = None,
     strategy: OssCandidateStrategy = "new-pr",
 ) -> OssContributionCandidate:
     resolved_title = title or issue_url or "open-source contribution"
     markers = [resolved_title.lower()]
     if issue_url:
         markers.append(issue_url.lower())
+        markers.extend(_issue_ref_markers(issue_url))
     markers.extend(marker.lower() for marker in dedupe_markers or [])
+    markers.extend(marker.lower() for marker in root_cause_markers or [])
     return OssContributionCandidate(
         candidate_id=_slug(resolved_title),
         repo=snapshot.repo_path,
@@ -221,7 +256,8 @@ def build_oss_candidate(
         issue_url=issue_url,
         strategy=strategy,
         changed_paths=changed_paths or [],
-        dedupe_markers=markers,
+        dedupe_markers=_unique_markers(markers),
+        root_cause_markers=_unique_markers(root_cause_markers or []),
     )
 
 
@@ -231,15 +267,24 @@ def find_oss_dedupe_matches(
     memory_markers: dict[str, str] | None = None,
 ) -> list[OssDedupeMatch]:
     matches: list[OssDedupeMatch] = []
-    markers = {marker.lower() for marker in [candidate.title, *candidate.dedupe_markers] if marker}
+    markers = _candidate_markers(candidate)
     for ref in existing_refs:
         haystack = ref.lower()
         if any(marker and (marker in haystack or haystack in marker) for marker in markers):
+            match_type: Literal["minimal-fix", "title"] = (
+                "minimal-fix" if _describes_minimal_active_fix(haystack) else "title"
+            )
+            reason = (
+                "active minimal fix already covers this issue or root cause; "
+                "route to review or consolidation"
+                if match_type == "minimal-fix"
+                else "candidate overlaps an existing public ref"
+            )
             matches.append(
                 OssDedupeMatch(
                     ref=ref,
-                    reason="candidate overlaps an existing public ref",
-                    match_type="title",
+                    reason=reason,
+                    match_type=match_type,
                 )
             )
     for marker, ref in (memory_markers or {}).items():
@@ -253,6 +298,35 @@ def find_oss_dedupe_matches(
                 )
             )
     return matches
+
+
+def audit_oss_public_pr_body(body: str) -> OssGateDecision:
+    """Validate public PR text without exposing internal contribution procedure."""
+
+    headings = _markdown_headings(body)
+    missing_groups = [
+        " | ".join(group)
+        for group in OSS_PUBLIC_PR_SECTION_GROUPS
+        if not any(section.lower() in headings for section in group)
+    ]
+    lowered_body = body.lower()
+    leaked_markers = [marker for marker in OSS_PRIVATE_PR_MARKERS if marker.lower() in lowered_body]
+    evidence = [
+        *(f"missing section: {group}" for group in missing_groups),
+        *(f"private marker: {marker}" for marker in leaked_markers),
+    ]
+    if evidence:
+        return OssGateDecision(
+            gate="publish",
+            status="blocked",
+            reason="public PR body is missing required sections or contains private procedure",
+            evidence=evidence,
+        )
+    return OssGateDecision(
+        gate="publish",
+        status="passed",
+        reason="public PR body follows the OSS contribution standard",
+    )
 
 
 def check_oss_dedupe(
@@ -294,6 +368,7 @@ def build_oss_publish_plan(
     validation_plan: OssValidationPlan,
     *,
     dry_run: bool = True,
+    public_body: str | None = None,
 ) -> OssPublishPlan:
     if validation_plan.requires_before_publish and (
         not validation_plan.commands or not validation_plan.passed
@@ -304,6 +379,15 @@ def build_oss_publish_plan(
             blocked=True,
             reason="validation evidence is required before publishing",
         )
+    if public_body is not None:
+        audit = audit_oss_public_pr_body(public_body)
+        if audit.status == "blocked":
+            return OssPublishPlan(
+                candidate_id=candidate.candidate_id,
+                dry_run=dry_run,
+                blocked=True,
+                reason=f"public PR body does not meet OSS standard: {audit.reason}",
+            )
     return OssPublishPlan(
         candidate_id=candidate.candidate_id,
         dry_run=dry_run,
@@ -376,6 +460,55 @@ def _default_test_commands(root: Path) -> list[str]:
     if (root / "web" / "package.json").is_file():
         commands.append("npm --prefix web test")
     return commands
+
+
+def _candidate_markers(candidate: OssContributionCandidate) -> set[str]:
+    markers = [
+        candidate.title,
+        *(candidate.dedupe_markers or []),
+        *(candidate.root_cause_markers or []),
+        *(candidate.changed_paths or []),
+    ]
+    if candidate.issue_url:
+        markers.append(candidate.issue_url)
+        markers.extend(_issue_ref_markers(candidate.issue_url))
+    return {marker.lower() for marker in _unique_markers(markers) if marker}
+
+
+def _describes_minimal_active_fix(ref: str) -> bool:
+    return any(marker in ref for marker in OSS_MINIMAL_ACTIVE_FIX_MARKERS)
+
+
+def _issue_ref_markers(issue_url: str) -> list[str]:
+    parts = [part for part in issue_url.rstrip("/").split("/") if part]
+    if len(parts) < 2 or not parts[-1].isdigit():
+        return []
+    issue_number = parts[-1]
+    return [f"#{issue_number}", f"{parts[-2]}/{issue_number}"]
+
+
+def _markdown_headings(body: str) -> set[str]:
+    headings: set[str] = set()
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("#"):
+            continue
+        title = stripped.lstrip("#").strip().lower()
+        if title:
+            headings.add(title)
+    return headings
+
+
+def _unique_markers(markers: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for marker in markers:
+        normalized = marker.lower().strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        unique.append(normalized)
+    return unique
 
 
 def _slug(value: str) -> str:

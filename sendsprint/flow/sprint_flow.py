@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import subprocess
 import tempfile
@@ -65,6 +66,8 @@ logger = logging.getLogger(__name__)
 
 MAX_FIX_LOOPS = 3
 DEFAULT_BRANCH_NAME_TEMPLATE = "feature/{number}-{title}"
+DEFAULT_RUNTIME_MAX_LANE_CONCURRENCY = 8
+RUNTIME_LANES = ("dev", "lint", "test", "security", "pr")
 
 
 def _task_number(item: SprintItem) -> str:
@@ -89,6 +92,21 @@ def _clean_branch_template(branch: str) -> str:
     return "/".join(parts) or DEFAULT_BRANCH_NAME_TEMPLATE.replace("{number}", "task").replace(
         "-{title}", ""
     )
+
+
+def _positive_int_from_env(name: str) -> int | None:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return None
+    try:
+        parsed = int(value)
+    except ValueError:
+        logger.warning("ignoring invalid %s=%r; expected positive integer", name, value)
+        return None
+    if parsed < 1:
+        logger.warning("ignoring invalid %s=%r; expected positive integer", name, value)
+        return None
+    return parsed
 
 
 class SprintFlowResult(BaseModel):
@@ -342,6 +360,7 @@ class SprintFlow:
                 delivery_tuples.append(delivery_tuple)
                 tuple_contexts[delivery_tuple.id] = {"delivery_key": dkey}
 
+        lane_concurrency = self._runtime_lane_concurrency(len(delivery_tuples))
         runtime_step = StepReport(
             step=0,
             name="tuple-runtime-bootstrap",
@@ -349,7 +368,8 @@ class SprintFlow:
         )
         runtime_step.message = (
             f"bootstrapped tuple/bus runtime run_id={runtime_run_id} "
-            f"with {len(delivery_tuples)} worker root tuple(s)"
+            f"with {len(delivery_tuples)} worker root tuple(s); "
+            f"lane_concurrency={lane_concurrency}"
         )
         report.steps.append(runtime_step)
 
@@ -367,6 +387,7 @@ class SprintFlow:
                     state=state,
                     state_store=state_store,
                     no_cache=no_cache,
+                    lane_concurrency=lane_concurrency,
                 )
             )
 
@@ -439,14 +460,15 @@ class SprintFlow:
         state: RunState | None,
         state_store: RunStateStore | None,
         no_cache: bool,
+        lane_concurrency: dict[str, int],
     ) -> ArchitectureReport | None:
         del tuple_contexts, sprint, resolved_run_id, no_cache
         receipt_root = log.root.parent / "receipts"
         store = ReceiptStore(receipt_root)
         catalog = self._runtime_catalog()
         dispatcher = Dispatcher(store=store, executor=self._execute_runtime_yool)
-        pool = WorkerPool()
-        for lane in ("dev", "lint", "test", "security", "pr"):
+        pool = WorkerPool(lane_concurrency=lane_concurrency)
+        for lane in RUNTIME_LANES:
             pool.add(
                 Worker(
                     lane=lane,
@@ -490,6 +512,18 @@ class SprintFlow:
             cost_step.message = json.dumps(total_cost, sort_keys=True)
             report.steps.append(cost_step)
         return None
+
+    def _runtime_lane_concurrency(self, root_tuple_count: int) -> dict[str, int]:
+        requested = _positive_int_from_env("SENDSPRINT_YOOL_LANE_CONCURRENCY")
+        max_per_lane = (
+            _positive_int_from_env("SENDSPRINT_YOOL_MAX_LANE_CONCURRENCY")
+            or DEFAULT_RUNTIME_MAX_LANE_CONCURRENCY
+        )
+        if requested is None:
+            cpu_count = max(1, os.cpu_count() or 1)
+            requested = min(max(1, root_tuple_count), cpu_count)
+        per_lane = max(1, min(requested, max_per_lane))
+        return {lane: per_lane for lane in RUNTIME_LANES}
 
     def _runtime_catalog(self) -> dict[str, Any]:
         entries = {

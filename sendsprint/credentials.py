@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 SERVICE = "sendsprint"
 Provider = Literal["jira", "azuredevops"]
+_VOLATILE_SECRETS: dict[str, str] = {}
 
 
 class CredentialError(RuntimeError):
@@ -39,30 +40,48 @@ def _username(provider: Provider, account: str) -> str:
     return f"{provider}:{account}"
 
 
+def _cache_key(provider: Provider, account: str) -> str:
+    return _username(provider, account.strip())
+
+
 def get_secret(provider: Provider, account: str) -> str | None:
     """Return the stored secret for ``provider:account`` or ``None``."""
+    normalized = account.strip()
+    if not normalized:
+        return None
     kr = _keyring()
     try:
-        return kr.get_password(SERVICE, _username(provider, account))
-    except Exception as exc:  # pragma: no cover — keyring backend errors
+        secret = kr.get_password(SERVICE, _username(provider, normalized))
+    except Exception as exc:  # pragma: no cover - keyring backend errors
         logger.warning("keyring read failed: %s", exc)
-        return None
+        secret = None
+    if secret:
+        _VOLATILE_SECRETS[_cache_key(provider, normalized)] = secret
+        return secret
+    return _VOLATILE_SECRETS.get(_cache_key(provider, normalized))
 
 
 def set_secret(provider: Provider, account: str, secret: str) -> None:
     """Persist ``secret`` for ``provider:account`` in the OS keyring."""
+    normalized = account.strip()
+    if not normalized:
+        raise CredentialError("account is required")
+    _VOLATILE_SECRETS[_cache_key(provider, normalized)] = secret
     kr = _keyring()
     try:
-        kr.set_password(SERVICE, _username(provider, account), secret)
+        kr.set_password(SERVICE, _username(provider, normalized), secret)
     except Exception as exc:
         raise CredentialError(f"keyring write failed: {exc}") from exc
 
 
 def delete_secret(provider: Provider, account: str) -> None:
     """Remove the stored secret. No-op if absent."""
+    normalized = account.strip()
+    if normalized:
+        _VOLATILE_SECRETS.pop(_cache_key(provider, normalized), None)
     kr = _keyring()
-    with contextlib.suppress(Exception):  # pragma: no cover — already gone
-        kr.delete_password(SERVICE, _username(provider, account))
+    with contextlib.suppress(Exception):  # pragma: no cover - already gone
+        kr.delete_password(SERVICE, _username(provider, normalized))
 
 
 def get_or_prompt(
@@ -77,7 +96,7 @@ def get_or_prompt(
     """Resolve ``(account, secret)`` from env, then keyring, then prompt.
 
     Lookup order:
-      1. ``os.environ[account_env]`` + ``os.environ[secret_env]`` — used as-is,
+      1. ``os.environ[account_env]`` + ``os.environ[secret_env]`` - used as-is,
          and (if both present) persisted to keyring for next time.
       2. Keyring entry for ``provider`` keyed by the env-var account.
       3. Interactive prompt (only when ``interactive`` is true). Both values

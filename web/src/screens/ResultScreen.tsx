@@ -45,9 +45,7 @@ export const ResultScreen: React.FC = () => {
   const headline = failed ? "Entrega falhou" : "Execucao concluida com sucesso";
   const deployTargets = Array.from(
     new Set(
-      session.projectSetup.repositories
-        .map((repository) => repository.deployTargetBranch.trim())
-        .filter(Boolean),
+      [session.projectSetup.deployTargetBranch.trim()].filter(Boolean),
     ),
   );
 
@@ -109,6 +107,16 @@ export const ResultScreen: React.FC = () => {
       }
     >
       <ScrollView contentContainerStyle={styles.scroll}>
+        <Card style={styles.resultHero}>
+          <View style={[styles.resultMark, failed && styles.resultMarkFailed]}>
+            <Text style={styles.resultMarkText}>{failed ? "X" : "OK"}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.heroTitle}>{headline}</Text>
+            <Text style={styles.heroMeta}>{run?.summary ?? `run_id ${route.params.runId}`}</Text>
+          </View>
+        </Card>
+
         <View style={styles.handoffGrid}>
           {topCards.map((card) => (
             <Card key={card.label} style={styles.handoffCard}>
@@ -237,6 +245,38 @@ const styles = StyleSheet.create({
   scroll: {
     gap: 12,
     paddingBottom: 24,
+  },
+  resultHero: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  resultMark: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.success,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  resultMarkFailed: {
+    backgroundColor: theme.danger,
+  },
+  resultMarkText: {
+    color: "#ffffff",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  heroTitle: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  heroMeta: {
+    color: theme.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 2,
   },
   handoffGrid: {
     flexDirection: "row",
