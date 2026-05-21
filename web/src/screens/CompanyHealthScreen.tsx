@@ -1,12 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../api/client";
-import { Card } from "../components/Card";
-import { Screen } from "../components/Screen";
-import type { AgentDashboardResponse, AuthStatus, Health, TupleDashboardResponse, ValidationDashboardResponse, VersionCheckResponse } from "../api/types";
+import type {
+  AgentDashboardResponse,
+  AuthStatus,
+  Health,
+  TupleDashboardResponse,
+  ValidationDashboardResponse,
+  VersionCheckResponse,
+} from "../api/types";
 import { loadSupportTickets } from "../supportCenterStore";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
+import { Card } from "../components/Card";
+import { Screen } from "../components/Screen";
+
+type HealthTab = "overview" | "operations" | "governance";
 
 export const CompanyHealthScreen: React.FC = () => {
   const { api, session } = useSession();
@@ -20,6 +29,7 @@ export const CompanyHealthScreen: React.FC = () => {
   const [agents, setAgents] = useState<AgentDashboardResponse | null>(null);
   const [validations, setValidations] = useState<ValidationDashboardResponse | null>(null);
   const [supportCount, setSupportCount] = useState(0);
+  const [tab, setTab] = useState<HealthTab>("overview");
 
   const load = async (background = false) => {
     if (!background) setLoading(true);
@@ -75,13 +85,20 @@ export const CompanyHealthScreen: React.FC = () => {
       next.push("A checagem de versao publicada nao esta disponivel neste momento.");
     }
     return next;
-  }, [health, session.currentSprint, session.projectSetup.repositories.length, tuples?.failed_runs, validations?.lanes, version?.status]);
+  }, [
+    health,
+    session.currentSprint,
+    session.projectSetup.repositories.length,
+    tuples?.failed_runs,
+    validations?.lanes,
+    version?.status,
+  ]);
 
   if (loading) {
     return (
       <Screen
         chrome="app"
-        eyebrow="Web 14 · Company Health"
+        eyebrow="Web 14 - Company Health"
         title="Company health"
         subtitle="Carregando sinais de integracao, execucao e postura operacional..."
       >
@@ -93,7 +110,7 @@ export const CompanyHealthScreen: React.FC = () => {
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 14 · Company Health"
+      eyebrow="Web 14 - Company Health"
       title="Saude do workspace"
       subtitle="Postura de integracao, adocao, execucao e suporte do slice Console + Web."
       scroll={false}
@@ -119,45 +136,71 @@ export const CompanyHealthScreen: React.FC = () => {
           </Card>
         ) : null}
 
+        <View style={styles.tabRow}>
+          {[
+            ["overview", "Overview"],
+            ["operations", "Operations"],
+            ["governance", "Governance"],
+          ].map(([value, label]) => (
+            <Pressable
+              key={value}
+              onPress={() => setTab(value as HealthTab)}
+              style={[styles.tab, tab === value && styles.tabActive]}
+            >
+              <Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={styles.metrics}>
-          <MetricCard label="Providers ativos" value={String(Number(Boolean(auth?.jira_configured)) + Number(Boolean(auth?.azuredevops_configured)))} />
+          <MetricCard
+            label="Providers ativos"
+            value={String(Number(Boolean(auth?.jira_configured)) + Number(Boolean(auth?.azuredevops_configured)))}
+          />
           <MetricCard label="Repos locais" value={String(session.projectSetup.repositories.length)} accent="primary" />
-          <MetricCard label="Runs ativos" value={String(tuples?.active_runs ?? 0)} accent="success" />
+          <MetricCard label="Runs ativas" value={String(tuples?.active_runs ?? 0)} accent="success" />
           <MetricCard label="Chamados locais" value={String(supportCount)} accent="warning" />
         </View>
 
-        <View style={styles.grid}>
-          <Card style={styles.panel}>
-            <Text style={styles.kicker}>INTEGRATION POSTURE</Text>
-            <HealthRow label="API local" value={health?.ok ? "online" : "offline"} />
-            <HealthRow label="Jira" value={auth?.jira_configured ? "configurado" : "nao configurado"} />
-            <HealthRow label="Azure DevOps" value={auth?.azuredevops_configured ? "configurado" : "nao configurado"} />
-            <HealthRow label="GitHub CLI" value={auth?.providers.github.configured ? "autenticado" : "nao autenticado"} />
-            <HealthRow label="Versao" value={version ? `${version.current_version}${version.latest_version ? ` / ${version.latest_version}` : ""}` : "nao verificada"} />
-          </Card>
+        {tab === "overview" || tab === "operations" ? (
+          <View style={styles.grid}>
+            <Card style={styles.panel}>
+              <Text style={styles.kicker}>INTEGRATION POSTURE</Text>
+              <HealthRow label="API local" value={health?.ok ? "online" : "offline"} />
+              <HealthRow label="Jira" value={auth?.jira_configured ? "configurado" : "nao configurado"} />
+              <HealthRow label="Azure DevOps" value={auth?.azuredevops_configured ? "configurado" : "nao configurado"} />
+              <HealthRow label="GitHub CLI" value={auth?.providers.github.configured ? "autenticado" : "nao autenticado"} />
+              <HealthRow
+                label="Versao"
+                value={version ? `${version.current_version}${version.latest_version ? ` / ${version.latest_version}` : ""}` : "nao verificada"}
+              />
+            </Card>
 
-          <Card style={styles.panel}>
-            <Text style={styles.kicker}>OPERATIONS POSTURE</Text>
-            <HealthRow label="Sprint atual" value={session.currentSprint?.sprintName ?? "nenhuma"} />
-            <HealthRow label="Tuples observadas" value={String(tuples?.total_runs ?? 0)} />
-            <HealthRow label="Falhas registradas" value={String(tuples?.failed_runs ?? 0)} />
-            <HealthRow label="Agents expostos" value={String(agents?.agents.length ?? 0)} />
-            <HealthRow label="Validation events" value={String(validations?.total_events ?? 0)} />
-          </Card>
-        </View>
+            <Card style={styles.panel}>
+              <Text style={styles.kicker}>OPERATIONS POSTURE</Text>
+              <HealthRow label="Sprint atual" value={session.currentSprint?.sprintName ?? "nenhuma"} />
+              <HealthRow label="Tuples observadas" value={String(tuples?.total_runs ?? 0)} />
+              <HealthRow label="Falhas registradas" value={String(tuples?.failed_runs ?? 0)} />
+              <HealthRow label="Agents expostos" value={String(agents?.agents.length ?? 0)} />
+              <HealthRow label="Validation events" value={String(validations?.total_events ?? 0)} />
+            </Card>
+          </View>
+        ) : null}
 
-        <Card>
-          <Text style={styles.kicker}>ACTIVE RISKS</Text>
-          {risks.length === 0 ? (
-            <Text style={styles.bodyText}>Nenhum risco operacional evidente no slice local atual.</Text>
-          ) : (
-            risks.map((risk) => (
-              <Text key={risk} style={styles.riskText}>
-                • {risk}
-              </Text>
-            ))
-          )}
-        </Card>
+        {tab === "governance" ? (
+          <Card>
+            <Text style={styles.kicker}>ACTIVE RISKS</Text>
+            {risks.length === 0 ? (
+              <Text style={styles.bodyText}>Nenhum risco operacional evidente no slice local atual.</Text>
+            ) : (
+              risks.map((risk) => (
+                <Text key={risk} style={styles.riskText}>
+                  - {risk}
+                </Text>
+              ))
+            )}
+          </Card>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -194,6 +237,31 @@ const styles = StyleSheet.create({
   scroll: {
     gap: 12,
     paddingBottom: 24,
+  },
+  tabRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  tab: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+  },
+  tabActive: {
+    backgroundColor: "rgba(44,107,237,0.10)",
+    borderColor: "rgba(44,107,237,0.24)",
+  },
+  tabText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  tabTextActive: {
+    color: theme.primary,
   },
   metrics: {
     flexDirection: "row",

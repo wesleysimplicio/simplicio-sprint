@@ -2,9 +2,9 @@ import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import type { Provider } from "../api/types";
 import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
-import type { Provider } from "../api/types";
 import type { RootStackParamList } from "../navigation";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
@@ -12,10 +12,12 @@ import { theme } from "../theme";
 type Nav = NativeStackNavigationProp<RootStackParamList, "Provider">;
 
 type ProviderOption = {
-  id: Provider;
+  id: Provider | "github";
   name: string;
   initial: string;
   desc: string;
+  available: boolean;
+  status: string;
 };
 
 const PROVIDERS: ProviderOption[] = [
@@ -23,13 +25,25 @@ const PROVIDERS: ProviderOption[] = [
     id: "jira",
     name: "Jira / Atlassian",
     initial: "J",
-    desc: "Cloud ou Server. Auth via email + API token.",
+    desc: "Cloud ou Server. Auth via email + API token com fallback por browser quando necessario.",
+    available: true,
+    status: "Pronto",
   },
   {
     id: "azuredevops",
     name: "Azure DevOps",
     initial: "A",
-    desc: "Sprint URL atual + Personal Access Token.",
+    desc: "Sprint URL atual + Personal Access Token com capture assistida por Playwright e browser agents.",
+    available: true,
+    status: "Pronto",
+  },
+  {
+    id: "github",
+    name: "GitHub Projects",
+    initial: "G",
+    desc: "Entrada por issues, projects e milestones fica visivel no shell, mas o intake completo ainda depende do backend.",
+    available: false,
+    status: "Em breve",
   },
 ];
 
@@ -40,33 +54,54 @@ export const ProviderScreen: React.FC = () => {
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 03 · Provider Picker"
+      eyebrow="Web 03 - Provider Picker"
       title="Conecte seu provider de trabalho"
-      subtitle="Escolha a ferramenta que voce usa para gerenciar sprints e issues."
+      subtitle="Escolha a origem da sprint. O shell web segue o mesmo fluxo visual em Jira, Azure e no futuro GitHub."
     >
       <View style={styles.grid}>
         {PROVIDERS.map((provider) => (
           <Card
             key={provider.id}
-            style={styles.providerCard}
-            onPress={() => {
-              setProvider(provider.id);
-              nav.navigate("Auth");
-            }}
+            style={
+              provider.available
+                ? styles.providerCard
+                : [styles.providerCard, styles.providerCardDisabled]
+            }
+            onPress={
+              provider.available
+                ? () => {
+                    void setProvider(provider.id as Provider);
+                    nav.navigate("Auth");
+                  }
+                : undefined
+            }
           >
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{provider.initial}</Text>
+            <View style={styles.cardTop}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{provider.initial}</Text>
+              </View>
+              <View
+                style={[
+                  styles.statusPill,
+                  provider.available ? styles.statusReady : styles.statusSoon,
+                ]}
+              >
+                <Text style={styles.statusPillText}>{provider.status}</Text>
+              </View>
             </View>
             <Text style={styles.name}>{provider.name}</Text>
             <Text style={styles.desc}>{provider.desc}</Text>
-            <Text style={styles.cta}>{`Conectar ${provider.name.split(" ")[0]}`}</Text>
+            <Text style={[styles.cta, !provider.available && styles.ctaDisabled]}>
+              {provider.available ? `Conectar ${provider.name.split(" ")[0]}` : "Aguardando backend"}
+            </Text>
           </Card>
         ))}
       </View>
+
       <Card style={styles.infoCard}>
-        <Text style={styles.infoTitle}>GitHub continua visivel no shell</Text>
+        <Text style={styles.infoTitle}>Fluxo comum depois da escolha</Text>
         <Text style={styles.infoText}>
-          O CLI autenticado e o contexto de repo seguem expostos em Configuracoes. O intake completo de issues e projects do GitHub fica fora deste fluxo ate o backend expor essa origem de sprint.
+          Login do app, configuracao do provider, autenticao, fallback de browser, captura da sprint e publicacao no backlog interno do SendSprint.
         </Text>
       </Card>
     </Screen>
@@ -80,15 +115,23 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   providerCard: {
-    width: 260,
+    width: 280,
+    minHeight: 236,
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  providerCardDisabled: {
+    backgroundColor: "rgba(248,251,255,0.92)",
+  },
+  cardTop: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 28,
+    justifyContent: "space-between",
+    gap: 12,
   },
   infoCard: {
     marginTop: 16,
-    maxWidth: 720,
+    maxWidth: 760,
     backgroundColor: "rgba(239,245,255,0.9)",
   },
   infoTitle: {
@@ -116,7 +159,39 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "800",
   },
-  name: { color: theme.text, fontSize: 19, fontWeight: "700", textAlign: "center" },
-  desc: { color: theme.textMuted, fontSize: 13, lineHeight: 20, textAlign: "center" },
-  cta: { color: theme.primary, fontSize: 13, fontWeight: "800", marginTop: 4 },
+  statusPill: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  statusReady: {
+    backgroundColor: "rgba(30,169,124,0.12)",
+  },
+  statusSoon: {
+    backgroundColor: "rgba(255,181,106,0.16)",
+  },
+  statusPillText: {
+    color: theme.text,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  name: {
+    color: theme.text,
+    fontSize: 19,
+    fontWeight: "700",
+  },
+  desc: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  cta: {
+    color: theme.primary,
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: "auto",
+  },
+  ctaDisabled: {
+    color: theme.textMuted,
+  },
 });

@@ -1,6 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -47,6 +47,26 @@ export const SprintsScreen: React.FC = () => {
         ? `board_id=${session.jiraBoardId}`
         : "board_id nao informado";
 
+  const contextRows = useMemo(
+    () => [
+      { label: "Provider", value: providerLabel },
+      { label: "Conta", value: session.account ?? "nao salva" },
+      { label: "Portfolio", value: session.currentSprint?.portfolioName ?? "sera derivado da URL" },
+      { label: "Projeto", value: session.currentSprint?.projectName ?? "sera derivado na importacao" },
+      { label: "Time", value: session.currentSprint?.teamName ?? session.adoTeamPath ?? "sera inferido" },
+      { label: "Origem", value: listContext },
+    ],
+    [
+      listContext,
+      providerLabel,
+      session.account,
+      session.adoTeamPath,
+      session.currentSprint?.portfolioName,
+      session.currentSprint?.projectName,
+      session.currentSprint?.teamName,
+    ],
+  );
+
   const load = async () => {
     setLoading(true);
     setLoadNotice({
@@ -90,7 +110,7 @@ export const SprintsScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    load();
+    void load();
   }, [provider, session.jiraBoardId, session.adoTeamPath]);
 
   useEffect(() => {
@@ -168,12 +188,13 @@ export const SprintsScreen: React.FC = () => {
     }
   };
 
-  const importRunning = importJob?.status?.state === "running" || Boolean(importJob && !importJob.status);
+  const importRunning =
+    importJob?.status?.state === "running" || Boolean(importJob && !importJob.status);
 
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 06 · Importacao / Sprints"
+      eyebrow="Web 06 - Importacao / Sprints"
       title="Sprints ativas"
       subtitle={`Provedor: ${providerLabel}${session.account ? ` | ${session.account}` : ""}`}
       scroll={false}
@@ -191,6 +212,17 @@ export const SprintsScreen: React.FC = () => {
       }
     >
       {importNotice ? <NoticePanel notice={importNotice} /> : null}
+      <Card style={styles.contextCard}>
+        <Text style={styles.contextLabel}>IMPORT CONTEXT</Text>
+        <View style={styles.contextGrid}>
+          {contextRows.map((row) => (
+            <View key={row.label} style={styles.contextRow}>
+              <Text style={styles.contextKey}>{row.label}</Text>
+              <Text style={styles.contextValue}>{row.value}</Text>
+            </View>
+          ))}
+        </View>
+      </Card>
       <ImportPipelineCard
         providerLabel={providerLabel}
         importRunning={importRunning}
@@ -212,7 +244,9 @@ export const SprintsScreen: React.FC = () => {
           {loadNotice ? <NoticePanel notice={loadNotice} compact /> : null}
           <ScrollView
             contentContainerStyle={styles.scroll}
-            refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={theme.primary} />}
+            refreshControl={
+              <RefreshControl refreshing={loading} onRefresh={load} tintColor={theme.primary} />
+            }
           >
             {sprints.map((s) => (
               <Card
@@ -231,9 +265,7 @@ export const SprintsScreen: React.FC = () => {
                         ? session.adoTeamPath?.split("/")[1] ?? null
                         : session.account?.split("@")[1] ?? null,
                     teamName:
-                      provider === "azuredevops"
-                        ? session.adoTeamPath?.split("/")[2] ?? null
-                        : null,
+                      provider === "azuredevops" ? session.adoTeamPath?.split("/")[2] ?? null : null,
                   });
                   nav.navigate("SprintDetail", { sprintId: s.id });
                 }}
@@ -244,9 +276,7 @@ export const SprintsScreen: React.FC = () => {
                     <Text style={styles.name}>{s.name || "Sprint sem nome"}</Text>
                     {s.goal ? <Text style={styles.goal}>"{s.goal}"</Text> : null}
                     <View style={styles.meta}>
-                      {s.item_count != null ? (
-                        <Text style={styles.metaText}>Itens: {s.item_count}</Text>
-                      ) : null}
+                      {s.item_count != null ? <Text style={styles.metaText}>Itens: {s.item_count}</Text> : null}
                       {s.start_date ? (
                         <Text style={styles.metaText}>Inicio: {String(s.start_date).slice(0, 10)}</Text>
                       ) : null}
@@ -316,30 +346,27 @@ const ImportPipelineCard: React.FC<{
   importRunning: boolean;
   status: ImportStatus["state"] | null;
 }> = ({ providerLabel, importRunning, status }) => {
-  const activeStep = importRunning ? 1 : status === "done" ? 2 : 0;
+  const activeStep = importRunning ? 4 : status === "done" ? 8 : status === "failed" ? 3 : 1;
   const steps = [
-    {
-      label: "Capture",
-      text: `Ler ${providerLabel} com API e fallback de browser quando necessario.`,
-    },
-    {
-      label: "Normalize",
-      text: "Resolver portfolio, projeto, time e colunas internas do SendSprint.",
-    },
-    {
-      label: "Backlog",
-      text: "Publicar cards na sprint interna prontos para drag and drop.",
-    },
+    "Selecionar provider",
+    "Autenticar e validar conta",
+    "Executar fallback de browser se necessario",
+    `Capturar sprint em ${providerLabel}`,
+    "Normalizar portfolio, projeto e time",
+    "Filtrar cards do operador",
+    "Publicar backlog interno",
+    "Liberar o board para arraste e execucao",
   ];
+
   return (
     <Card style={styles.pipelineCard}>
       <Text style={styles.pipelineLabel}>IMPORT PIPELINE</Text>
       <View style={styles.pipelineSteps}>
         {steps.map((step, index) => {
-          const done = activeStep > index;
-          const current = activeStep === index;
+          const done = activeStep > index + 1;
+          const current = activeStep === index + 1;
           return (
-            <View key={step.label} style={styles.pipelineStep}>
+            <View key={step} style={styles.pipelineStep}>
               <View
                 style={[
                   styles.pipelineDot,
@@ -348,8 +375,14 @@ const ImportPipelineCard: React.FC<{
                 ]}
               />
               <View style={{ flex: 1 }}>
-                <Text style={styles.pipelineStepLabel}>{step.label}</Text>
-                <Text style={styles.pipelineStepText}>{step.text}</Text>
+                <Text style={styles.pipelineStepLabel}>{step}</Text>
+                <Text style={styles.pipelineStepText}>
+                  {done
+                    ? "Concluido."
+                    : current
+                      ? "Etapa em andamento no backend local."
+                      : "Aguardando liberar a proxima fase."}
+                </Text>
               </View>
             </View>
           );
@@ -403,6 +436,37 @@ const styles = StyleSheet.create({
   noticeText: { color: theme.textMuted, fontSize: 13, lineHeight: 18 },
   noticeMeta: { color: theme.textMuted, fontSize: 12, fontFamily: theme.fontMono },
   noticeAction: { marginTop: 6 },
+  contextCard: {
+    marginBottom: 12,
+  },
+  contextLabel: {
+    color: theme.primary,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: "800",
+    marginBottom: 6,
+  },
+  contextGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  contextRow: {
+    minWidth: 180,
+    flex: 1,
+    gap: 4,
+  },
+  contextKey: {
+    color: theme.textMuted,
+    fontSize: 11,
+    letterSpacing: 1.4,
+    textTransform: "uppercase",
+  },
+  contextValue: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "700",
+  },
   pipelineCard: {
     marginBottom: 12,
     backgroundColor: "rgba(239,245,255,0.9)",

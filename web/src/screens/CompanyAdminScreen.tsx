@@ -3,6 +3,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -19,6 +20,7 @@ import { useSession } from "../store/session";
 import { theme } from "../theme";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "CompanyAdmin">;
+type AdminTab = "overview" | "users" | "approvals" | "policies";
 
 export const CompanyAdminScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
@@ -27,6 +29,7 @@ export const CompanyAdminScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<AuthStatus | null>(null);
+  const [tab, setTab] = useState<AdminTab>("overview");
 
   const load = async (background = false) => {
     if (!background) setLoading(true);
@@ -66,11 +69,29 @@ export const CompanyAdminScreen: React.FC = () => {
     [session.projectSetup.repositories],
   );
 
+  const approvals = useMemo(
+    () => [
+      {
+        label: "Run all backlog",
+        value: session.appUser?.permissions?.canRunAllBacklog ? "Liberado" : "Restrito",
+      },
+      {
+        label: "Deploy target",
+        value: deployTargets.join(", ") || "dev",
+      },
+      {
+        label: "Provider padrao",
+        value: status?.default_provider ?? session.provider ?? "none",
+      },
+    ],
+    [deployTargets, session.appUser?.permissions?.canRunAllBacklog, session.provider, status?.default_provider],
+  );
+
   if (loading) {
     return (
       <Screen
         chrome="app"
-        eyebrow="Web 16 · Company Admin"
+        eyebrow="Web 16 - Company Admin"
         title="Company admin"
         subtitle="Carregando politica local, identidade e configuracao operacional..."
       >
@@ -82,23 +103,15 @@ export const CompanyAdminScreen: React.FC = () => {
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 16 · Company Admin"
+      eyebrow="Web 16 - Company Admin"
       title="Admin center"
       subtitle="Painel administrativo local para identidade, providers e politicas de entrega do slice web."
       scroll={false}
       footer={
         <View style={{ gap: 10 }}>
           <Button title="Abrir configuracoes" onPress={() => nav.navigate("Settings")} />
-          <Button
-            title="Revisar project setup"
-            variant="secondary"
-            onPress={() => nav.navigate("ProjectSetup")}
-          />
-          <Button
-            title="Ir para suporte"
-            variant="secondary"
-            onPress={() => nav.navigate("Support")}
-          />
+          <Button title="Revisar project setup" variant="secondary" onPress={() => nav.navigate("ProjectSetup")} />
+          <Button title="Ir para suporte" variant="secondary" onPress={() => nav.navigate("Support")} />
         </View>
       }
     >
@@ -123,6 +136,23 @@ export const CompanyAdminScreen: React.FC = () => {
           </Card>
         ) : null}
 
+        <View style={styles.tabRow}>
+          {[
+            ["overview", "Visao geral"],
+            ["users", "Usuarios"],
+            ["approvals", "Aprovacoes"],
+            ["policies", "Politicas"],
+          ].map(([value, label]) => (
+            <Pressable
+              key={value}
+              onPress={() => setTab(value as AdminTab)}
+              style={[styles.tab, tab === value && styles.tabActive]}
+            >
+              <Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={styles.metrics}>
           <MetricCard label="Usuario ativo" value={session.appUser?.active ? "yes" : "no"} />
           <MetricCard
@@ -137,23 +167,43 @@ export const CompanyAdminScreen: React.FC = () => {
           <MetricCard label="Branches de deploy" value={String(deployTargets.length)} accent="success" />
         </View>
 
-        <View style={styles.grid}>
-          <Card style={styles.panel}>
-            <Text style={styles.kicker}>IDENTITY AND ACCESS</Text>
-            <AdminRow label="Display name" value={session.appUser?.displayName ?? "local operator"} />
-            <AdminRow label="Email" value={session.appUser?.email ?? "not defined"} />
-            <AdminRow label="Account active" value={session.appUser?.active ? "true" : "false"} />
-            <AdminRow label="Default provider" value={status?.default_provider ?? session.provider ?? "none"} />
-          </Card>
+        {tab === "overview" || tab === "policies" ? (
+          <View style={styles.grid}>
+            <Card style={styles.panel}>
+              <Text style={styles.kicker}>IDENTITY AND ACCESS</Text>
+              <AdminRow label="Display name" value={session.appUser?.displayName ?? "local operator"} />
+              <AdminRow label="Email" value={session.appUser?.email ?? "not defined"} />
+              <AdminRow label="Account active" value={session.appUser?.active ? "true" : "false"} />
+              <AdminRow label="Default provider" value={status?.default_provider ?? session.provider ?? "none"} />
+            </Card>
 
-          <Card style={styles.panel}>
-            <Text style={styles.kicker}>PROVIDER POLICY</Text>
-            <AdminRow label="Jira" value={status?.jira_configured ? "configured" : "not configured"} />
-            <AdminRow label="Azure DevOps" value={status?.azuredevops_configured ? "configured" : "not configured"} />
-            <AdminRow label="GitHub CLI" value={status?.providers.github.configured ? "authenticated" : "not authenticated"} />
-            <AdminRow label="Current sprint" value={session.currentSprint?.sprintName ?? "none"} />
+            <Card style={styles.panel}>
+              <Text style={styles.kicker}>PROVIDER POLICY</Text>
+              <AdminRow label="Jira" value={status?.jira_configured ? "configured" : "not configured"} />
+              <AdminRow label="Azure DevOps" value={status?.azuredevops_configured ? "configured" : "not configured"} />
+              <AdminRow label="GitHub CLI" value={status?.providers.github.configured ? "authenticated" : "not authenticated"} />
+              <AdminRow label="Current sprint" value={session.currentSprint?.sprintName ?? "none"} />
+            </Card>
+          </View>
+        ) : null}
+
+        {tab === "users" ? (
+          <Card>
+            <Text style={styles.kicker}>USERS AND WORKSPACE ACCESS</Text>
+            <AdminRow label="Usuario atual" value={session.appUser?.email ?? "local-operator"} />
+            <AdminRow label="Repos registrados" value={String(session.projectSetup.repositories.length)} />
+            <AdminRow label="Validation commands" value={String(validationCommands)} />
           </Card>
-        </View>
+        ) : null}
+
+        {tab === "approvals" ? (
+          <Card>
+            <Text style={styles.kicker}>APPROVAL FLOWS</Text>
+            {approvals.map((approval) => (
+              <AdminRow key={approval.label} label={approval.label} value={approval.value} />
+            ))}
+          </Card>
+        ) : null}
 
         <Card>
           <Text style={styles.kicker}>DELIVERY POLICY</Text>
@@ -205,6 +255,31 @@ const styles = StyleSheet.create({
   scroll: {
     gap: 12,
     paddingBottom: 24,
+  },
+  tabRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  tab: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+  },
+  tabActive: {
+    backgroundColor: "rgba(44,107,237,0.10)",
+    borderColor: "rgba(44,107,237,0.24)",
+  },
+  tabText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  tabTextActive: {
+    color: theme.primary,
   },
   metrics: {
     flexDirection: "row",

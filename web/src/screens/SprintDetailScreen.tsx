@@ -16,9 +16,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import { getApiErrorMessage } from "../api/client";
-import { Button } from "../components/Button";
-import { Card } from "../components/Card";
-import { Screen } from "../components/Screen";
 import type {
   ColumnKey,
   ControlPlaneRunDetail,
@@ -26,12 +23,16 @@ import type {
   SprintDetail,
   SprintItem,
 } from "../api/types";
+import { Button } from "../components/Button";
+import { Card } from "../components/Card";
+import { Screen } from "../components/Screen";
 import type { RootStackParamList } from "../navigation";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
 
 type Nav = NativeStackNavigationProp<RootStackParamList, "SprintDetail">;
 type Rt = RouteProp<RootStackParamList, "SprintDetail">;
+type DetailTab = "overview" | "logs" | "timeline" | "readiness" | "evidence";
 
 const COLUMNS: Record<ColumnKey, { label: string; hint: string }> = {
   backlog: { label: "Backlog", hint: "Itens importados e aguardando preparo" },
@@ -72,6 +73,7 @@ export const SprintDetailScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedItem, setSelectedItem] = useState<SprintItem | null>(null);
   const [selectedRunDetail, setSelectedRunDetail] = useState<ControlPlaneRunDetail | null>(null);
+  const [detailTab, setDetailTab] = useState<DetailTab>("overview");
   const [detailLoading, setDetailLoading] = useState(false);
   const [draggingKey, setDraggingKey] = useState<string | null>(null);
   const [hoverColumn, setHoverColumn] = useState<ColumnKey | null>(null);
@@ -131,7 +133,8 @@ export const SprintDetailScreen: React.FC = () => {
   const relevantRuns = useMemo(
     () =>
       runs.filter(
-        (run) => run.sprint_id === route.params.sprintId && String(run.provider) === String(provider),
+        (run) =>
+          run.sprint_id === route.params.sprintId && String(run.provider) === String(provider),
       ),
     [provider, route.params.sprintId, runs],
   );
@@ -278,6 +281,7 @@ export const SprintDetailScreen: React.FC = () => {
   const openItem = async (item: SprintItem) => {
     setSelectedItem(item);
     setSelectedRunDetail(null);
+    setDetailTab("overview");
     const latestRun = latestRunByItem.get(item.key);
     if (!latestRun) return;
     setDetailLoading(true);
@@ -371,7 +375,7 @@ export const SprintDetailScreen: React.FC = () => {
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 07 · Kanban Backlog / Web 08 · Card Detail"
+      eyebrow="Web 07 - Kanban Backlog / Web 08 - Card Detail"
       title={detail?.sprint.name ?? session.currentSprint?.sprintName ?? "Sprint"}
       subtitle={
         headerMeta
@@ -424,6 +428,15 @@ export const SprintDetailScreen: React.FC = () => {
               placeholderTextColor={theme.textMuted}
               style={styles.searchInput}
             />
+            <View style={styles.toolbarRow}>
+              <SignalPill label={`cards ${visibleItems.length}`} />
+              <SignalPill
+                label={`repos ${configuredLocalRepos.length}`}
+                tone={canRun ? "success" : "warning"}
+              />
+              <SignalPill label={actorEmail ? "scope mine" : "scope all"} />
+              <SignalPill label="modo IA" tone="primary" />
+            </View>
           </View>
           <View style={styles.heroActions}>
             <MiniAction
@@ -501,13 +514,13 @@ export const SprintDetailScreen: React.FC = () => {
                             <Text style={styles.itemStatus}>{item.board_status ?? COLUMNS[column].label}</Text>
                             <View style={styles.metaRow}>
                               {item.assignee ? <Text style={styles.metaText}>owner {item.assignee}</Text> : null}
-                              {item.story_points != null ? (
-                                <Text style={styles.metaText}>{item.story_points} sp</Text>
-                              ) : null}
+                              {item.story_points != null ? <Text style={styles.metaText}>{item.story_points} sp</Text> : null}
                               {latestRun?.readiness_verdict ? (
                                 <Text style={styles.metaText}>readiness {latestRun.readiness_verdict}</Text>
                               ) : null}
-                              {latestRun?.failed ? <Text style={[styles.metaText, styles.metaDanger]}>failed</Text> : null}
+                              {latestRun?.failed ? (
+                                <Text style={[styles.metaText, styles.metaDanger]}>failed</Text>
+                              ) : null}
                               {item.archived ? <Text style={styles.metaText}>archived</Text> : null}
                             </View>
                             <View style={styles.cardFooter}>
@@ -517,6 +530,9 @@ export const SprintDetailScreen: React.FC = () => {
                                   : latestRun
                                     ? `${latestRun.state} - step ${latestRun.last_step ?? 0}`
                                     : item.status}
+                              </Text>
+                              <Text style={[styles.runMeta, !isDraggable && styles.metaDanger]}>
+                                {isDraggable ? "drag para mover" : "configure o repositorio"}
                               </Text>
                             </View>
                           </Card>
@@ -534,6 +550,8 @@ export const SprintDetailScreen: React.FC = () => {
       <ItemDetailModal
         item={selectedItem}
         detail={selectedRunDetail}
+        tab={detailTab}
+        onTabChange={setDetailTab}
         loading={detailLoading}
         archiveBusy={archiveBusy}
         onToggleArchive={() => void toggleArchive()}
@@ -645,14 +663,32 @@ const StatusChip: React.FC<{ label: string }> = ({ label }) => (
   </View>
 );
 
+const SignalPill: React.FC<{
+  label: string;
+  tone?: "default" | "primary" | "success" | "warning";
+}> = ({ label, tone = "default" }) => (
+  <View
+    style={[
+      styles.signalPill,
+      tone === "primary" && styles.signalPillPrimary,
+      tone === "success" && styles.signalPillSuccess,
+      tone === "warning" && styles.signalPillWarning,
+    ]}
+  >
+    <Text style={[styles.signalPillText, tone !== "default" && styles.signalPillTextStrong]}>{label}</Text>
+  </View>
+);
+
 const ItemDetailModal: React.FC<{
   item: SprintItem | null;
   detail: ControlPlaneRunDetail | null;
+  tab: DetailTab;
+  onTabChange: (tab: DetailTab) => void;
   loading: boolean;
   archiveBusy: boolean;
   onToggleArchive: () => void;
   onClose: () => void;
-}> = ({ item, detail, loading, archiveBusy, onToggleArchive, onClose }) => (
+}> = ({ item, detail, tab, onTabChange, loading, archiveBusy, onToggleArchive, onClose }) => (
   <Modal visible={Boolean(item)} transparent animationType="fade" onRequestClose={onClose}>
     <View style={styles.modalBackdrop}>
       <View style={styles.modalCard}>
@@ -674,118 +710,198 @@ const ItemDetailModal: React.FC<{
           </View>
         </View>
 
+        <View style={styles.modalTabs}>
+          {[
+            ["overview", "Visao geral"],
+            ["logs", "Logs"],
+            ["timeline", "Timeline"],
+            ["readiness", "Readiness"],
+            ["evidence", "Evidencias"],
+          ].map(([value, label]) => (
+            <Pressable
+              key={value}
+              onPress={() => onTabChange(value as DetailTab)}
+              style={[styles.modalTab, tab === value && styles.modalTabActive]}
+            >
+              <Text style={[styles.modalTabText, tab === value && styles.modalTabTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
         <ScrollView style={{ maxHeight: 520 }} showsVerticalScrollIndicator={false}>
-          <Card style={styles.modalSection}>
-            <Text style={styles.modalSectionTitle}>WORKFLOW</Text>
-            <Text style={styles.modalBody}>Status do provider: {item?.status ?? "unknown"}</Text>
-            <Text style={styles.modalBody}>Status SendSprint: {item?.board_status ?? "Backlog"}</Text>
-            <Text style={styles.modalBody}>Tipo: {item?.type ?? "Issue"}</Text>
-            {item?.assignee ? <Text style={styles.modalBody}>Assignee: {item.assignee}</Text> : null}
-            {item?.assignee_email ? (
-              <Text style={styles.modalBody}>Email do assignee: {item.assignee_email}</Text>
-            ) : null}
-            {item?.parent_key ? <Text style={styles.modalBody}>Parent: {item.parent_key}</Text> : null}
-            {item?.story_points != null ? (
-              <Text style={styles.modalBody}>Story points: {item.story_points}</Text>
-            ) : null}
-            {item?.board_updated_by ? (
-              <Text style={styles.modalBody}>Ultima alteracao: {item.board_updated_by}</Text>
-            ) : null}
-          </Card>
+          {tab === "overview" ? (
+            <>
+              <Card style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>WORKFLOW</Text>
+                <Text style={styles.modalBody}>Status do provider: {item?.status ?? "unknown"}</Text>
+                <Text style={styles.modalBody}>Status SendSprint: {item?.board_status ?? "Backlog"}</Text>
+                <Text style={styles.modalBody}>Tipo: {item?.type ?? "Issue"}</Text>
+                {item?.assignee ? <Text style={styles.modalBody}>Assignee: {item.assignee}</Text> : null}
+                {item?.assignee_email ? (
+                  <Text style={styles.modalBody}>Email do assignee: {item.assignee_email}</Text>
+                ) : null}
+                {item?.parent_key ? <Text style={styles.modalBody}>Parent: {item.parent_key}</Text> : null}
+                {item?.story_points != null ? (
+                  <Text style={styles.modalBody}>Story points: {item.story_points}</Text>
+                ) : null}
+                {item?.board_updated_by ? (
+                  <Text style={styles.modalBody}>Ultima alteracao: {item.board_updated_by}</Text>
+                ) : null}
+              </Card>
 
-          {item?.description ? (
-            <Card style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>DESCRICAO</Text>
-              <Text style={styles.modalBody}>{item.description}</Text>
-            </Card>
+              {item?.description ? (
+                <Card style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>DESCRICAO</Text>
+                  <Text style={styles.modalBody}>{item.description}</Text>
+                </Card>
+              ) : null}
+
+              {item?.acceptance_criteria ? (
+                <Card style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>CRITERIOS DE ACEITE</Text>
+                  <Text style={styles.modalBody}>{item.acceptance_criteria}</Text>
+                </Card>
+              ) : null}
+
+              <Card style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>ORIGEM</Text>
+                {item?.source_url ? <Text style={styles.modalMono}>{item.source_url}</Text> : null}
+                {item?.created_at ? <Text style={styles.modalBody}>Criado em: {item.created_at}</Text> : null}
+                {item?.updated_at ? <Text style={styles.modalBody}>Atualizado em: {item.updated_at}</Text> : null}
+                {item?.revision != null ? <Text style={styles.modalBody}>Revision: {String(item.revision)}</Text> : null}
+                {item?.labels.length ? <Text style={styles.modalBody}>Labels: {item.labels.join(", ")}</Text> : null}
+              </Card>
+
+              {item?.links.length ? (
+                <Card style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>LINKS</Text>
+                  {item.links.map((link, index) => (
+                    <Text key={`${index}-${link.type}-${link.target_key ?? ""}`} style={styles.modalMono}>
+                      {link.type} - {link.target_key ?? "-"} - {link.target_url ?? "-"}
+                    </Text>
+                  ))}
+                </Card>
+              ) : null}
+
+              {item?.comments.length ? (
+                <Card style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>COMENTARIOS</Text>
+                  {item.comments.map((comment, index) => (
+                    <View key={`${index}-${comment.created_at ?? "comment"}`} style={styles.modalListItem}>
+                      <Text style={styles.modalBody}>
+                        {(comment.author || "autor desconhecido") +
+                          (comment.created_at ? ` - ${comment.created_at}` : "")}
+                      </Text>
+                      <Text style={styles.modalBody}>{comment.body ?? ""}</Text>
+                    </View>
+                  ))}
+                </Card>
+              ) : null}
+            </>
           ) : null}
 
-          {item?.acceptance_criteria ? (
+          {tab === "logs" ? (
             <Card style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>CRITERIOS DE ACEITE</Text>
-              <Text style={styles.modalBody}>{item.acceptance_criteria}</Text>
-            </Card>
-          ) : null}
-
-          <Card style={styles.modalSection}>
-            <Text style={styles.modalSectionTitle}>ORIGEM</Text>
-            {item?.source_url ? <Text style={styles.modalMono}>{item.source_url}</Text> : null}
-            {item?.created_at ? <Text style={styles.modalBody}>Criado em: {item.created_at}</Text> : null}
-            {item?.updated_at ? <Text style={styles.modalBody}>Atualizado em: {item.updated_at}</Text> : null}
-            {item?.revision != null ? <Text style={styles.modalBody}>Revision: {String(item.revision)}</Text> : null}
-            {item?.labels.length ? <Text style={styles.modalBody}>Labels: {item.labels.join(", ")}</Text> : null}
-          </Card>
-
-          {item?.links.length ? (
-            <Card style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>LINKS</Text>
-              {item.links.map((link, index) => (
-                <Text key={`${index}-${link.type}-${link.target_key ?? ""}`} style={styles.modalMono}>
-                  {link.type} - {link.target_key ?? "-"} - {link.target_url ?? "-"}
-                </Text>
-              ))}
-            </Card>
-          ) : null}
-
-          {item?.comments.length ? (
-            <Card style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>COMENTARIOS</Text>
-              {item.comments.map((comment, index) => (
-                <View key={`${index}-${comment.created_at ?? "comment"}`} style={styles.modalListItem}>
+              <Text style={styles.modalSectionTitle}>LOGS DO SENDSPRINT</Text>
+              {loading ? (
+                <ActivityIndicator color={theme.primary} />
+              ) : detail ? (
+                <>
                   <Text style={styles.modalBody}>
-                    {(comment.author || "autor desconhecido") + (comment.created_at ? ` - ${comment.created_at}` : "")}
+                    Run: {detail.run.state} - step {detail.run.last_step ?? 0}
                   </Text>
-                  <Text style={styles.modalBody}>{comment.body ?? ""}</Text>
-                </View>
-              ))}
+                  {(detail.logs ?? []).length === 0 ? (
+                    <Text style={styles.modalBody}>Sem logs capturados ainda.</Text>
+                  ) : (
+                    detail.logs.map((log, index) => (
+                      <Text key={`${index}-${log}`} style={styles.modalMono}>
+                        {log}
+                      </Text>
+                    ))
+                  )}
+                </>
+              ) : (
+                <Text style={styles.modalBody}>Nenhuma execucao registrada para este card ainda.</Text>
+              )}
             </Card>
           ) : null}
 
-          {item?.attachments.length ? (
-            <Card style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>ANEXOS</Text>
-              {item.attachments.map((attachment, index) => (
-                <Text key={`${index}-${attachment.filename ?? "attachment"}`} style={styles.modalMono}>
-                  {attachment.filename ?? "arquivo"} - {attachment.mime_type ?? "sem mime"} - {attachment.url ?? "-"}
-                </Text>
-              ))}
-            </Card>
-          ) : null}
-
-          {item?.history.length ? (
-            <Card style={styles.modalSection}>
-              <Text style={styles.modalSectionTitle}>HISTORICO DO BOARD</Text>
-              {item.history.map((entry, index) => (
-                <Text key={`${index}-${entry.observed_at ?? "history"}`} style={styles.modalMono}>
-                  {`${entry.observed_at ?? "-"} | ${entry.action ?? "-"} | ${entry.actor_email ?? "-"} | ${entry.from_column ?? "-"} -> ${entry.to_column ?? "-"}${entry.note ? ` | ${entry.note}` : ""}`}
-                </Text>
-              ))}
-            </Card>
-          ) : null}
-
-          <Card style={styles.modalSection}>
-            <Text style={styles.modalSectionTitle}>LOGS DO SENDSPRINT</Text>
-            {loading ? (
-              <ActivityIndicator color={theme.primary} />
-            ) : detail ? (
-              <>
-                <Text style={styles.modalBody}>
-                  Run: {detail.run.state} - step {detail.run.last_step ?? 0}
-                </Text>
-                {(detail.logs ?? []).length === 0 ? (
-                  <Text style={styles.modalBody}>Sem logs capturados ainda.</Text>
-                ) : (
-                  detail.logs.map((log, index) => (
-                    <Text key={`${index}-${log}`} style={styles.modalMono}>
-                      {log}
+          {tab === "timeline" ? (
+            <>
+              {item?.history.length ? (
+                <Card style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>HISTORICO DO BOARD</Text>
+                  {item.history.map((entry, index) => (
+                    <Text key={`${index}-${entry.observed_at ?? "history"}`} style={styles.modalMono}>
+                      {`${entry.observed_at ?? "-"} | ${entry.action ?? "-"} | ${entry.actor_email ?? "-"} | ${entry.from_column ?? "-"} -> ${entry.to_column ?? "-"}${entry.note ? ` | ${entry.note}` : ""}`}
+                    </Text>
+                  ))}
+                </Card>
+              ) : null}
+              <Card style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>TIMELINE DA EXECUCAO</Text>
+                {detail?.timeline?.length ? (
+                  detail.timeline.map((entry, index) => (
+                    <Text key={`${index}-timeline`} style={styles.modalMono}>
+                      {JSON.stringify(entry)}
                     </Text>
                   ))
+                ) : (
+                  <Text style={styles.modalBody}>Nenhum evento de timeline registrado ainda.</Text>
                 )}
-              </>
-            ) : (
-              <Text style={styles.modalBody}>Nenhuma execucao registrada para este card ainda.</Text>
-            )}
-          </Card>
+              </Card>
+            </>
+          ) : null}
+
+          {tab === "readiness" ? (
+            <Card style={styles.modalSection}>
+              <Text style={styles.modalSectionTitle}>READINESS</Text>
+              {detail?.quality_gate ? (
+                <>
+                  <Text style={styles.modalBody}>Veredito: {detail.quality_gate.verdict}</Text>
+                  {detail.quality_gate.reasons.map((reason, index) => (
+                    <Text key={`${index}-${reason}`} style={styles.modalBody}>
+                      - {reason}
+                    </Text>
+                  ))}
+                  {detail.quality_gate.checks.map((check) => (
+                    <Text key={check.check_name} style={styles.modalMono}>
+                      {check.check_name} - {check.passed ? "ok" : "failed"} - {check.details}
+                    </Text>
+                  ))}
+                </>
+              ) : (
+                <Text style={styles.modalBody}>Sem quality gate calculado para este card ainda.</Text>
+              )}
+            </Card>
+          ) : null}
+
+          {tab === "evidence" ? (
+            <>
+              {item?.attachments.length ? (
+                <Card style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>ANEXOS DE ORIGEM</Text>
+                  {item.attachments.map((attachment, index) => (
+                    <Text key={`${index}-${attachment.filename ?? "attachment"}`} style={styles.modalMono}>
+                      {attachment.filename ?? "arquivo"} - {attachment.mime_type ?? "sem mime"} - {attachment.url ?? "-"}
+                    </Text>
+                  ))}
+                </Card>
+              ) : null}
+              <Card style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>EVIDENCIAS DO SENDSPRINT</Text>
+                {detail?.evidence?.items?.length ? (
+                  detail.evidence.items.map((entry) => (
+                    <Text key={`${entry.type}-${entry.path}`} style={styles.modalMono}>
+                      {entry.label} - {entry.type} - {entry.path}
+                    </Text>
+                  ))
+                ) : (
+                  <Text style={styles.modalBody}>Nenhuma evidencia registrada ainda.</Text>
+                )}
+              </Card>
+            </>
+          ) : null}
         </ScrollView>
       </View>
     </View>
@@ -834,6 +950,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     color: theme.text,
     fontSize: 14,
+  },
+  toolbarRow: {
+    marginTop: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   heroActions: {
     gap: 8,
@@ -961,6 +1083,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
   },
+  signalPill: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  signalPillPrimary: {
+    backgroundColor: "rgba(44,107,237,0.10)",
+    borderColor: "rgba(44,107,237,0.20)",
+  },
+  signalPillSuccess: {
+    backgroundColor: "rgba(30,169,124,0.10)",
+    borderColor: "rgba(30,169,124,0.20)",
+  },
+  signalPillWarning: {
+    backgroundColor: "rgba(193,138,23,0.12)",
+    borderColor: "rgba(193,138,23,0.24)",
+  },
+  signalPillText: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  signalPillTextStrong: {
+    color: theme.text,
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: "rgba(14, 24, 36, 0.35)",
@@ -983,6 +1133,31 @@ const styles = StyleSheet.create({
   modalActions: {
     gap: 8,
     alignItems: "flex-end",
+  },
+  modalTabs: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  modalTab: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: theme.surfaceAlt,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  modalTabActive: {
+    backgroundColor: "rgba(44,107,237,0.10)",
+    borderColor: "rgba(44,107,237,0.24)",
+  },
+  modalTabText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  modalTabTextActive: {
+    color: theme.primary,
   },
   modalTitle: {
     color: theme.text,

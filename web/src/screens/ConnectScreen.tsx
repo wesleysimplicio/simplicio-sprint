@@ -1,13 +1,13 @@
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../api/client";
+import type { AuthBootstrap, Provider } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { Input } from "../components/Input";
 import { Screen } from "../components/Screen";
-import type { AuthBootstrap, Provider } from "../api/types";
 import type { RootStackParamList } from "../navigation";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
@@ -29,6 +29,7 @@ export const ConnectScreen: React.FC = () => {
   const [url, setUrl] = useState(session.backendUrl);
   const [email, setEmail] = useState(session.appUser?.email ?? "");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [booting, setBooting] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<AuthBootstrap | null>(null);
@@ -130,20 +131,29 @@ export const ConnectScreen: React.FC = () => {
   return (
     <Screen
       chrome="auth"
-      eyebrow="Web 01 · App Login"
+      eyebrow="Web 01 - App Login"
       title="SendSprint"
-      subtitle="Entre com email e senha da assinatura. Nesta fase local todos os usuarios autenticados ficam ativos."
+      subtitle="Entre com email e senha da assinatura. Nesta fase local todos os usuarios autenticados continuam ativos, mas o fluxo ja segue o shell comercial planejado."
       footer={
-        <Button
-          title={busy ? "Entrando..." : "Entrar"}
-          onPress={handleLogin}
-          loading={busy}
-          disabled={booting}
-        />
+        <View style={styles.footerActions}>
+          <Button
+            title={busy ? "Entrando..." : "Entrar"}
+            onPress={handleLogin}
+            loading={busy}
+            disabled={booting || !email.trim() || !password.trim()}
+          />
+          <Button
+            title="Entrar com Microsoft"
+            onPress={handleLogin}
+            variant="secondary"
+            disabled={booting}
+          />
+        </View>
       }
     >
       <View style={styles.split}>
         <Card style={styles.loginCard}>
+          <Text style={styles.kicker}>LOGIN SENDSPRINT</Text>
           <Text style={styles.brand}>SendSprint</Text>
           <Text style={styles.brandSub}>AI Sprint Delivery Control Plane</Text>
           <View style={{ height: 18 }} />
@@ -161,15 +171,30 @@ export const ConnectScreen: React.FC = () => {
             placeholder="********"
             secureTextEntry
           />
-          <Text style={styles.metaText}>Login do app primeiro. Conexao com provider depois.</Text>
+          <View style={styles.preferenceRow}>
+            <Pressable onPress={() => setRemember((current) => !current)} style={styles.checkboxRow}>
+              <View style={[styles.checkbox, remember && styles.checkboxActive]}>
+                {remember ? <Text style={styles.checkboxMark}>x</Text> : null}
+              </View>
+              <Text style={styles.preferenceText}>Manter sessao neste workspace</Text>
+            </Pressable>
+            <Pressable>
+              <Text style={styles.inlineLink}>Esqueci a senha</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.metaText}>
+            Login do app primeiro. Conexao com provider, importacao da sprint e fallback por browser acontecem depois do botao Iniciar.
+          </Text>
+          <Text style={styles.sideHint}>
+            SSO Azure e gestao de assinatura entram aqui sem trocar o fluxo principal.
+          </Text>
         </Card>
 
         <Card style={styles.backendCard}>
           <Text style={styles.kicker}>STATUS DO BACKEND LOCAL</Text>
           <Text style={styles.sideTitle}>Tudo pronto para o shell web</Text>
           <Text style={styles.copy}>
-            O backend local valida o endpoint, recupera o token operador e exibe a disponibilidade
-            do plano de controle antes do onboarding da sprint.
+            O backend local valida o endpoint, recupera o token operador e exibe a disponibilidade do plano de controle antes do onboarding da sprint.
           </Text>
           <Input
             label="API"
@@ -191,7 +216,20 @@ export const ConnectScreen: React.FC = () => {
             <View style={styles.statusList}>
               <StatusLine label="Control Plane" value="Online" tone="success" />
               <StatusLine label="Auth Local" value="Online" tone="success" />
+              <StatusLine
+                label="Profile cache"
+                value={session.appUser?.email ? "Hydrated" : "Waiting login"}
+              />
+              <StatusLine
+                label="Operator token"
+                value={status?.operator_token ? "Ready" : "Pending"}
+                tone={status?.operator_token ? "success" : "default"}
+              />
               <StatusLine label="Provider padrao" value={status?.default_provider ?? "nenhum"} />
+              <StatusLine
+                label="GitHub CLI"
+                value={status?.providers.github.configured ? "Ready" : "Pending"}
+              />
               <StatusLine label="Versao" value="local" />
             </View>
           )}
@@ -224,7 +262,6 @@ const styles = StyleSheet.create({
   loginCard: {
     flex: 1,
     minWidth: 320,
-    justifyContent: "center",
     paddingHorizontal: 28,
     paddingVertical: 28,
   },
@@ -236,26 +273,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 24,
   },
+  kicker: {
+    color: theme.textMuted,
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: "700",
+  },
   brand: {
     color: theme.text,
     fontSize: 32,
     fontWeight: "800",
+    marginTop: 8,
   },
   brandSub: {
     color: theme.textMuted,
     fontSize: 14,
     marginTop: 6,
   },
+  footerActions: {
+    gap: 10,
+  },
   copy: {
     color: theme.textMuted,
     fontSize: 14,
     lineHeight: 21,
-  },
-  kicker: {
-    color: theme.textMuted,
-    fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "700",
   },
   sideTitle: {
     color: theme.text,
@@ -274,11 +315,6 @@ const styles = StyleSheet.create({
     color: theme.textMuted,
     fontSize: 12,
   },
-  okText: {
-    color: theme.success,
-    fontSize: 12,
-    fontFamily: theme.fontMono,
-  },
   errorText: {
     color: theme.danger,
     fontSize: 12,
@@ -288,7 +324,55 @@ const styles = StyleSheet.create({
   metaText: {
     color: theme.textMuted,
     fontSize: 12,
-    marginTop: 6,
+    marginTop: 10,
+    lineHeight: 18,
+  },
+  sideHint: {
+    color: theme.primary,
+    fontSize: 12,
+    marginTop: 10,
+    lineHeight: 18,
+  },
+  preferenceRow: {
+    marginTop: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.surfaceAlt,
+  },
+  checkboxActive: {
+    backgroundColor: "rgba(44,107,237,0.14)",
+    borderColor: theme.primary,
+  },
+  checkboxMark: {
+    color: theme.primary,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  preferenceText: {
+    color: theme.textMuted,
+    fontSize: 12,
+  },
+  inlineLink: {
+    color: theme.primary,
+    fontSize: 12,
+    fontWeight: "700",
   },
   statusList: {
     gap: 10,

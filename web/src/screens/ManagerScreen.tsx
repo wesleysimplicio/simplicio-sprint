@@ -1,5 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { getApiErrorMessage } from "../api/client";
 import { Card } from "../components/Card";
 import { Screen } from "../components/Screen";
@@ -25,6 +34,8 @@ type EmployeeRollup = {
   latestMove?: string | null;
 };
 
+type ManagerTab = "team" | "tasks" | "runs" | "alerts";
+
 export const ManagerScreen: React.FC = () => {
   const { api, session } = useSession();
   const [loading, setLoading] = useState(true);
@@ -34,6 +45,8 @@ export const ManagerScreen: React.FC = () => {
   const [agents, setAgents] = useState<AgentDashboardResponse | null>(null);
   const [validations, setValidations] = useState<ValidationDashboardResponse | null>(null);
   const [detail, setDetail] = useState<SprintDetail | null>(null);
+  const [tab, setTab] = useState<ManagerTab>("team");
+  const [query, setQuery] = useState("");
 
   const load = async (background = false) => {
     if (!background) setLoading(true);
@@ -128,8 +141,17 @@ export const ManagerScreen: React.FC = () => {
       ];
     }
 
-    return Array.from(base.values()).sort((left, right) => right.totalItems - left.totalItems);
-  }, [detail?.items, latestRunByItem, session.appUser]);
+    const normalizedQuery = query.trim().toLowerCase();
+    return Array.from(base.values())
+      .filter((row) =>
+        !normalizedQuery
+          ? true
+          : [row.label, row.email, row.latestMove].filter(Boolean).some((value) =>
+              String(value).toLowerCase().includes(normalizedQuery),
+            ),
+      )
+      .sort((left, right) => right.totalItems - left.totalItems);
+  }, [detail?.items, latestRunByItem, query, session.appUser]);
 
   const approvalsPending = useMemo(
     () =>
@@ -148,11 +170,22 @@ export const ManagerScreen: React.FC = () => {
     [detail?.items, latestRunByItem],
   );
 
+  const alertItems = useMemo(() => {
+    const list: string[] = [];
+    if (blockedItems > 0) list.push(`${blockedItems} item(ns) bloqueados aguardando remocao de impedimento.`);
+    if (approvalsPending > 0) list.push(`${approvalsPending} item(ns) aguardando review humana ou deploy.`);
+    if ((validations?.lanes ?? []).some((lane) => lane.status === "failed")) {
+      list.push("Uma ou mais validation lanes terminaram em failed.");
+    }
+    if ((agents?.total_active_runs ?? 0) > 3) list.push("Mais de 3 runs ativas no workspace local.");
+    return list;
+  }, [agents?.total_active_runs, approvalsPending, blockedItems, validations?.lanes]);
+
   if (loading) {
     return (
       <Screen
         chrome="app"
-        eyebrow="Web 13 · Manager Console"
+        eyebrow="Web 13 - Manager Console"
         title="Manager console"
         subtitle="Carregando atividade de operadores, runs e validacoes..."
       >
@@ -164,7 +197,7 @@ export const ManagerScreen: React.FC = () => {
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 13 · Manager Console"
+      eyebrow="Web 13 - Manager Console"
       title="Visao do gerente"
       subtitle="Panorama do sprint ativo, operadores locais, lanes de validacao e aprovacoes pendentes."
       scroll={false}
@@ -190,62 +223,128 @@ export const ManagerScreen: React.FC = () => {
           </Card>
         ) : null}
 
+        <View style={styles.toolbar}>
+          <View style={styles.tabRow}>
+            {[
+              ["team", "Minha equipe"],
+              ["tasks", "Status das tarefas"],
+              ["runs", "Execucoes recentes"],
+              ["alerts", "Alertas"],
+            ].map(([value, label]) => (
+              <Pressable
+                key={value}
+                onPress={() => setTab(value as ManagerTab)}
+                style={[styles.tab, tab === value && styles.tabActive]}
+              >
+                <Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Buscar colaborador ou sinal"
+            placeholderTextColor={theme.textMuted}
+            style={styles.searchInput}
+          />
+        </View>
+
         <View style={styles.metrics}>
           <MetricCard label="Operadores visiveis" value={String(employeeRows.length)} />
-          <MetricCard label="Runs ativos" value={String(relevantRuns.filter((run) => run.state === "running").length)} accent="primary" />
+          <MetricCard
+            label="Runs ativas"
+            value={String(relevantRuns.filter((run) => run.state === "running").length)}
+            accent="primary"
+          />
           <MetricCard label="Aprovacoes pendentes" value={String(approvalsPending)} accent="warning" />
           <MetricCard label="Itens bloqueados" value={String(blockedItems)} accent="danger" />
         </View>
 
-        <View style={styles.split}>
-          <Card style={styles.primaryPanel}>
-            <Text style={styles.kicker}>TEAM ACTIVITY</Text>
-            {employeeRows.map((row) => (
-              <View key={row.key} style={styles.employeeRow}>
+        {tab === "team" || tab === "tasks" ? (
+          <View style={styles.split}>
+            <Card style={styles.primaryPanel}>
+              <Text style={styles.kicker}>
+                {tab === "team" ? "TEAM ACTIVITY" : "TASK OWNERSHIP"}
+              </Text>
+              {employeeRows.map((row) => (
+                <View key={row.key} style={styles.employeeRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.employeeName}>{row.label}</Text>
+                    <Text style={styles.employeeMeta}>
+                      {row.email ?? "sem email"} - ultima alteracao {row.latestMove ?? "nao registrada"}
+                    </Text>
+                  </View>
+                  <View style={styles.employeeStats}>
+                    <Text style={styles.employeeStat}>{row.totalItems} itens</Text>
+                    <Text style={styles.employeeStat}>{row.activeItems} ativos</Text>
+                    <Text style={styles.employeeStat}>{row.reviewItems} review/deploy</Text>
+                    <Text style={[styles.employeeStat, row.blockedItems > 0 && { color: theme.danger }]}>
+                      {row.blockedItems} bloqueados
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </Card>
+
+            <View style={styles.sideStack}>
+              <Card>
+                <Text style={styles.kicker}>VALIDATION LANES</Text>
+                {(validations?.lanes ?? []).map((lane) => (
+                  <View key={lane.lane} style={styles.inlineRow}>
+                    <Text style={styles.inlineLabel}>{lane.lane.toUpperCase()}</Text>
+                    <Text style={styles.inlineValue}>
+                      {lane.status} - {lane.events_count} eventos
+                    </Text>
+                  </View>
+                ))}
+              </Card>
+
+              <Card>
+                <Text style={styles.kicker}>AGENT RUNTIMES</Text>
+                {(agents?.agents ?? []).slice(0, 5).map((agent) => (
+                  <View key={agent.key} style={styles.inlineRow}>
+                    <Text style={styles.inlineLabel}>{agent.name}</Text>
+                    <Text style={styles.inlineValue}>
+                      {agent.runtime} - {agent.capabilities.length} capacidades
+                    </Text>
+                  </View>
+                ))}
+              </Card>
+            </View>
+          </View>
+        ) : null}
+
+        {tab === "runs" ? (
+          <Card>
+            <Text style={styles.kicker}>RECENT RUNS</Text>
+            {relevantRuns.slice(0, 10).map((run) => (
+              <View key={run.run_id} style={styles.inlineRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.employeeName}>{row.label}</Text>
+                  <Text style={styles.inlineLabel}>{run.run_id.slice(0, 12)}</Text>
                   <Text style={styles.employeeMeta}>
-                    {row.email ?? "sem email"} · ultima alteracao {row.latestMove ?? "nao registrada"}
+                    {run.state} - step {run.last_step ?? 0} - {run.item_keys.length} itens
                   </Text>
                 </View>
-                <View style={styles.employeeStats}>
-                  <Text style={styles.employeeStat}>{row.totalItems} itens</Text>
-                  <Text style={styles.employeeStat}>{row.activeItems} ativos</Text>
-                  <Text style={styles.employeeStat}>{row.reviewItems} review/deploy</Text>
-                  <Text style={[styles.employeeStat, row.blockedItems > 0 && { color: theme.danger }]}>
-                    {row.blockedItems} bloqueados
-                  </Text>
-                </View>
+                <Text style={styles.inlineValue}>{run.started_at?.slice(0, 19) ?? "-"}</Text>
               </View>
             ))}
           </Card>
+        ) : null}
 
-          <View style={styles.sideStack}>
-            <Card>
-              <Text style={styles.kicker}>VALIDATION LANES</Text>
-              {(validations?.lanes ?? []).map((lane) => (
-                <View key={lane.lane} style={styles.inlineRow}>
-                  <Text style={styles.inlineLabel}>{lane.lane.toUpperCase()}</Text>
-                  <Text style={styles.inlineValue}>
-                    {lane.status} · {lane.events_count} eventos
-                  </Text>
-                </View>
-              ))}
-            </Card>
-
-            <Card>
-              <Text style={styles.kicker}>AGENT RUNTIMES</Text>
-              {(agents?.agents ?? []).slice(0, 5).map((agent) => (
-                <View key={agent.key} style={styles.inlineRow}>
-                  <Text style={styles.inlineLabel}>{agent.name}</Text>
-                  <Text style={styles.inlineValue}>
-                    {agent.runtime} · {agent.capabilities.length} capacidades
-                  </Text>
-                </View>
-              ))}
-            </Card>
-          </View>
-        </View>
+        {tab === "alerts" ? (
+          <Card>
+            <Text style={styles.kicker}>ALERT FEED</Text>
+            {alertItems.length === 0 ? (
+              <Text style={styles.emptyText}>Nenhum alerta operacional forte no momento.</Text>
+            ) : (
+              alertItems.map((item) => (
+                <Text key={item} style={styles.alertText}>
+                  - {item}
+                </Text>
+              ))
+            )}
+          </Card>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -306,6 +405,44 @@ const styles = StyleSheet.create({
   scroll: {
     gap: 12,
     paddingBottom: 24,
+  },
+  toolbar: {
+    gap: 10,
+  },
+  tabRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  tab: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+  },
+  tabActive: {
+    backgroundColor: "rgba(44,107,237,0.10)",
+    borderColor: "rgba(44,107,237,0.24)",
+  },
+  tabText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  tabTextActive: {
+    color: theme.primary,
+  },
+  searchInput: {
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: theme.radius,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: theme.text,
+    fontSize: 14,
   },
   metrics: {
     flexDirection: "row",
@@ -403,5 +540,16 @@ const styles = StyleSheet.create({
     color: theme.danger,
     fontSize: 13,
     lineHeight: 20,
+  },
+  emptyText: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  alertText: {
+    color: theme.text,
+    fontSize: 13,
+    lineHeight: 20,
+    marginTop: 4,
   },
 });

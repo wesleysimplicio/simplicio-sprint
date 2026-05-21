@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,8 @@ import type {
 import { useSession } from "../store/session";
 import { theme } from "../theme";
 
+type ReportsTab = "throughput" | "tuples" | "yools";
+
 export const ReportsScreen: React.FC = () => {
   const { api, session } = useSession();
   const [loading, setLoading] = useState(true);
@@ -30,6 +33,7 @@ export const ReportsScreen: React.FC = () => {
   const [yools, setYools] = useState<YoolDashboardResponse | null>(null);
   const [validations, setValidations] = useState<ValidationDashboardResponse | null>(null);
   const [detail, setDetail] = useState<SprintDetail | null>(null);
+  const [tab, setTab] = useState<ReportsTab>("throughput");
 
   const load = async (background = false) => {
     if (!background) setLoading(true);
@@ -97,11 +101,13 @@ export const ReportsScreen: React.FC = () => {
     [yools?.yools],
   );
 
+  const maxFunnelValue = Math.max(...Object.values(funnel), 1);
+
   if (loading) {
     return (
       <Screen
         chrome="app"
-        eyebrow="Web 17 · Reports"
+        eyebrow="Web 17 - Reports"
         title="Reports"
         subtitle="Carregando sinais de throughput, tuple activity e yool usage..."
       >
@@ -113,7 +119,7 @@ export const ReportsScreen: React.FC = () => {
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 17 · Reports"
+      eyebrow="Web 17 - Reports"
       title="Relatorios operacionais"
       subtitle="Throughput da sprint, atividade de tuples, validacoes e uso dos yools que sustentam o shell local."
       scroll={false}
@@ -139,6 +145,22 @@ export const ReportsScreen: React.FC = () => {
           </Card>
         ) : null}
 
+        <View style={styles.tabRow}>
+          {[
+            ["throughput", "Throughput"],
+            ["tuples", "Tuples"],
+            ["yools", "Yools"],
+          ].map(([value, label]) => (
+            <Pressable
+              key={value}
+              onPress={() => setTab(value as ReportsTab)}
+              style={[styles.tab, tab === value && styles.tabActive]}
+            >
+              <Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+
         <View style={styles.metrics}>
           <MetricCard label="Itens importados" value={String(detail?.items.length ?? 0)} />
           <MetricCard label="Arquivados" value={String(detail?.archived_count ?? 0)} accent="warning" />
@@ -154,18 +176,33 @@ export const ReportsScreen: React.FC = () => {
           />
         </View>
 
-        <View style={styles.grid}>
-          <Card style={styles.panel}>
-            <Text style={styles.kicker}>DELIVERY FUNNEL</Text>
-            {Object.entries(funnel).map(([label, value]) => (
-              <View key={label} style={styles.row}>
-                <Text style={styles.rowLabel}>{label}</Text>
-                <Text style={styles.rowValue}>{String(value)}</Text>
-              </View>
-            ))}
-          </Card>
+        {tab === "throughput" ? (
+          <View style={styles.grid}>
+            <Card style={styles.panel}>
+              <Text style={styles.kicker}>DELIVERY FUNNEL</Text>
+              {Object.entries(funnel).map(([label, value]) => (
+                <View key={label} style={styles.funnelRow}>
+                  <Text style={styles.rowLabel}>{label}</Text>
+                  <View style={styles.funnelBarTrack}>
+                    <View style={[styles.funnelBarFill, { width: `${Math.max((value / maxFunnelValue) * 100, value > 0 ? 16 : 0)}%` }]} />
+                  </View>
+                  <Text style={styles.rowValue}>{String(value)}</Text>
+                </View>
+              ))}
+            </Card>
 
-          <Card style={styles.panel}>
+            <Card style={styles.panel}>
+              <Text style={styles.kicker}>TELEMETRY NOTES</Text>
+              <Text style={styles.bodyText}>
+                Este slice Console + Web ja expone tuples, runs, validations e invocacoes de yool.
+                Tokens, horas gastas e custo por modelo ainda nao estao instrumentados na telemetria local.
+              </Text>
+            </Card>
+          </View>
+        ) : null}
+
+        {tab === "tuples" ? (
+          <Card>
             <Text style={styles.kicker}>TUPLE ACTIVITY</Text>
             <ReportRow label="Total tuples" value={String(tuples?.total_runs ?? 0)} />
             <ReportRow label="Active runs" value={String(tuples?.active_runs ?? 0)} />
@@ -173,34 +210,28 @@ export const ReportsScreen: React.FC = () => {
             <ReportRow label="Validation events" value={String(validations?.total_events ?? 0)} />
             <ReportRow label="Registered contracts" value={String(yools?.registered_contracts ?? 0)} />
           </Card>
-        </View>
+        ) : null}
 
-        <Card>
-          <Text style={styles.kicker}>TOP YOOLS</Text>
-          {topYools.length === 0 ? (
-            <Text style={styles.bodyText}>Nenhuma estatistica de yool foi registrada ainda.</Text>
-          ) : (
-            topYools.map((entry) => (
-              <View key={entry.yool_id} style={styles.row}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.rowLabel}>{entry.yool_id}</Text>
-                  <Text style={styles.bodyText}>
-                    invocacoes={entry.total_invocations} · cache={Math.round(entry.cache_hit_rate * 100)}% · retries={entry.total_retries}
-                  </Text>
+        {tab === "yools" ? (
+          <Card>
+            <Text style={styles.kicker}>TOP YOOLS</Text>
+            {topYools.length === 0 ? (
+              <Text style={styles.bodyText}>Nenhuma estatistica de yool foi registrada ainda.</Text>
+            ) : (
+              topYools.map((entry) => (
+                <View key={entry.yool_id} style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowLabel}>{entry.yool_id}</Text>
+                    <Text style={styles.bodyText}>
+                      invocacoes={entry.total_invocations} - cache={Math.round(entry.cache_hit_rate * 100)}% - retries={entry.total_retries}
+                    </Text>
+                  </View>
+                  <Text style={styles.rowValue}>{Math.round(entry.avg_duration_ms)} ms</Text>
                 </View>
-                <Text style={styles.rowValue}>{Math.round(entry.avg_duration_ms)} ms</Text>
-              </View>
-            ))
-          )}
-        </Card>
-
-        <Card>
-          <Text style={styles.kicker}>TELEMETRY NOTES</Text>
-          <Text style={styles.bodyText}>
-            Este slice Console + Web ja expone tuples, runs, validations e invocacoes de yool.
-            Tokens, horas gastas e custo por modelo ainda nao estao instrumentados na telemetria local.
-          </Text>
-        </Card>
+              ))
+            )}
+          </Card>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -237,6 +268,31 @@ const styles = StyleSheet.create({
   scroll: {
     gap: 12,
     paddingBottom: 24,
+  },
+  tabRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  tab: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+  },
+  tabActive: {
+    backgroundColor: "rgba(44,107,237,0.10)",
+    borderColor: "rgba(44,107,237,0.24)",
+  },
+  tabText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  tabTextActive: {
+    color: theme.primary,
   },
   metrics: {
     flexDirection: "row",
@@ -306,5 +362,25 @@ const styles = StyleSheet.create({
     color: theme.danger,
     fontSize: 13,
     lineHeight: 20,
+  },
+  funnelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  funnelBarTrack: {
+    flex: 1,
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: theme.surfaceAlt,
+    overflow: "hidden",
+  },
+  funnelBarFill: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: theme.primary,
   },
 });

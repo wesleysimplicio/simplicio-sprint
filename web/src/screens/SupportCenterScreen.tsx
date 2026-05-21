@@ -38,6 +38,7 @@ export const SupportCenterScreen: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [runs, setRuns] = useState<ControlPlaneRunSummary[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [category, setCategory] = useState<SupportTicketCategory>("bug");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -52,8 +53,10 @@ export const SupportCenterScreen: React.FC = () => {
         api.listControlPlaneRuns(),
         loadSupportTickets(),
       ]);
+      const sortedTickets = localTickets.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
       setRuns(runList);
-      setTickets(localTickets.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)));
+      setTickets(sortedTickets);
+      setSelectedTicketId((current) => current ?? sortedTickets[0]?.id ?? null);
     } catch (nextError) {
       setError(getApiErrorMessage(nextError));
     } finally {
@@ -87,6 +90,11 @@ export const SupportCenterScreen: React.FC = () => {
     [tickets],
   );
 
+  const selectedTicket = useMemo(
+    () => tickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
+    [selectedTicketId, tickets],
+  );
+
   const createTicket = async () => {
     if (!title.trim() || !description.trim()) return;
     setSaving(true);
@@ -113,6 +121,7 @@ export const SupportCenterScreen: React.FC = () => {
       const updated = [next, ...tickets];
       await saveSupportTickets(updated);
       setTickets(updated);
+      setSelectedTicketId(next.id);
       setTitle("");
       setDescription("");
       setLinkedRunId(null);
@@ -146,7 +155,7 @@ export const SupportCenterScreen: React.FC = () => {
     return (
       <Screen
         chrome="app"
-        eyebrow="Web 15 · Support Center"
+        eyebrow="Web 15 - Support Center"
         title="Support center"
         subtitle="Carregando tickets locais, runs e diagnosticos do workspace..."
       >
@@ -158,7 +167,7 @@ export const SupportCenterScreen: React.FC = () => {
   return (
     <Screen
       chrome="app"
-      eyebrow="Web 15 · Support Center"
+      eyebrow="Web 15 - Support Center"
       title="Support center"
       subtitle="Cada item de suporte pode ser tratado, resolvido localmente ou promovido para backlog candidato."
       scroll={false}
@@ -258,68 +267,79 @@ export const SupportCenterScreen: React.FC = () => {
             />
           </Card>
 
-          <Card style={styles.sidePanel}>
-            <Text style={styles.kicker}>DIAGNOSTICOS ANEXADOS</Text>
-            <SupportRow label="Usuario" value={session.appUser?.email ?? "local-operator"} />
-            <SupportRow label="Sprint" value={session.currentSprint?.sprintName ?? "nenhuma"} />
-            <SupportRow label="Provider" value={session.currentSprint?.provider ?? session.provider ?? "nao definido"} />
-            <SupportRow label="Repos locais" value={String(session.projectSetup.repositories.length)} />
-            <SupportRow label="Runs recentes" value={String(relevantRuns.length)} />
-            <Text style={styles.sideNote}>
-              O case fica salvo localmente e ja nasce com contexto suficiente para triagem ou promocao para backlog.
-            </Text>
-          </Card>
+          <View style={styles.sideStack}>
+            <Card>
+              <Text style={styles.kicker}>CASOS ABERTOS</Text>
+              {tickets.length === 0 ? (
+                <Text style={styles.emptyText}>Nenhum caso local registrado ainda.</Text>
+              ) : (
+                tickets.map((ticket) => (
+                  <Card
+                    key={ticket.id}
+                    onPress={() => setSelectedTicketId(ticket.id)}
+                    selected={selectedTicketId === ticket.id}
+                    style={styles.ticketListCard}
+                  >
+                    <View style={styles.ticketHead}>
+                      <Text style={styles.ticketTitle}>{ticket.title}</Text>
+                      <StatusPill status={ticket.status} />
+                    </View>
+                    <Text style={styles.ticketMeta}>
+                      {ticket.category} - {ticket.createdBy} - {ticket.updatedAt.slice(0, 16).replace("T", " ")}
+                    </Text>
+                  </Card>
+                ))
+              )}
+            </Card>
+
+            <Card>
+              <Text style={styles.kicker}>DIAGNOSTICOS ANEXADOS</Text>
+              <SupportRow label="Usuario" value={session.appUser?.email ?? "local-operator"} />
+              <SupportRow label="Sprint" value={session.currentSprint?.sprintName ?? "nenhuma"} />
+              <SupportRow label="Provider" value={session.currentSprint?.provider ?? session.provider ?? "nao definido"} />
+              <SupportRow label="Repos locais" value={String(session.projectSetup.repositories.length)} />
+              <SupportRow label="Runs recentes" value={String(relevantRuns.length)} />
+            </Card>
+          </View>
         </View>
 
         <Card>
-          <Text style={styles.kicker}>CASOS ABERTOS</Text>
-          {tickets.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhum caso local registrado ainda.</Text>
+          <Text style={styles.kicker}>DETALHE E TRIAGEM</Text>
+          {!selectedTicket ? (
+            <Text style={styles.emptyText}>Selecione um caso para ver o detalhe.</Text>
           ) : (
-            tickets.map((ticket) => (
-              <View key={ticket.id} style={styles.ticketRow}>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.ticketHead}>
-                    <Text style={styles.ticketTitle}>{ticket.title}</Text>
-                    <StatusPill status={ticket.status} />
-                  </View>
-                  <Text style={styles.ticketMeta}>
-                    {ticket.category} · {ticket.createdBy} · {ticket.updatedAt.slice(0, 16).replace("T", " ")}
-                  </Text>
-                  <Text style={styles.ticketBody}>{ticket.description}</Text>
-                  <Text style={styles.ticketMeta}>
-                    sprint={ticket.diagnostics.sprintName ?? "none"} · repos={ticket.diagnostics.repoCount} · runs={ticket.diagnostics.runCount}
-                    {ticket.linkedRunId ? ` · run=${ticket.linkedRunId}` : ""}
-                  </Text>
-                  {ticket.backlogReason ? (
-                    <Text style={styles.ticketBacklog}>backlog: {ticket.backlogReason}</Text>
-                  ) : null}
-                </View>
-                <View style={styles.ticketActions}>
-                  <Button
-                    title="Triar"
-                    variant="secondary"
-                    onPress={() => void setTicketStatus(ticket.id, "triaged")}
-                  />
-                  <Button
-                    title="Virar backlog"
-                    variant="secondary"
-                    onPress={() =>
-                      void setTicketStatus(
-                        ticket.id,
-                        "backlog_candidate",
-                        "Triage local sinalizou gap de produto ou fluxo.",
-                      )
-                    }
-                  />
-                  <Button
-                    title="Resolver"
-                    variant="secondary"
-                    onPress={() => void setTicketStatus(ticket.id, "resolved")}
-                  />
-                </View>
+            <>
+              <View style={styles.ticketHead}>
+                <Text style={styles.detailTitle}>{selectedTicket.title}</Text>
+                <StatusPill status={selectedTicket.status} />
               </View>
-            ))
+              <Text style={styles.ticketMeta}>
+                {selectedTicket.category} - {selectedTicket.createdBy} - {selectedTicket.updatedAt.slice(0, 16).replace("T", " ")}
+              </Text>
+              <Text style={styles.ticketBody}>{selectedTicket.description}</Text>
+              <Text style={styles.ticketMeta}>
+                sprint={selectedTicket.diagnostics.sprintName ?? "none"} - repos={selectedTicket.diagnostics.repoCount} - runs={selectedTicket.diagnostics.runCount}
+                {selectedTicket.linkedRunId ? ` - run=${selectedTicket.linkedRunId}` : ""}
+              </Text>
+              {selectedTicket.backlogReason ? (
+                <Text style={styles.ticketBacklog}>backlog: {selectedTicket.backlogReason}</Text>
+              ) : null}
+              <View style={styles.ticketActions}>
+                <Button title="Triar" variant="secondary" onPress={() => void setTicketStatus(selectedTicket.id, "triaged")} />
+                <Button
+                  title="Virar backlog"
+                  variant="secondary"
+                  onPress={() =>
+                    void setTicketStatus(
+                      selectedTicket.id,
+                      "backlog_candidate",
+                      "Triage local sinalizou gap de produto ou fluxo.",
+                    )
+                  }
+                />
+                <Button title="Resolver" variant="secondary" onPress={() => void setTicketStatus(selectedTicket.id, "resolved")} />
+              </View>
+            </>
           )}
         </Card>
       </ScrollView>
@@ -410,9 +430,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 420,
   },
-  sidePanel: {
+  sideStack: {
     width: 340,
     minWidth: 320,
+    gap: 12,
   },
   kicker: {
     color: theme.primary,
@@ -482,18 +503,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: theme.fontMono,
   },
-  sideNote: {
-    color: theme.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
+  ticketListCard: {
     marginTop: 10,
-  },
-  ticketRow: {
-    flexDirection: "row",
-    gap: 12,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
   },
   ticketHead: {
     flexDirection: "row",
@@ -503,8 +514,14 @@ const styles = StyleSheet.create({
   },
   ticketTitle: {
     color: theme.text,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
+    flex: 1,
+  },
+  detailTitle: {
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: "800",
     flex: 1,
   },
   ticketMeta: {
@@ -526,7 +543,9 @@ const styles = StyleSheet.create({
     fontFamily: theme.fontMono,
   },
   ticketActions: {
-    width: 150,
+    marginTop: 12,
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   statusPill: {

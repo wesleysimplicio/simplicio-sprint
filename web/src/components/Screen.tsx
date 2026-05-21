@@ -137,17 +137,17 @@ export const Screen: React.FC<Props> = ({
 };
 
 const NAV_ITEMS = [
-  { label: "Inicio", glyph: "o", route: "Dashboard" },
-  { label: "Conexoes", glyph: "o", route: "Provider" },
-  { label: "Sprints", glyph: "o", route: "Sprints" },
-  { label: "Backlog", glyph: "o", route: "SprintDetail" },
-  { label: "Projetos", glyph: "o", route: "ProjectSetup" },
-  { label: "Manager", glyph: "o", route: "Manager" },
-  { label: "Saude", glyph: "o", route: "CompanyHealth" },
-  { label: "Suporte", glyph: "o", route: "Support" },
-  { label: "Reports", glyph: "o", route: "Reports" },
-  { label: "Admin", glyph: "o", route: "CompanyAdmin" },
-  { label: "Configuracoes", glyph: "o", route: "Settings" },
+  { label: "Inicio", glyph: "IN", route: "Dashboard" },
+  { label: "Conexoes", glyph: "CN", route: "Provider" },
+  { label: "Sprints", glyph: "SP", route: "Sprints" },
+  { label: "Backlog", glyph: "BK", route: "SprintDetail" },
+  { label: "Projetos", glyph: "PJ", route: "ProjectSetup" },
+  { label: "Manager", glyph: "MG", route: "Manager" },
+  { label: "Saude", glyph: "HL", route: "CompanyHealth" },
+  { label: "Suporte", glyph: "SU", route: "Support" },
+  { label: "Reports", glyph: "RP", route: "Reports" },
+  { label: "Admin", glyph: "AD", route: "CompanyAdmin" },
+  { label: "Configuracoes", glyph: "CF", route: "Settings" },
 ] as const;
 
 const ROUTE_ALIASES: Record<(typeof NAV_ITEMS)[number]["route"], string[]> = {
@@ -262,8 +262,9 @@ const styles = StyleSheet.create({
   },
   navGlyph: {
     color: theme.textMuted,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "900",
+    letterSpacing: 0.8,
   },
   navGlyphActive: {
     color: theme.primary,
