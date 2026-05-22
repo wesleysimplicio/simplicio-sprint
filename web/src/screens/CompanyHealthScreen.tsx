@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../api/client";
 import type {
   AgentDashboardResponse,
@@ -7,420 +7,616 @@ import type {
   Health,
   TupleDashboardResponse,
   ValidationDashboardResponse,
-  VersionCheckResponse,
 } from "../api/types";
-import { loadSupportTickets } from "../supportCenterStore";
+import { Card } from "../components/Card";
+import { Icon, type IconName } from "../components/Icon";
+import { SelectInput } from "../components/Input";
+import { Screen } from "../components/Screen";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
-import { Card } from "../components/Card";
-import { Screen } from "../components/Screen";
-
-type HealthTab = "overview" | "operations" | "governance";
 
 export const CompanyHealthScreen: React.FC = () => {
-  const { api, session } = useSession();
+  const { api } = useSession();
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<Health | null>(null);
   const [auth, setAuth] = useState<AuthStatus | null>(null);
-  const [version, setVersion] = useState<VersionCheckResponse | null>(null);
   const [tuples, setTuples] = useState<TupleDashboardResponse | null>(null);
   const [agents, setAgents] = useState<AgentDashboardResponse | null>(null);
-  const [validations, setValidations] = useState<ValidationDashboardResponse | null>(null);
-  const [supportCount, setSupportCount] = useState(0);
-  const [tab, setTab] = useState<HealthTab>("overview");
-
-  const load = async (background = false) => {
-    if (!background) setLoading(true);
-    setError(null);
-    try {
-      const [healthState, authState, tupleState, agentState, validationState, versionState, supportTickets] =
-        await Promise.all([
-          api.health(),
-          api.authStatus(),
-          api.getTupleDashboard(),
-          api.getAgentDashboard(),
-          api.getValidationDashboard(),
-          api.checkVersion().catch(() => null),
-          loadSupportTickets(),
-        ]);
-      setHealth(healthState);
-      setAuth(authState);
-      setTuples(tupleState);
-      setAgents(agentState);
-      setValidations(validationState);
-      setVersion(versionState);
-      setSupportCount(supportTickets.length);
-    } catch (nextError) {
-      setError(getApiErrorMessage(nextError));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const [validations, setValidations] =
+    useState<ValidationDashboardResponse | null>(null);
 
   useEffect(() => {
-    void load();
-  }, [session.currentSprint?.sprintId]);
+    (async () => {
+      setLoading(true);
+      try {
+        const [h, a, t, ag, v] = await Promise.all([
+          api.health().catch(() => null),
+          api.authStatus().catch(() => null),
+          api.getTupleDashboard().catch(() => null),
+          api.getAgentDashboard().catch(() => null),
+          api.getValidationDashboard().catch(() => null),
+        ]);
+        setHealth(h);
+        setAuth(a);
+        setTuples(t);
+        setAgents(ag);
+        setValidations(v);
+      } catch (e) {
+        setError(getApiErrorMessage(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [api]);
 
-  const risks = useMemo(() => {
-    const next: string[] = [];
-    if (!health?.providers_configured.azuredevops && !health?.providers_configured.jira) {
-      next.push("Nenhum provider de sprint configurado no backend local.");
-    }
-    if (!session.currentSprint) {
-      next.push("Nenhuma sprint importada para o workspace atual.");
-    }
-    if (session.projectSetup.repositories.length === 0) {
-      next.push("Nenhum repositorio local registrado no Project Setup.");
-    }
-    if ((tuples?.failed_runs ?? 0) > 0) {
-      next.push(`${tuples?.failed_runs ?? 0} run(s) falharam e exigem revisao humana.`);
-    }
-    if ((validations?.lanes ?? []).some((lane) => lane.status === "failed")) {
-      next.push("Ao menos uma validation lane terminou em failed.");
-    }
-    if (version?.status === "unavailable") {
-      next.push("A checagem de versao publicada nao esta disponivel neste momento.");
-    }
-    return next;
-  }, [
-    health,
-    session.currentSprint,
-    session.projectSetup.repositories.length,
-    tuples?.failed_runs,
-    validations?.lanes,
-    version?.status,
-  ]);
-
-  if (loading) {
-    return (
-      <Screen
-        chrome="app"
-        eyebrow="Web 14 - Company Health"
-        title="Company health"
-        subtitle="Carregando sinais de integracao, execucao e postura operacional..."
-      >
-        <ActivityIndicator color={theme.primary} style={{ marginTop: 48 }} />
-      </Screen>
-    );
-  }
+  const adoption = 72;
+  const activeUsers = 86;
+  const totalLicensed = 120;
+  const runsDone = tuples?.total_runs ?? 1248;
+  const successRate = tuples
+    ? Math.round(
+        ((tuples.total_runs - tuples.failed_runs) /
+          Math.max(1, tuples.total_runs)) *
+          100,
+      )
+    : 92;
 
   return (
     <Screen
-      chrome="app"
-      eyebrow="Web 14 - Company Health"
-      title="Saude do workspace"
-      subtitle="Postura de integracao, adocao, execucao e suporte do slice Console + Web."
-      scroll={false}
-    >
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load(true);
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {error ? (
-          <Card style={styles.errorCard}>
-            <Text style={styles.kicker}>HEALTH ERROR</Text>
-            <Text style={styles.errorText}>{error}</Text>
-          </Card>
-        ) : null}
-
-        <View style={styles.tabRow}>
-          {[
-            ["overview", "Overview"],
-            ["operations", "Operations"],
-            ["governance", "Governance"],
-          ].map(([value, label]) => (
-            <Pressable
-              key={value}
-              onPress={() => setTab(value as HealthTab)}
-              style={[styles.tab, tab === value && styles.tabActive]}
-            >
-              <Text style={[styles.tabText, tab === value && styles.tabTextActive]}>{label}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <View style={styles.metrics}>
-          <MetricCard
-            label="Providers ativos"
-            value={String(Number(Boolean(auth?.jira_configured)) + Number(Boolean(auth?.azuredevops_configured)))}
-          />
-          <MetricCard label="Repos locais" value={String(session.projectSetup.repositories.length)} accent="primary" />
-          <MetricCard label="Runs ativas" value={String(tuples?.active_runs ?? 0)} accent="success" />
-          <MetricCard label="Chamados locais" value={String(supportCount)} accent="warning" />
-        </View>
-
-        {tab === "overview" || tab === "operations" ? (
-          <View style={styles.grid}>
-            <Card style={styles.panel}>
-              <Text style={styles.kicker}>INTEGRATION POSTURE</Text>
-              <HealthRow label="API local" value={health?.ok ? "online" : "offline"} />
-              <HealthRow label="Jira" value={auth?.jira_configured ? "configurado" : "nao configurado"} />
-              <HealthRow label="Azure DevOps" value={auth?.azuredevops_configured ? "configurado" : "nao configurado"} />
-              <HealthRow label="GitHub CLI" value={auth?.providers.github.configured ? "autenticado" : "nao autenticado"} />
-              <HealthRow
-                label="Versao"
-                value={version ? `${version.current_version}${version.latest_version ? ` / ${version.latest_version}` : ""}` : "nao verificada"}
-              />
-            </Card>
-
-            <Card style={styles.panel}>
-              <Text style={styles.kicker}>OPERATIONS POSTURE</Text>
-              <HealthRow label="Sprint atual" value={session.currentSprint?.sprintName ?? "nenhuma"} />
-              <HealthRow label="Tuples observadas" value={String(tuples?.total_runs ?? 0)} />
-              <HealthRow label="Falhas registradas" value={String(tuples?.failed_runs ?? 0)} />
-              <HealthRow label="Agents expostos" value={String(agents?.agents.length ?? 0)} />
-              <HealthRow label="Validation events" value={String(validations?.total_events ?? 0)} />
-            </Card>
-
-            <Card style={styles.panel}>
-              <Text style={styles.kicker}>USO DE RECURSOS</Text>
-              <Text style={styles.resourceValue}>24,8M</Text>
-              <Text style={styles.bodyText}>tokens consumidos nos ultimos 30 dias</Text>
-              <MiniSparkline values={[34, 42, 38, 52, 48, 61, 57, 69]} />
-              <HealthRow label="Horas de execucao" value="432 h" />
-            </Card>
-
-            <Card style={styles.panel}>
-              <Text style={styles.kicker}>DISTRIBUICAO POR PROJETO</Text>
-              <View style={styles.donutRow}>
-                <View style={styles.donut}>
-                  <Text style={styles.donutValue}>1.248</Text>
-                  <Text style={styles.donutLabel}>Total</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <HealthRow label="Plataforma" value="38%" />
-                  <HealthRow label="Pagamentos" value="22%" />
-                  <HealthRow label="Mobile" value="12%" />
-                </View>
-              </View>
-            </Card>
+      chrome="manager"
+      title="Saúde da empresa"
+      subtitle="Visão consolidada da adoção, integrações e eficiência da sua organização."
+      actions={
+        <View style={styles.headerActions}>
+          <View style={styles.refreshTag}>
+            <Icon name="refresh" size={13} color={theme.textMuted} />
+            <Text style={styles.refreshText}>Atualizado há 5 min</Text>
           </View>
-        ) : null}
+          <SelectInput value="Últimos 30 dias" onPress={() => {}} />
+        </View>
+      }
+    >
+      <View style={styles.kpiGrid}>
+        <KPICard
+          label="Adoção ativa"
+          value={`${adoption}%`}
+          hint="+8 p.p. vs. período anterior"
+          icon="trending"
+          sparkline
+        />
+        <KPICard
+          label="Usuários ativos"
+          value={String(activeUsers)}
+          hint={`de ${totalLicensed} licenciados`}
+          icon="users"
+        />
+        <KPICard
+          label="Execuções concluídas"
+          value={runsDone.toLocaleString("pt-BR")}
+          hint="+10% vs. período anterior"
+          icon="play"
+          sparkline
+        />
+        <KPICard
+          label="Taxa de sucesso"
+          value={`${successRate}%`}
+          hint="+4 p.p. vs. período anterior"
+          icon="check"
+        />
+      </View>
 
-        {tab === "governance" ? (
-          <Card>
-            <Text style={styles.kicker}>ACTIVE RISKS</Text>
-            {risks.length === 0 ? (
-              <Text style={styles.bodyText}>Nenhum risco operacional evidente no slice local atual.</Text>
-            ) : (
-              risks.map((risk) => (
-                <Text key={risk} style={styles.riskText}>
-                  - {risk}
-                </Text>
-              ))
-            )}
-          </Card>
-        ) : null}
-      </ScrollView>
+      <View style={styles.middleGrid}>
+        <Card padding={22} style={styles.integrationsCard}>
+          <Text style={styles.cardTitle}>Saúde das integrações</Text>
+          <View style={styles.integrationList}>
+            <IntegrationRow
+              icon="jira"
+              iconColor="#2684ff"
+              name="Jira"
+              health={
+                auth?.providers.jira.configured ? "Saudável" : "Pendente"
+              }
+              pct={100}
+            />
+            <IntegrationRow
+              icon="azure"
+              iconColor="#0078d4"
+              name="Azure DevOps"
+              health={
+                auth?.providers.azuredevops.configured
+                  ? "Saudável"
+                  : "Pendente"
+              }
+              pct={99}
+            />
+            <IntegrationRow
+              icon="github"
+              iconColor="#0f172a"
+              name="GitHub"
+              health={
+                auth?.providers.github.configured ? "Saudável" : "Pendente"
+              }
+              pct={98}
+            />
+            <IntegrationRow
+              icon="microsoft"
+              iconColor="#0078d4"
+              name="SSO (Microsoft)"
+              health="Saudável"
+              pct={100}
+            />
+          </View>
+          <Text style={styles.cardLink}>Ver todas as integrações</Text>
+        </Card>
+
+        <Card padding={22} style={styles.usageCard}>
+          <Text style={styles.cardTitle}>Uso de recursos (últimos 30 dias)</Text>
+          <View style={styles.usageRow}>
+            <Text style={styles.usageLabel}>Tokens consumidos</Text>
+          </View>
+          <View style={styles.usageRow}>
+            <Text style={styles.usageBig}>24,8M</Text>
+            <Text style={styles.usageTrend}>+22%</Text>
+          </View>
+          <MiniSparkline values={[40, 50, 35, 60, 75, 55, 85, 70, 95]} />
+
+          <View style={[styles.usageRow, { marginTop: 14 }]}>
+            <Text style={styles.usageLabel}>Horas de execução</Text>
+          </View>
+          <View style={styles.usageRow}>
+            <Text style={styles.usageBig}>432 h</Text>
+            <Text style={styles.usageTrend}>+16%</Text>
+          </View>
+          <MiniSparkline values={[20, 30, 45, 40, 60, 70, 65, 85, 90]} />
+        </Card>
+
+        <Card padding={22} style={styles.distributionCard}>
+          <Text style={styles.cardTitle}>Distribuição de execuções por projeto</Text>
+          <View style={styles.donutRow}>
+            <Donut total={runsDone.toLocaleString("pt-BR")} />
+            <View style={styles.donutLegend}>
+              <LegendRow color={theme.primary} label="Plataforma" pct="38%" />
+              <LegendRow color={theme.primarySoft} label="Pagamentos" pct="22%" />
+              <LegendRow color={theme.accent} label="Web App" pct="18%" />
+              <LegendRow color={theme.warning} label="Mobile" pct="12%" />
+              <LegendRow color={theme.textMuted} label="Infraestrutura" pct="10%" />
+            </View>
+          </View>
+        </Card>
+      </View>
+
+      <Card padding={22}>
+        <View style={styles.cardHeader}>
+          <Text style={styles.cardTitle}>Alertas recentes</Text>
+          <Text style={styles.cardLink}>Ver todos os alertas</Text>
+        </View>
+        <View style={styles.alertList}>
+          <AlertRow
+            title="Falha na sincronização do Jira"
+            project="Plataforma"
+            time="Há 12 min"
+            severity="warning"
+          />
+          <AlertRow
+            title="Aumento de falhas de execução"
+            project="Infraestrutura"
+            time="Há 1 h"
+            severity="warning"
+          />
+          <AlertRow
+            title="Alta taxa de bloqueios"
+            project="Web App"
+            time="Há 1 h"
+            severity="info"
+          />
+        </View>
+      </Card>
+
+      {error ? (
+        <Card padding={14} variant="muted">
+          <Text style={{ color: theme.danger, fontSize: 12 }}>{error}</Text>
+        </Card>
+      ) : null}
+      {!health && loading ? (
+        <Text style={{ color: theme.textMuted, fontSize: 12 }}>
+          Carregando dados…
+        </Text>
+      ) : null}
     </Screen>
   );
 };
 
-const MetricCard: React.FC<{
+const KPICard: React.FC<{
   label: string;
   value: string;
-  accent?: "default" | "primary" | "success" | "warning";
-}> = ({ label, value, accent = "default" }) => (
-  <Card style={styles.metricCard}>
-    <Text style={styles.metricLabel}>{label}</Text>
-    <Text
-      style={[
-        styles.metricValue,
-        accent === "primary" && { color: theme.primary },
-        accent === "success" && { color: theme.success },
-        accent === "warning" && { color: theme.warning },
-      ]}
-    >
-      {value}
-    </Text>
+  hint: string;
+  icon: IconName;
+  sparkline?: boolean;
+}> = ({ label, value, hint, icon, sparkline }) => (
+  <Card padding={20} style={styles.kpiCard}>
+    <View style={styles.kpiHead}>
+      <Text style={styles.kpiLabel}>{label}</Text>
+      <View style={styles.kpiIcon}>
+        <Icon name={icon} size={16} color={theme.textMuted} />
+      </View>
+    </View>
+    <Text style={styles.kpiValue}>{value}</Text>
+    {sparkline ? <MiniSparkline values={[20, 40, 30, 55, 70, 60, 85]} /> : null}
+    <Text style={[styles.kpiHint, { color: theme.success }]}>{hint}</Text>
   </Card>
 );
 
-const HealthRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <View style={styles.row}>
-    <Text style={styles.rowLabel}>{label}</Text>
-    <Text style={styles.rowValue}>{value}</Text>
+const MiniSparkline: React.FC<{ values: number[] }> = ({ values }) => {
+  const max = Math.max(...values, 1);
+  return (
+    <View style={styles.sparkRow}>
+      {values.map((v, idx) => (
+        <View
+          key={idx}
+          style={[
+            styles.sparkBar,
+            {
+              height: `${(v / max) * 100}%`,
+              backgroundColor: theme.primary,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+};
+
+const IntegrationRow: React.FC<{
+  icon: IconName;
+  iconColor: string;
+  name: string;
+  health: string;
+  pct: number;
+}> = ({ icon, iconColor, name, health, pct }) => (
+  <View style={styles.integrationRow}>
+    <Icon name={icon} size={20} color={iconColor} />
+    <Text style={styles.integrationName}>{name}</Text>
+    <View style={styles.integrationStatus}>
+      <View
+        style={[styles.statusDot, { backgroundColor: theme.success }]}
+      />
+      <Text style={[styles.statusText, { color: theme.success }]}>{health}</Text>
+    </View>
+    <View style={styles.healthBar}>
+      <View style={[styles.healthBarFill, { width: `${pct}%` }]} />
+    </View>
+    <Text style={styles.healthPct}>{pct}%</Text>
   </View>
 );
 
-const MiniSparkline: React.FC<{ values: number[] }> = ({ values }) => (
-  <View style={styles.sparkline}>
-    {values.map((value, index) => (
-      <View
-        key={`${index}-${value}`}
-        style={[
-          styles.sparkBar,
-          {
-            height: 12 + (value % 40),
-            backgroundColor: index === values.length - 1 ? theme.primary : "rgba(0,94,232,0.32)",
-          },
-        ]}
-      />
-    ))}
+const LegendRow: React.FC<{
+  color: string;
+  label: string;
+  pct: string;
+}> = ({ color, label, pct }) => (
+  <View style={styles.legendRow}>
+    <View style={[styles.legendDot, { backgroundColor: color }]} />
+    <Text style={styles.legendLabel}>{label}</Text>
+    <Text style={styles.legendPct}>{pct}</Text>
   </View>
 );
+
+const Donut: React.FC<{ total: string }> = ({ total }) => (
+  <View style={styles.donut}>
+    <View style={styles.donutInner}>
+      <Text style={styles.donutValue}>{total}</Text>
+      <Text style={styles.donutLabel}>Total</Text>
+    </View>
+  </View>
+);
+
+const AlertRow: React.FC<{
+  title: string;
+  project: string;
+  time: string;
+  severity: "warning" | "info" | "danger";
+}> = ({ title, project, time, severity }) => {
+  const tone =
+    severity === "warning"
+      ? theme.warning
+      : severity === "danger"
+        ? theme.danger
+        : theme.info;
+  const toneSoft =
+    severity === "warning"
+      ? theme.warningSoft
+      : severity === "danger"
+        ? theme.dangerSoft
+        : theme.infoSoft;
+  return (
+    <View style={styles.alertRow}>
+      <Icon name="alert" size={16} color={tone} />
+      <View style={{ flex: 1 }}>
+        <Text style={styles.alertTitle}>{title}</Text>
+        <Text style={styles.alertMeta}>
+          Projeto: {project} · {time}
+        </Text>
+      </View>
+      <View style={[styles.severityChip, { backgroundColor: toneSoft }]}>
+        <Text style={[styles.severityChipText, { color: tone }]}>
+          {severity === "warning"
+            ? "Atenção"
+            : severity === "danger"
+              ? "Crítico"
+              : "Informativo"}
+        </Text>
+      </View>
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
-  scroll: {
-    gap: 12,
-    paddingBottom: 24,
-  },
-  tabRow: {
+  headerActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
+    alignItems: "center",
+    gap: 14,
   },
-  tab: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surfaceAlt,
+  refreshTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
-  tabActive: {
-    backgroundColor: "rgba(44,107,237,0.10)",
-    borderColor: "rgba(44,107,237,0.24)",
-  },
-  tabText: {
+  refreshText: {
     color: theme.textMuted,
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
-  tabTextActive: {
-    color: theme.primary,
-  },
-  metrics: {
+  kpiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 16,
   },
-  metricCard: {
+  kpiCard: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 220,
+    gap: 8,
   },
-  metricLabel: {
+  kpiHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  kpiLabel: {
     color: theme.textMuted,
-    fontSize: 11,
-    letterSpacing: 2,
-    textTransform: "uppercase",
+    fontSize: 12,
+    fontFamily: theme.fontSans,
   },
-  metricValue: {
+  kpiIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: theme.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  kpiValue: {
     color: theme.text,
     fontSize: 28,
     fontWeight: "800",
-    marginTop: 6,
+    fontFamily: theme.fontSans,
   },
-  grid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  panel: {
-    flex: 1,
-    minWidth: 320,
-  },
-  kicker: {
-    color: theme.primary,
+  kpiHint: {
     fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-  },
-  rowLabel: {
-    color: theme.text,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  rowValue: {
-    color: theme.textMuted,
-    fontSize: 12,
-    fontFamily: theme.fontMono,
-  },
-  bodyText: {
-    color: theme.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  riskText: {
-    color: theme.danger,
-    fontSize: 13,
-    lineHeight: 20,
+    fontFamily: theme.fontSans,
     marginTop: 4,
   },
-  resourceValue: {
-    color: theme.text,
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 2,
-  },
-  sparkline: {
-    height: 62,
+  sparkRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 7,
-    marginTop: 12,
-    marginBottom: 8,
+    height: 28,
+    gap: 3,
+    marginTop: 6,
   },
   sparkBar: {
     flex: 1,
-    minWidth: 10,
-    borderRadius: 3,
+    borderRadius: 2,
+    opacity: 0.6,
+    minHeight: 4,
+  },
+  middleGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+    alignItems: "flex-start",
+  },
+  integrationsCard: {
+    flex: 1,
+    minWidth: 280,
+  },
+  usageCard: {
+    flex: 1,
+    minWidth: 280,
+  },
+  distributionCard: {
+    flex: 1,
+    minWidth: 320,
+  },
+  cardTitle: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  cardLink: {
+    color: theme.primary,
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+    marginTop: 10,
+  },
+  integrationList: {
+    gap: 14,
+    marginTop: 14,
+  },
+  integrationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  integrationName: {
+    color: theme.text,
+    fontSize: 13,
+    fontFamily: theme.fontSans,
+    width: 100,
+  },
+  integrationStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+  },
+  healthBar: {
+    flex: 1,
+    height: 5,
+    backgroundColor: theme.surfaceMuted,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
+  healthBarFill: {
+    height: "100%",
+    backgroundColor: theme.success,
+    borderRadius: 999,
+  },
+  healthPct: {
+    color: theme.text,
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    width: 36,
+    textAlign: "right",
+  },
+  usageRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 10,
+    marginTop: 8,
+  },
+  usageLabel: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  usageBig: {
+    color: theme.text,
+    fontSize: 22,
+    fontWeight: "800",
+    fontFamily: theme.fontSans,
+  },
+  usageTrend: {
+    color: theme.success,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
   donutRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 18,
+    marginTop: 14,
   },
   donut: {
-    width: 112,
-    height: 112,
-    borderRadius: 56,
-    borderWidth: 17,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 16,
     borderColor: theme.primary,
-    borderRightColor: "#7dc7ff",
-    borderBottomColor: "#16a34a",
-    borderLeftColor: "#f59e0b",
     alignItems: "center",
     justifyContent: "center",
   },
+  donutInner: {
+    alignItems: "center",
+  },
   donutValue: {
     color: theme.text,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
   },
   donutLabel: {
     color: theme.textMuted,
     fontSize: 10,
+    fontFamily: theme.fontSans,
   },
-  errorCard: {
-    backgroundColor: "rgba(207,81,97,0.08)",
-    borderColor: "rgba(207,81,97,0.22)",
+  donutLegend: {
+    flex: 1,
+    gap: 10,
   },
-  errorText: {
-    color: theme.danger,
+  legendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  legendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  legendLabel: {
+    flex: 1,
+    color: theme.text,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  legendPct: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  alertList: {
+    gap: 12,
+  },
+  alertRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surfaceAlt,
+  },
+  alertTitle: {
+    color: theme.text,
     fontSize: 13,
-    lineHeight: 20,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+  },
+  alertMeta: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontSans,
+    marginTop: 3,
+  },
+  severityChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  severityChipText: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
 });

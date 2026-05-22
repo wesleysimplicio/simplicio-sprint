@@ -1,12 +1,13 @@
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage, getApiErrorStatusLine } from "../api/client";
 import type { AuthResponse, CurrentSprint, SprintDetail } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { Input } from "../components/Input";
+import { Icon } from "../components/Icon";
+import { Input, SelectInput } from "../components/Input";
 import { Screen } from "../components/Screen";
 import type { RootStackParamList } from "../navigation";
 import { useSession } from "../store/session";
@@ -23,13 +24,13 @@ type Notice = {
 
 const formatAuthSuccess = (res: AuthResponse): string => {
   const parts = [`Conta: ${res.account}`];
-  if (res.user_display_name) parts.push(`Usuario: ${res.user_display_name}`);
+  if (res.user_display_name) parts.push(`Usuário: ${res.user_display_name}`);
   if (res.ado_team_path) parts.push(`Time: ${res.ado_team_path}`);
-  if (res.ado_iteration_path) parts.push(`Iteracao: ${res.ado_iteration_path}`);
+  if (res.ado_iteration_path) parts.push(`Iteração: ${res.ado_iteration_path}`);
   if (res.fallback_used) {
     parts.push(`Fallback: ${res.capture_transport ?? "browser capture"}`);
   }
-  return parts.join(" | ");
+  return parts.join(" · ");
 };
 
 const toJiraCurrentSprint = (
@@ -91,7 +92,7 @@ export const AuthScreen: React.FC = () => {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [jBase, setJBase] = useState("");
-  const [jEmail, setJEmail] = useState("");
+  const [jEmail, setJEmail] = useState(session.appUser?.email ?? "");
   const [jToken, setJToken] = useState("");
   const [jBoardId, setJBoard] = useState("");
   const [jSprintId, setJSprintId] = useState("");
@@ -108,12 +109,15 @@ export const AuthScreen: React.FC = () => {
     nav.dispatch(
       CommonActions.reset({
         index: 0,
-        routes: [{ name: "Dashboard" }, { name: "SprintDetail", params: { sprintId } }],
+        routes: [
+          { name: "Dashboard" },
+          { name: "SprintDetail", params: { sprintId } },
+        ],
       }),
     );
   };
 
-  const importJiraSprint = async (baseUrl: string): Promise<SprintDetail | null> => {
+  const importJiraSprint = async (): Promise<SprintDetail | null> => {
     const boardId = jBoardId.trim();
     const sprintId = jSprintId.trim() || "browser-captured";
     const sprintUrl = jSprintUrl.trim();
@@ -149,7 +153,7 @@ export const AuthScreen: React.FC = () => {
     if (provider === "jira" && (!jiraBase || !jiraEmail || !jiraToken)) {
       setNotice({
         kind: "error",
-        title: "Campos obrigatorios",
+        title: "Campos obrigatórios",
         message: "Informe Base URL, email e API token para validar o Jira.",
       });
       return;
@@ -157,13 +161,15 @@ export const AuthScreen: React.FC = () => {
 
     if (
       provider === "azuredevops" &&
-      ((!sprintUrl && (!organization || !project)) || !azureUserEmail || !pat)
+      ((!sprintUrl && (!organization || !project)) ||
+        !azureUserEmail ||
+        !pat)
     ) {
       setNotice({
         kind: "error",
-        title: "Campos obrigatorios",
+        title: "Campos obrigatórios",
         message:
-          "Informe o usuario/email, a URL da sprint ou Organization + Project, junto com o Personal Access Token do Azure DevOps.",
+          "Informe o e-mail, a URL da sprint ou Organização + Projeto e o Personal Access Token.",
       });
       return;
     }
@@ -174,8 +180,7 @@ export const AuthScreen: React.FC = () => {
         setNotice({
           kind: "loading",
           title: "Conectando Jira",
-          message:
-            "Validando credenciais. Se o backend receber 401 e houver Sprint URL, ele tenta Playwright e os fallbacks de browser agent.",
+          message: "Validando credenciais…",
         });
         const res = await api.authJira({
           base_url: jiraBase,
@@ -189,13 +194,15 @@ export const AuthScreen: React.FC = () => {
         await setAdoTeamPath(null);
         setJToken("");
 
-        const imported = await importJiraSprint(jiraBase);
+        const imported = await importJiraSprint();
         if (imported) {
-          await setCurrentSprint(toJiraCurrentSprint(imported, jiraBase, jiraSprintUrl));
+          await setCurrentSprint(
+            toJiraCurrentSprint(imported, jiraBase, jiraSprintUrl),
+          );
           setNotice({
             kind: "success",
             title: "Jira conectado",
-            message: `${formatAuthSuccess(res)}. Sprint ${imported.sprint.name} importada para o backlog.`,
+            message: `${formatAuthSuccess(res)} · Sprint ${imported.sprint.name} importada.`,
           });
           goToSprint(imported.sprint.id);
           return;
@@ -204,7 +211,7 @@ export const AuthScreen: React.FC = () => {
         setNotice({
           kind: "success",
           title: "Jira conectado",
-          message: `${formatAuthSuccess(res)}. Nenhuma sprint foi importada automaticamente; abrindo a listagem.`,
+          message: `${formatAuthSuccess(res)} · Nenhuma sprint importada.`,
         });
         nav.navigate("Sprints");
         return;
@@ -214,8 +221,7 @@ export const AuthScreen: React.FC = () => {
         setNotice({
           kind: "loading",
           title: "Conectando Azure DevOps",
-          message:
-            "Validando a sprint URL e o PAT. Em 401, o backend tenta Playwright primeiro e depois os browser agents instalados.",
+          message: "Validando a sprint URL e o PAT…",
         });
         const res = await api.authAzure({
           sprint_url: sprintUrl,
@@ -234,18 +240,21 @@ export const AuthScreen: React.FC = () => {
           setNotice({
             kind: "success",
             title: "Azure DevOps conectado",
-            message: `${formatAuthSuccess(res)}. O backend conectou, mas nao retornou a iteracao atual.`,
+            message: `${formatAuthSuccess(res)} · Iteração atual não detectada.`,
           });
           nav.navigate("Sprints");
           return;
         }
 
-        const imported = await api.getSprint(res.ado_iteration_path, "azuredevops");
+        const imported = await api.getSprint(
+          res.ado_iteration_path,
+          "azuredevops",
+        );
         await setCurrentSprint(toAzureCurrentSprint(imported, res, sprintUrl));
         setNotice({
           kind: "success",
           title: "Azure DevOps conectado",
-          message: `${formatAuthSuccess(res)}. Sprint ${imported.sprint.name} importada para o backlog.`,
+          message: `${formatAuthSuccess(res)} · Sprint ${imported.sprint.name} importada.`,
         });
         goToSprint(imported.sprint.id);
         return;
@@ -259,7 +268,10 @@ export const AuthScreen: React.FC = () => {
     } catch (e) {
       setNotice({
         kind: "error",
-        title: provider === "azuredevops" ? "Azure DevOps nao conectou" : "Auth falhou",
+        title:
+          provider === "azuredevops"
+            ? "Azure DevOps não conectou"
+            : "Autenticação falhou",
         message: getApiErrorMessage(e),
         statusLine: getApiErrorStatusLine(e),
       });
@@ -270,154 +282,219 @@ export const AuthScreen: React.FC = () => {
 
   if (provider === "jira") {
     return (
-      <Screen
-        chrome="app"
-        eyebrow="Web 05 - Connect Jira"
-        title="Conectar Jira"
-        subtitle="Conecte seu Jira para importar sprints e issues."
-      >
-        <View style={styles.split}>
-          <Card style={styles.formCard}>
-            <View style={styles.formGrid}>
+      <Screen>
+        <Card style={styles.formCard} padding={28}>
+          <View style={styles.formHeader}>
+            <View style={styles.providerIcon}>
+              <Icon name="jira" size={36} color="#2684ff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.formTitle}>Conectar Jira</Text>
+              <Text style={styles.formSubtitle}>
+                Conecte seu Jira para importar sprints e issues.
+              </Text>
+              <Pressable>
+                <Text style={styles.learnLink}>Saiba como gerar um token</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.formGrid}>
+            <View style={styles.formCol}>
               <Input
                 label="Base URL"
                 value={jBase}
                 onChangeText={setJBase}
-                placeholder="https://org.atlassian.net"
+                placeholder="https://suaempresa.atlassian.net"
                 keyboardType="url"
                 monospace
               />
+            </View>
+            <View style={styles.formCol}>
               <Input
                 label="Board ID"
                 value={jBoardId}
                 onChangeText={setJBoard}
                 placeholder="Ex: 123"
                 keyboardType="numeric"
-                monospace
               />
+            </View>
+            <View style={styles.formCol}>
               <Input
-                label="Usuario / email Jira"
+                label="E-mail"
                 value={jEmail}
                 onChangeText={setJEmail}
                 placeholder="voce@empresa.com"
                 keyboardType="email-address"
               />
+            </View>
+            <View style={styles.formCol}>
               <Input
                 label="Sprint ID"
                 value={jSprintId}
                 onChangeText={setJSprintId}
                 placeholder="Ex: 456"
-                keyboardType="default"
+              />
+            </View>
+            <View style={styles.formCol}>
+              <Input
+                label="Token API"
+                value={jToken}
+                onChangeText={setJToken}
+                placeholder="••••••••••••••••••"
+                secureTextEntry
                 monospace
               />
             </View>
-            <Input
-              label="Token API"
-              value={jToken}
-              onChangeText={setJToken}
-              placeholder="ATATT3xFfGF..."
-              secureTextEntry
-              monospace
-            />
-            <Input
-              label="Sprint URL (opcional)"
-              value={jSprintUrl}
-              onChangeText={setJSprintUrl}
-              placeholder="https://org.atlassian.net/jira/software/projects/..."
-              keyboardType="url"
-              monospace
-            />
-            <StatusNotice notice={notice} />
-            <View style={{ height: 8 }} />
-            <Button title="Conectar" onPress={submit} loading={busy} />
-          </Card>
+            <View style={styles.formCol}>
+              <Input
+                label="Sprint URL (opcional)"
+                value={jSprintUrl}
+                onChangeText={setJSprintUrl}
+                placeholder="https://suaempresa.atlassian.net/browse/SPR-1"
+                keyboardType="url"
+                monospace
+              />
+            </View>
+          </View>
 
-          <Card style={styles.sideCard}>
-            <Text style={styles.sideCardTitle}>Sobre o fallback</Text>
-            <Text style={styles.sideCardText}>
-              Se a API responder `401`, o backend tenta capturar o contexto da sprint usando
-              Playwright e depois os browser agents instalados.
-            </Text>
-            <Text style={styles.sideCardText}>
-              O token vai para o keyring do sistema. Nenhum segredo fica salvo no navegador.
-            </Text>
-            <Text style={styles.hint}>Transporte fixo: mcp, depois api, depois playwright</Text>
-          </Card>
-        </View>
+          <StatusNotice notice={notice} />
+
+          <View style={styles.formActions}>
+            <Button title="Cancelar" variant="ghost" onPress={() => nav.goBack()} />
+            <Button
+              title={busy ? "Conectando…" : "Conectar"}
+              onPress={submit}
+              loading={busy}
+            />
+          </View>
+        </Card>
       </Screen>
     );
   }
 
   return (
-    <Screen
-      chrome="app"
-      eyebrow="Web 04 - Connect Azure DevOps"
-      title="Conectar Azure DevOps"
-      subtitle="Conecte sua organizacao para importar sprints, work items e equipes."
-    >
-      <View style={styles.split}>
-        <Card style={styles.formCard}>
+    <Screen>
+      <View style={styles.azureSplit}>
+        <Card style={styles.formCard} padding={28}>
+          <View style={styles.formHeader}>
+            <View style={styles.providerIcon}>
+              <Icon name="azure" size={36} color="#0078d4" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.formTitle}>Conectar Azure DevOps</Text>
+              <Text style={styles.formSubtitle}>
+                Conecte sua organização para importar sprints, work items e equipes.
+              </Text>
+              <Pressable>
+                <Text style={styles.learnLink}>Saiba como gerar um PAT</Text>
+              </Pressable>
+            </View>
+          </View>
+
           <Input
-            label="URL da Sprint"
+            label="URL da Organização"
             value={aSprintUrl}
             onChangeText={setASprintUrl}
-            placeholder="https://dev.azure.com/org/project/_sprints/taskboard/..."
+            placeholder="https://dev.azure.com/sua-organizacao"
             keyboardType="url"
             monospace
           />
+
           <Input
-            label="Usuario / email Azure DevOps"
+            label="Personal Access Token (PAT)"
+            value={aPat}
+            onChangeText={setAPat}
+            placeholder="••••••••••••••••••••••••"
+            secureTextEntry
+            monospace
+          />
+
+          <Input
+            label="E-mail do usuário"
             value={aUserEmail}
             onChangeText={setAUserEmail}
             placeholder="voce@empresa.com"
             keyboardType="email-address"
           />
-          <Input
-            label="Personal Access Token (PAT)"
-            value={aPat}
-            onChangeText={setAPat}
-            placeholder="********"
-            secureTextEntry
-            monospace
-          />
+
+          <View style={styles.organizationField}>
+            <Text style={styles.fieldLabel}>Organização</Text>
+            {aOrg ? (
+              <Input
+                label=""
+                value={aOrg}
+                onChangeText={setAOrg}
+                placeholder="contoso"
+              />
+            ) : (
+              <SelectInput
+                value={aOrg}
+                placeholder="Selecione a organização"
+                onPress={() => setAOrg("contoso")}
+              />
+            )}
+          </View>
+
           <View style={styles.formGrid}>
-            <Input
-              label="Organizacao"
-              value={aOrg}
-              onChangeText={setAOrg}
-              placeholder="Selecione a organizacao"
-              monospace
-            />
-            <Input
-              label="Projeto"
-              value={aProject}
-              onChangeText={setAProject}
-              placeholder="Selecione o projeto"
-              monospace
-            />
-            <Input
-              label="Equipe (opcional)"
-              value={aTeam}
-              onChangeText={setATeam}
-              placeholder="Selecione a equipe"
-              monospace
+            <View style={styles.formCol}>
+              <Text style={styles.fieldLabel}>Projeto</Text>
+              {aProject ? (
+                <Input
+                  label=""
+                  value={aProject}
+                  onChangeText={setAProject}
+                  placeholder="Plataforma"
+                />
+              ) : (
+                <SelectInput
+                  value={aProject}
+                  placeholder="Selecione o projeto"
+                  onPress={() => setAProject("Plataforma")}
+                />
+              )}
+            </View>
+            <View style={styles.formCol}>
+              <Text style={styles.fieldLabel}>Equipe (opcional)</Text>
+              {aTeam ? (
+                <Input
+                  label=""
+                  value={aTeam}
+                  onChangeText={setATeam}
+                  placeholder="Time A"
+                />
+              ) : (
+                <SelectInput
+                  value={aTeam}
+                  placeholder="Selecione a equipe"
+                  onPress={() => setATeam("Time A")}
+                />
+              )}
+            </View>
+          </View>
+
+          <StatusNotice notice={notice} />
+
+          <View style={styles.formActions}>
+            <Button title="Cancelar" variant="ghost" onPress={() => nav.goBack()} />
+            <Button
+              title={busy ? "Conectando…" : "Conectar"}
+              onPress={submit}
+              loading={busy}
             />
           </View>
-          <StatusNotice notice={notice} />
-          <View style={{ height: 8 }} />
-          <Button title="Conectar" onPress={submit} loading={busy} />
         </Card>
 
-        <Card style={styles.sideCard}>
-          <Text style={styles.sideCardTitle}>Sobre o fallback</Text>
-          <Text style={styles.sideCardText}>
-            Se a API responder `401`, o backend tenta Playwright primeiro e depois Claude, Codex,
-            Hermes e OpenClaw quando instalados.
+        <Card style={styles.fallbackCard} variant="muted" padding={22}>
+          <Text style={styles.fallbackTitle}>Sobre o fallback</Text>
+          <Text style={styles.fallbackText}>
+            Caso alguma API do Azure DevOps não esteja disponível em sua
+            organização, o SendSprint utilizará APIs alternativas e técnicas de
+            fallback para garantir a importação e continuidade do processo.
           </Text>
-          <Text style={styles.sideCardText}>
-            O PAT fica apenas no keyring do sistema pelo backend local.
-          </Text>
-          <Text style={styles.hint}>Importacao vai para o backlog interno do SendSprint.</Text>
+          <Pressable>
+            <Text style={styles.learnLink}>Saiba mais</Text>
+          </Pressable>
         </Card>
       </View>
     </Screen>
@@ -437,45 +514,99 @@ const StatusNotice: React.FC<{ notice: Notice | null }> = ({ notice }) => {
     >
       <Text style={styles.noticeTitle}>{notice.title}</Text>
       <Text style={styles.noticeText}>{notice.message}</Text>
-      {notice.statusLine ? <Text style={styles.noticeMeta}>Backend: {notice.statusLine}</Text> : null}
+      {notice.statusLine ? (
+        <Text style={styles.noticeMeta}>Backend: {notice.statusLine}</Text>
+      ) : null}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  split: {
+  formCard: {
+    flex: 1,
+    minWidth: 480,
+    gap: 16,
+  },
+  azureSplit: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 16,
     alignItems: "flex-start",
   },
-  formCard: {
-    flex: 1,
-    minWidth: 420,
-    gap: 12,
-  },
-  sideCard: {
+  fallbackCard: {
     width: 280,
-    minWidth: 260,
-    gap: 8,
-    backgroundColor: "rgba(239,245,255,0.9)",
+    minWidth: 240,
+    gap: 10,
   },
-  sideCardTitle: {
+  fallbackTitle: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  fallbackText: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: theme.fontSans,
+  },
+  formHeader: {
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "flex-start",
+    marginBottom: 6,
+  },
+  providerIcon: {
+    width: 52,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  formTitle: {
     color: theme.text,
     fontSize: 18,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
   },
-  sideCardText: {
+  formSubtitle: {
     color: theme.textMuted,
     fontSize: 13,
-    lineHeight: 20,
+    fontFamily: theme.fontSans,
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  learnLink: {
+    color: theme.primary,
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+    marginTop: 6,
+  },
+  organizationField: {
+    gap: 6,
+  },
+  fieldLabel: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
   },
   formGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 14,
   },
-  hint: { color: theme.textMuted, fontSize: 12, fontFamily: theme.fontMono },
+  formCol: {
+    flex: 1,
+    minWidth: 220,
+    gap: 6,
+  },
+  formActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 12,
+  },
   notice: {
     borderRadius: theme.radius,
     borderWidth: 1,
@@ -483,18 +614,32 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   noticeLoading: {
-    backgroundColor: theme.surfaceAlt,
-    borderColor: theme.primarySoft,
+    backgroundColor: theme.infoSoft,
+    borderColor: theme.info,
   },
   noticeSuccess: {
-    backgroundColor: "rgba(30, 169, 124, 0.10)",
+    backgroundColor: theme.successSoft,
     borderColor: theme.success,
   },
   noticeError: {
-    backgroundColor: "rgba(207, 81, 97, 0.10)",
+    backgroundColor: theme.dangerSoft,
     borderColor: theme.danger,
   },
-  noticeTitle: { color: theme.text, fontSize: 14, fontWeight: "800" },
-  noticeText: { color: theme.textMuted, fontSize: 13, lineHeight: 18 },
-  noticeMeta: { color: theme.textMuted, fontSize: 12, fontFamily: theme.fontMono },
+  noticeTitle: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  noticeText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+    lineHeight: 18,
+  },
+  noticeMeta: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontMono,
+  },
 });

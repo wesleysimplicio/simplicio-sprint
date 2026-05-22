@@ -4,8 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,92 +13,52 @@ import {
 } from "react-native";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Icon } from "../components/Icon";
 import { Screen } from "../components/Screen";
 import type {
   AuthStatus,
   ControlPlaneRunDetail,
   ControlPlaneRunSummary,
-  ValidationDashboardResponse,
 } from "../api/types";
 import type { RootStackParamList } from "../navigation";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
 
-type ColumnKey = "queued" | "build" | "validate" | "review" | "done" | "blocked";
 type Nav = NativeStackNavigationProp<RootStackParamList, "Dashboard">;
-
-const COLUMN_META: Record<ColumnKey, { label: string; hint: string }> = {
-  queued: { label: "Queue", hint: "Aguardando setup ou despacho" },
-  build: { label: "Build", hint: "Mapeamento, planejamento e codigo" },
-  validate: { label: "Validate", hint: "Lint, testes e seguranca" },
-  review: { label: "Review", hint: "PR, evidencias e aprovacao" },
-  done: { label: "Done", hint: "Prontas para deploy" },
-  blocked: { label: "Blocked", hint: "Falhas ou dependencias pendentes" },
-};
 
 export const DashboardScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const { api, session } = useSession();
   const [auth, setAuth] = useState<AuthStatus | null>(null);
   const [runs, setRuns] = useState<ControlPlaneRunSummary[]>([]);
-  const [validation, setValidation] = useState<ValidationDashboardResponse | null>(null);
   const [selected, setSelected] = useState<ControlPlaneRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const load = async (background = false) => {
-    if (!background) setLoading(true);
-    try {
-      const [authStatus, runList, validationState] = await Promise.all([
-        api.authStatus(),
-        api.listControlPlaneRuns(),
-        api.getValidationDashboard(),
-      ]);
-      setAuth(authStatus);
-      setRuns(runList);
-      setValidation(validationState);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
 
   useEffect(() => {
     void load();
   }, []);
 
-  const grouped = useMemo(() => {
-    const base: Record<ColumnKey, ControlPlaneRunSummary[]> = {
-      queued: [],
-      build: [],
-      validate: [],
-      review: [],
-      done: [],
-      blocked: [],
-    };
-    for (const run of runs) base[resolveColumn(run)].push(run);
-    return base;
-  }, [runs]);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [authStatus, runList] = await Promise.all([
+        api.authStatus(),
+        api.listControlPlaneRuns(),
+      ]);
+      setAuth(authStatus);
+      setRuns(runList);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totals = useMemo(() => {
     const total = runs.length;
     const running = runs.filter((run) => run.state === "running").length;
-    const blocked = runs.filter((run) => resolveColumn(run) === "blocked").length;
-    const done = runs.filter((run) => resolveColumn(run) === "done").length;
+    const blocked = runs.filter((run) => run.failed || run.state === "failed").length;
+    const done = runs.filter((run) => run.state === "done").length;
     return { total, running, blocked, done };
   }, [runs]);
-
-  const currentSprintMeta = [
-    session.currentSprint?.portfolioName,
-    session.currentSprint?.projectName,
-    session.currentSprint?.teamName,
-  ]
-    .filter(Boolean)
-    .join(" / ");
-
-  const openDetail = async (runId: string) => {
-    setSelected(await api.getControlPlaneRun(runId));
-  };
 
   const providerLabel =
     session.provider === "azuredevops"
@@ -111,49 +71,71 @@ export const DashboardScreen: React.FC = () => {
 
   if (loading) {
     return (
-      <Screen chrome="app" eyebrow="Web 02 · Shell" title="SendSprint" subtitle="Carregando shell operacional local...">
-        <ActivityIndicator color={theme.primary} style={{ marginTop: 48 }} />
+      <Screen>
+        <View style={styles.centerLoading}>
+          <ActivityIndicator color={theme.primary} />
+          <Text style={styles.centerLoadingText}>Carregando shell operacional…</Text>
+        </View>
       </Screen>
     );
   }
 
   if (!session.currentSprint) {
     return (
-      <Screen
-        chrome="app"
-        eyebrow="Web 02 · Shell Pos-login"
-        title="Pronto para orquestrar seu proximo sprint"
-        subtitle="Conecte um provider, importe a sprint e depois aponte ao menos um repositorio local para liberar execucao."
-      >
-        <Card style={styles.centerHero}>
-          <View style={styles.heroOrb}>
-            <Text style={styles.heroOrbText}>{">"}</Text>
+      <Screen>
+        <View style={styles.emptyOuter}>
+          <Card style={styles.emptyHero} padding={48}>
+            <View style={styles.compassOrb}>
+              <Icon name="compass" size={56} color={theme.primary} />
+            </View>
+            <Text style={styles.emptyHeroTitle}>
+              Pronto para orquestrar seu próximo sprint
+            </Text>
+            <Text style={styles.emptyHeroText}>
+              Conecte seus provedores, importe um sprint e deixe a IA cuidar
+              da execução ponta a ponta.
+            </Text>
+            <View style={{ height: 8 }} />
+            <Button
+              title="Iniciar"
+              onPress={() => nav.navigate("Provider")}
+              iconLeft="play"
+              size="lg"
+            />
+          </Card>
+
+          <View style={styles.emptyQuickGrid}>
+            <Card style={styles.quickCard} onPress={() => nav.navigate("ProjectSetup")}>
+              <View style={styles.quickIcon}>
+                <Icon name="clipboard" size={22} color={theme.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quickTitle}>Configurar projeto</Text>
+                <Text style={styles.quickText}>
+                  Defina repositórios, papéis e padrões de branches.
+                </Text>
+                <View style={styles.quickLinkRow}>
+                  <Text style={styles.quickLinkText}>Configurar</Text>
+                  <Icon name="arrow-right" size={14} color={theme.primary} />
+                </View>
+              </View>
+            </Card>
+            <Card style={styles.quickCard} onPress={() => nav.navigate("Provider")}>
+              <View style={styles.quickIcon}>
+                <Icon name="link" size={22} color={theme.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.quickTitle}>Conexões</Text>
+                <Text style={styles.quickText}>
+                  Conecte Jira, Azure DevOps ou GitHub.
+                </Text>
+                <View style={styles.quickLinkRow}>
+                  <Text style={styles.quickLinkText}>Conectar</Text>
+                  <Icon name="arrow-right" size={14} color={theme.primary} />
+                </View>
+              </View>
+            </Card>
           </View>
-          <Text style={styles.centerHeroTitle}>Nenhuma sprint ativa no shell web ainda</Text>
-          <Text style={styles.centerHeroText}>
-            O login do app ja foi validado. O proximo passo e escolher Jira ou Azure DevOps,
-            importar a sprint e abrir o backlog interno do SendSprint.
-          </Text>
-          <Button title="Iniciar" onPress={() => nav.navigate("Provider")} icon=">" />
-        </Card>
-
-        <View style={styles.quickGrid}>
-          <Card style={styles.quickCard} onPress={() => nav.navigate("ProjectSetup")}>
-            <Text style={styles.quickLabel}>Configurar projeto</Text>
-            <Text style={styles.quickValue}>Repositorios, papeis e branches</Text>
-            <Text style={styles.quickLink}>Configurar agora</Text>
-          </Card>
-          <Card style={styles.quickCard} onPress={() => nav.navigate("Settings")}>
-            <Text style={styles.quickLabel}>Conexoes</Text>
-            <Text style={styles.quickValue}>Jira, Azure DevOps e GitHub</Text>
-            <Text style={styles.quickLink}>Abrir conexoes</Text>
-          </Card>
-        </View>
-
-        <View style={styles.statRow}>
-          <StatPill label="Auth" value={session.appUser?.displayName ?? session.appUser?.email ?? "Operador local"} />
-          <StatPill label="Provider padrao" value={providerLabel} />
-          <StatPill label="Repositorios" value={String(session.projectSetup.repositories.length)} />
         </View>
       </Screen>
     );
@@ -161,151 +143,104 @@ export const DashboardScreen: React.FC = () => {
 
   return (
     <Screen
-      chrome="app"
-      eyebrow="Web 07 · Kanban / Web 09 · Live Run"
       title={session.currentSprint.sprintName}
-      subtitle={
-        currentSprintMeta
-          ? `${currentSprintMeta} · backlog importado e pronto para despacho`
-          : "Sprint importada e pronta para despacho"
-      }
-      scroll={false}
+      subtitle={`${providerLabel} · ${session.currentSprint.projectName ?? "projeto"} · sprint importada`}
       actions={
-        <View style={styles.headerPanel}>
-          <Text style={styles.headerPanelValue}>{totals.running} running</Text>
-          <Text style={styles.headerPanelMeta}>{providerLabel}</Text>
-        </View>
-      }
-      footer={
-        <View style={{ gap: 10 }}>
-          <Button
-            title="Abrir backlog"
-            onPress={() => nav.navigate("SprintDetail", { sprintId: session.currentSprint?.sprintId ?? "" })}
-          />
-          <Button title="Configurar projeto" variant="secondary" onPress={() => nav.navigate("ProjectSetup")} />
-          <Button title="Parametros e conexoes" variant="secondary" onPress={() => nav.navigate("Settings")} />
-        </View>
+        <Button
+          title="Abrir backlog"
+          iconRight="arrow-right"
+          onPress={() =>
+            nav.navigate("SprintDetail", {
+              sprintId: session.currentSprint?.sprintId ?? "",
+            })
+          }
+        />
       }
     >
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load(true);
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-      >
-        <Card style={styles.activeHero}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.kicker}>ACTIVE DELIVERY CONTEXT</Text>
-            <Text style={styles.activeHeroTitle}>{session.currentSprint.sprintName}</Text>
-            <Text style={styles.activeHeroText}>
-              {providerLabel}
-              {currentSprintMeta ? ` · ${currentSprintMeta}` : ""}
+      <View style={styles.metricGrid}>
+        <MetricCard label="Runs totais" value={String(totals.total)} />
+        <MetricCard
+          label="Em execução"
+          value={String(totals.running)}
+          tone="primary"
+        />
+        <MetricCard
+          label="Bloqueadas"
+          value={String(totals.blocked)}
+          tone="danger"
+        />
+        <MetricCard label="Concluídas" value={String(totals.done)} tone="success" />
+      </View>
+
+      <Card style={styles.runsCard}>
+        <View style={styles.runsHeader}>
+          <Text style={styles.runsTitle}>Execuções recentes</Text>
+          <Text style={styles.runsMeta}>{runs.length} runs · {providerLabel}</Text>
+        </View>
+        {runs.length === 0 ? (
+          <View style={styles.runsEmpty}>
+            <Text style={styles.runsEmptyText}>
+              Nenhuma execução registrada ainda. Abra o backlog para iniciar.
             </Text>
           </View>
-          <View style={styles.activeHeroRight}>
-            <Text style={styles.activeHeroNumber}>{totals.total}</Text>
-            <Text style={styles.activeHeroLabel}>runs mapeados</Text>
-          </View>
-        </Card>
-
-        <View style={styles.metricGrid}>
-          <MetricCard label="Runs totais" value={String(totals.total)} />
-          <MetricCard label="Em execucao" value={String(totals.running)} accent="primary" />
-          <MetricCard label="Bloqueadas" value={String(totals.blocked)} accent="danger" />
-          <MetricCard label="Prontas" value={String(totals.done)} accent="success" />
-        </View>
-
-        <Card>
-          <Text style={styles.sectionLabel}>VALIDATION LANES</Text>
-          {(validation?.lanes ?? []).map((lane) => (
-            <View key={lane.lane} style={styles.laneRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.laneTitle}>{lane.lane.toUpperCase()}</Text>
-                <Text style={styles.laneText}>
-                  {lane.last_result ?? lane.status} · {lane.events_count} eventos
-                </Text>
-              </View>
-              <View style={styles.barTrack}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      width: `${Math.min(100, lane.events_count * 12)}%`,
-                      backgroundColor: lane.status === "failed" ? theme.danger : theme.primary,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-          ))}
-        </Card>
-
-        <Text style={styles.boardTitle}>RUNS EM CURSO</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.board}>
-          {(Object.keys(COLUMN_META) as ColumnKey[]).map((column) => (
-            <View key={column} style={styles.column}>
-              <View style={styles.columnHead}>
-                <Text style={styles.columnTitle}>{COLUMN_META[column].label}</Text>
-                <Text style={styles.columnHint}>{COLUMN_META[column].hint}</Text>
-              </View>
-              <View style={{ gap: 10 }}>
-                {grouped[column].length === 0 ? (
-                  <Card style={styles.emptyRunCard}>
-                    <Text style={styles.emptyRunText}>Sem runs nesta etapa.</Text>
-                  </Card>
-                ) : (
-                  grouped[column].map((run) => (
-                    <Pressable key={run.run_id} onPress={() => void openDetail(run.run_id)}>
-                      <Card style={styles.taskCard}>
-                        <View style={styles.taskHead}>
-                          <Text style={styles.taskSprint}>{run.sprint_id}</Text>
-                          <StatusChip text={run.state} tone={chipTone(run)} />
-                        </View>
-                        <Text style={styles.taskTitle}>{run.task ?? run.summary ?? "Task sem titulo"}</Text>
-                        <Text style={styles.taskMeta}>{run.provider} · {run.autonomy_level}</Text>
-                        <View style={styles.progressTrack}>
-                          <View
-                            style={[
-                              styles.progressFill,
-                              { width: `${Math.max(8, Math.round((run.progress ?? 0.1) * 100))}%` },
-                            ]}
-                          />
-                        </View>
-                      </Card>
-                    </Pressable>
-                  ))
-                )}
-              </View>
-            </View>
-          ))}
-        </ScrollView>
-      </ScrollView>
+        ) : (
+          <ScrollView style={{ maxHeight: 460 }}>
+            {runs.map((run) => (
+              <Pressable
+                key={run.run_id}
+                onPress={() => void openDetail(run.run_id, setSelected, api)}
+                style={({ pressed }) => [
+                  styles.runRow,
+                  pressed && { backgroundColor: theme.surfaceMuted },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <View style={styles.runRowHead}>
+                    <Text style={styles.runRowKey}>{run.sprint_id}</Text>
+                    <RunStateChip state={run.state} failed={run.failed} />
+                  </View>
+                  <Text style={styles.runRowTitle} numberOfLines={1}>
+                    {run.task ?? run.summary ?? "Run sem título"}
+                  </Text>
+                  <Text style={styles.runRowMeta}>
+                    {run.provider} · passo {run.last_step ?? 0}/10 ·
+                    {" "}
+                    {Math.round((run.progress ?? 0) * 100)}%
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={16} color={theme.textMuted} />
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+      </Card>
 
       <RunDetailModal detail={selected} onClose={() => setSelected(null)} />
     </Screen>
   );
 };
 
+const openDetail = async (
+  runId: string,
+  setSelected: (r: ControlPlaneRunDetail | null) => void,
+  api: any,
+) => {
+  setSelected(await api.getControlPlaneRun(runId));
+};
+
 const MetricCard: React.FC<{
   label: string;
   value: string;
-  accent?: "default" | "primary" | "success" | "danger";
-}> = ({ label, value, accent = "default" }) => (
+  tone?: "default" | "primary" | "success" | "danger";
+}> = ({ label, value, tone = "default" }) => (
   <Card style={styles.metricCard}>
     <Text style={styles.metricLabel}>{label}</Text>
     <Text
       style={[
         styles.metricValue,
-        accent === "primary" && { color: theme.primary },
-        accent === "success" && { color: theme.success },
-        accent === "danger" && { color: theme.danger },
+        tone === "primary" && { color: theme.primary },
+        tone === "success" && { color: theme.success },
+        tone === "danger" && { color: theme.danger },
       ]}
     >
       {value}
@@ -313,35 +248,41 @@ const MetricCard: React.FC<{
   </Card>
 );
 
-const StatPill: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <View style={styles.statPill}>
-    <Text style={styles.statPillLabel}>{label}</Text>
-    <Text style={styles.statPillValue}>{value}</Text>
-  </View>
-);
-
-const StatusChip: React.FC<{
-  text: string;
-  tone: "default" | "success" | "danger";
-}> = ({ text, tone }) => (
-  <View
-    style={[
-      styles.statusChip,
-      tone === "success" && styles.statusChipSuccess,
-      tone === "danger" && styles.statusChipDanger,
-    ]}
-  >
-    <Text
-      style={[
-        styles.statusChipText,
-        tone === "success" && { color: theme.success },
-        tone === "danger" && { color: theme.danger },
-      ]}
-    >
-      {text}
-    </Text>
-  </View>
-);
+const RunStateChip: React.FC<{ state: string; failed?: boolean }> = ({
+  state,
+  failed,
+}) => {
+  const tone = failed
+    ? "danger"
+    : state === "done"
+      ? "success"
+      : state === "running"
+        ? "info"
+        : "muted";
+  const colorBg =
+    tone === "danger"
+      ? theme.dangerSoft
+      : tone === "success"
+        ? theme.successSoft
+        : tone === "info"
+          ? theme.infoSoft
+          : theme.surfaceMuted;
+  const colorFg =
+    tone === "danger"
+      ? theme.danger
+      : tone === "success"
+        ? theme.success
+        : tone === "info"
+          ? theme.info
+          : theme.textMuted;
+  return (
+    <View style={[styles.runChip, { backgroundColor: colorBg }]}>
+      <Text style={[styles.runChipText, { color: colorFg }]}>
+        {state.toUpperCase()}
+      </Text>
+    </View>
+  );
+};
 
 const RunDetailModal: React.FC<{
   detail: ControlPlaneRunDetail | null;
@@ -352,205 +293,144 @@ const RunDetailModal: React.FC<{
       <View style={styles.modalCard}>
         <View style={styles.modalHead}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.modalTitle}>{detail?.run.task ?? detail?.run.run_id ?? "Run"}</Text>
-            <Text style={styles.modalSubtitle}>{detail?.run.summary ?? "Sem resumo"}</Text>
+            <Text style={styles.modalTitle}>
+              {detail?.run.task ?? detail?.run.run_id ?? "Run"}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {detail?.run.summary ?? "Sem resumo"}
+            </Text>
           </View>
-          <Button title="Fechar" variant="ghost" onPress={onClose} />
+          <Pressable onPress={onClose} style={styles.modalClose}>
+            <Icon name="x" size={16} color={theme.textMuted} />
+          </Pressable>
         </View>
 
-        <ScrollView style={{ maxHeight: 480 }} showsVerticalScrollIndicator={false}>
-          <Card style={styles.modalSection}>
-            <Text style={styles.sectionLabel}>RUN</Text>
+        <ScrollView style={{ maxHeight: 460 }}>
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>Run</Text>
             <Text style={styles.modalBody}>Estado: {detail?.run.state ?? "-"}</Text>
             <Text style={styles.modalBody}>Provider: {detail?.run.provider ?? "-"}</Text>
             <Text style={styles.modalBody}>Branch: {detail?.run.branch ?? "-"}</Text>
-          </Card>
+          </View>
 
-          <Card style={styles.modalSection}>
-            <Text style={styles.sectionLabel}>LOGS</Text>
+          <View style={styles.modalSection}>
+            <Text style={styles.modalSectionTitle}>Logs</Text>
             {(detail?.logs ?? []).length === 0 ? (
               <Text style={styles.modalBody}>Sem logs capturados.</Text>
             ) : (
-              detail?.logs.map((line, index) => (
-                <Text key={`${index}-${line}`} style={styles.modalMono}>
+              detail?.logs.map((line, idx) => (
+                <Text key={idx} style={styles.modalMono}>
                   {line}
                 </Text>
               ))
             )}
-          </Card>
+          </View>
         </ScrollView>
       </View>
     </View>
   </Modal>
 );
 
-const resolveColumn = (run: ControlPlaneRunSummary): ColumnKey => {
-  if (run.failed || run.state === "failed") return "blocked";
-  if (run.state === "done") return "done";
-  if ((run.last_step ?? 0) >= 8 || run.readiness_verdict === "needs_human_approval") return "review";
-  if ((run.last_step ?? 0) >= 4) return "validate";
-  if ((run.last_step ?? 0) >= 1 || run.state === "running") return "build";
-  return "queued";
-};
-
-const chipTone = (run: ControlPlaneRunSummary): "default" | "success" | "danger" => {
-  if (run.failed || run.state === "failed") return "danger";
-  if (run.state === "done") return "success";
-  return "default";
-};
-
 const styles = StyleSheet.create({
-  centerHero: {
-    minHeight: 180,
+  centerLoading: {
+    flex: 1,
+    minHeight: 280,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    paddingVertical: 26,
+    gap: 12,
   },
-  heroOrb: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "rgba(44,107,237,0.10)",
-    borderWidth: 1,
-    borderColor: "rgba(44,107,237,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroOrbText: {
-    color: theme.primary,
-    fontSize: 19,
-    fontWeight: "800",
-  },
-  centerHeroTitle: {
-    color: theme.text,
-    fontSize: 17,
-    lineHeight: 22,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  centerHeroText: {
+  centerLoadingText: {
     color: theme.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
-    textAlign: "center",
-    maxWidth: 620,
+    fontSize: 13,
   },
-  quickGrid: {
+  emptyOuter: {
+    flex: 1,
+    paddingTop: 18,
+    gap: 18,
+  },
+  emptyHero: {
+    minHeight: 360,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 16,
+  },
+  compassOrb: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: theme.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    ...(Platform.OS === "web"
+      ? ({ borderStyle: "dashed" } as any)
+      : { borderStyle: "dashed" }),
+  },
+  emptyHeroTitle: {
+    color: theme.text,
+    fontSize: 22,
+    fontWeight: "800",
+    fontFamily: theme.fontSans,
+    textAlign: "center",
+  },
+  emptyHeroText: {
+    color: theme.textMuted,
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: theme.fontSans,
+    textAlign: "center",
+    maxWidth: 480,
+  },
+  emptyQuickGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 14,
+    gap: 16,
   },
   quickCard: {
     flex: 1,
     minWidth: 280,
-    minHeight: 76,
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "flex-start",
   },
-  quickLabel: {
+  quickIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: theme.primaryFaint,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickTitle: {
     color: theme.text,
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
-  quickValue: {
+  quickText: {
     color: theme.textMuted,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: theme.fontSans,
     marginTop: 4,
   },
-  quickLink: {
-    color: theme.primary,
-    fontSize: 13,
-    fontWeight: "700",
-    marginTop: 12,
-  },
-  statRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  statPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: theme.radius,
-    backgroundColor: theme.surface,
-    borderWidth: 1,
-    borderColor: theme.border,
-    minWidth: 180,
-  },
-  statPillLabel: {
-    color: theme.textMuted,
-    fontSize: 11,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
-  },
-  statPillValue: {
-    color: theme.text,
-    fontSize: 13,
-    fontWeight: "700",
-    marginTop: 6,
-  },
-  headerPanel: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: "rgba(255,255,255,0.84)",
-    minWidth: 140,
-    alignItems: "flex-end",
-  },
-  headerPanelValue: {
-    color: theme.primary,
-    fontSize: 22,
-    fontWeight: "800",
-  },
-  headerPanelMeta: {
-    color: theme.textMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  activeHero: {
-    backgroundColor: "#eef5ff",
+  quickLinkRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
+    gap: 6,
+    marginTop: 12,
   },
-  kicker: {
+  quickLinkText: {
     color: theme.primary,
-    fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "800",
-  },
-  activeHeroTitle: {
-    color: theme.text,
-    fontSize: 26,
-    fontWeight: "800",
-    marginTop: 4,
-  },
-  activeHeroText: {
-    color: theme.textMuted,
-    fontSize: 14,
-    marginTop: 6,
-  },
-  activeHeroRight: {
-    width: 140,
-    alignItems: "flex-end",
-  },
-  activeHeroNumber: {
-    color: theme.primary,
-    fontSize: 32,
-    fontWeight: "800",
-  },
-  activeHeroLabel: {
-    color: theme.textMuted,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
   metricGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
-    marginTop: 16,
+    gap: 14,
   },
   metricCard: {
     flex: 1,
@@ -558,179 +438,155 @@ const styles = StyleSheet.create({
   },
   metricLabel: {
     color: theme.textMuted,
-    fontSize: 11,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
+    fontSize: 12,
+    fontFamily: theme.fontSans,
   },
   metricValue: {
     color: theme.text,
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
     marginTop: 6,
   },
-  sectionLabel: {
-    color: theme.textMuted,
-    fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "700",
-    marginBottom: 6,
+  runsCard: {
+    gap: 0,
   },
-  laneRow: {
+  runsHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
-    paddingVertical: 10,
+    justifyContent: "space-between",
+    paddingBottom: 12,
+    marginBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
-  laneTitle: {
-    color: theme.text,
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  laneText: {
-    color: theme.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-  },
-  barTrack: {
-    width: 180,
-    height: 8,
-    borderRadius: 999,
-    backgroundColor: "rgba(44,107,237,0.10)",
-    overflow: "hidden",
-  },
-  barFill: {
-    height: "100%",
-    borderRadius: 999,
-  },
-  boardTitle: {
+  runsTitle: {
     color: theme.text,
     fontSize: 16,
-    fontWeight: "800",
-    marginTop: 18,
-    marginBottom: 10,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
-  board: {
-    gap: 12,
-    paddingBottom: 8,
-  },
-  column: {
-    width: 280,
-    gap: 10,
-  },
-  columnHead: {
-    paddingHorizontal: 4,
-  },
-  columnTitle: {
-    color: theme.text,
-    fontSize: 15,
-    fontWeight: "800",
-  },
-  columnHint: {
+  runsMeta: {
     color: theme.textMuted,
     fontSize: 12,
-    marginTop: 2,
+    fontFamily: theme.fontSans,
   },
-  emptyRunCard: {
-    backgroundColor: theme.surfaceAlt,
+  runsEmpty: {
+    paddingVertical: 28,
+    alignItems: "center",
   },
-  emptyRunText: {
+  runsEmptyText: {
     color: theme.textMuted,
-    fontSize: 12,
+    fontSize: 13,
+    fontFamily: theme.fontSans,
   },
-  taskCard: {
-    gap: 8,
-  },
-  taskHead: {
+  runRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  runRowHead: {
+    flexDirection: "row",
     alignItems: "center",
     gap: 10,
   },
-  taskSprint: {
+  runRowKey: {
     color: theme.primary,
     fontSize: 12,
+    fontWeight: "700",
     fontFamily: theme.fontMono,
   },
-  taskTitle: {
+  runRowTitle: {
     color: theme.text,
-    fontSize: 14,
-    fontWeight: "700",
-    lineHeight: 20,
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+    marginTop: 4,
   },
-  taskMeta: {
+  runRowMeta: {
     color: theme.textMuted,
     fontSize: 12,
+    fontFamily: theme.fontSans,
+    marginTop: 4,
   },
-  progressTrack: {
-    height: 6,
+  runChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 999,
-    backgroundColor: "rgba(44,107,237,0.10)",
-    overflow: "hidden",
-    marginTop: 2,
   },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: theme.primary,
-  },
-  statusChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: "rgba(44,107,237,0.10)",
-  },
-  statusChipSuccess: {
-    backgroundColor: "rgba(30,169,124,0.10)",
-  },
-  statusChipDanger: {
-    backgroundColor: "rgba(207,81,97,0.10)",
-  },
-  statusChipText: {
-    color: theme.primary,
-    fontSize: 11,
-    fontWeight: "800",
+  runChipText: {
+    fontSize: 10,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    letterSpacing: 0.4,
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(14, 24, 36, 0.35)",
+    backgroundColor: "rgba(15, 23, 42, 0.45)",
     justifyContent: "center",
-    padding: 20,
+    padding: 24,
   },
   modalCard: {
-    backgroundColor: theme.bg,
-    borderRadius: theme.radius,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: 16,
-    gap: 12,
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    backgroundColor: theme.surface,
+    borderRadius: 14,
+    padding: 22,
+    gap: 14,
   },
   modalHead: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 12,
+    gap: 14,
+  },
+  modalClose: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.surfaceMuted,
   },
   modalTitle: {
     color: theme.text,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
   },
   modalSubtitle: {
     color: theme.textMuted,
     fontSize: 13,
+    fontFamily: theme.fontSans,
     marginTop: 4,
   },
   modalSection: {
-    marginBottom: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+    gap: 4,
+  },
+  modalSectionTitle: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "800",
+    fontFamily: theme.fontSans,
+    letterSpacing: 1,
+    textTransform: "uppercase",
   },
   modalBody: {
     color: theme.text,
     fontSize: 13,
-    lineHeight: 20,
+    fontFamily: theme.fontSans,
   },
   modalMono: {
     color: theme.text,
     fontSize: 12,
-    lineHeight: 18,
     fontFamily: theme.fontMono,
+    lineHeight: 18,
   },
 });

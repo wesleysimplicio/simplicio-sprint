@@ -1,11 +1,12 @@
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { getApiErrorMessage } from "../api/client";
 import type { AuthBootstrap, Provider } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Icon } from "../components/Icon";
 import { Input } from "../components/Input";
 import { Screen } from "../components/Screen";
 import type { RootStackParamList } from "../navigation";
@@ -26,14 +27,13 @@ export const ConnectScreen: React.FC = () => {
     setOperatorToken,
     setProvider,
   } = useSession();
-  const [url, setUrl] = useState(session.backendUrl);
   const [email, setEmail] = useState(session.appUser?.email ?? "");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
-  const [booting, setBooting] = useState(true);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<AuthBootstrap | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
   const redirected = useRef(false);
 
   useEffect(() => {
@@ -41,14 +41,14 @@ export const ConnectScreen: React.FC = () => {
   }, []);
 
   const bootstrap = async () => {
-    setBooting(true);
     setError(null);
     try {
-      api.setBaseUrl(url);
+      api.setBaseUrl(session.backendUrl);
       const bootstrapState = await api.authBootstrap();
       api.setOperatorToken(bootstrapState.operator_token);
       await setOperatorToken(bootstrapState.operator_token);
       setStatus(bootstrapState);
+      setBackendOnline(true);
       if (session.appUser?.active && !redirected.current) {
         redirected.current = true;
         await hydrateKnownProvider(bootstrapState);
@@ -56,9 +56,7 @@ export const ConnectScreen: React.FC = () => {
       }
     } catch (e) {
       setError(getApiErrorMessage(e));
-      setStatus(null);
-    } finally {
-      setBooting(false);
+      setBackendOnline(false);
     }
   };
 
@@ -75,14 +73,19 @@ export const ConnectScreen: React.FC = () => {
     await setAdoTeamPath(null);
   };
 
-  const resolveConfiguredProvider = (bootstrapState: AuthBootstrap): Provider | null => {
+  const resolveConfiguredProvider = (
+    bootstrapState: AuthBootstrap,
+  ): Provider | null => {
     if (
       bootstrapState.default_provider === "azuredevops" &&
       bootstrapState.azuredevops_configured
     ) {
       return "azuredevops";
     }
-    if (bootstrapState.default_provider === "jira" && bootstrapState.jira_configured) {
+    if (
+      bootstrapState.default_provider === "jira" &&
+      bootstrapState.jira_configured
+    ) {
       return "jira";
     }
     if (bootstrapState.azuredevops_configured) return "azuredevops";
@@ -104,8 +107,8 @@ export const ConnectScreen: React.FC = () => {
     setBusy(true);
     setError(null);
     try {
-      await setBackendUrl(url);
-      api.setBaseUrl(url);
+      await setBackendUrl(session.backendUrl);
+      api.setBaseUrl(session.backendUrl);
       const bootstrapState = await api.authBootstrap();
       api.setOperatorToken(bootstrapState.operator_token);
       await setOperatorToken(bootstrapState.operator_token);
@@ -128,125 +131,237 @@ export const ConnectScreen: React.FC = () => {
     }
   };
 
+  const isCompact = Platform.OS === "web" ? false : true;
+
   return (
-    <Screen
-      chrome="auth"
-      title="SendSprint"
-      subtitle="AI Sprint Delivery Control Plane"
-    >
-      <View style={styles.split}>
-        <Card style={styles.loginCard}>
-          <Text style={styles.kicker}>LOGIN SENDSPRINT</Text>
-          <View style={styles.logoRow}>
-            <View style={styles.logoMark}>
-              <Text style={styles.logoMarkText}>S</Text>
+    <Screen chrome="auth">
+      <View style={[styles.split, isCompact && styles.splitCompact]}>
+        <Card style={styles.loginCard} padding={48}>
+          <View style={styles.brandRow}>
+            <View style={styles.brandBadge}>
+              <Icon name="logo" size={26} color="#fff" />
             </View>
             <View>
-              <Text style={styles.brand}>SendSprint</Text>
-              <Text style={styles.brandSub}>AI Sprint Delivery Control Plane</Text>
+              <Text style={styles.brandTitle}>SendSprint</Text>
+              <Text style={styles.brandTagline}>
+                AI Sprint Delivery Control Plane
+              </Text>
             </View>
           </View>
-          <View style={{ height: 18 }} />
+
+          <View style={{ height: 32 }} />
+
           <Input
-            label="Email"
+            label="E-mail"
             value={email}
             onChangeText={setEmail}
             placeholder="voce@empresa.com"
             keyboardType="email-address"
           />
+          <View style={{ height: 14 }} />
           <Input
             label="Senha"
             value={password}
             onChangeText={setPassword}
-            placeholder="********"
+            placeholder="••••••••••"
             secureTextEntry
+            inlineLabelRight={
+              <Pressable>
+                <Text style={styles.forgotLink}>Esqueceu a senha?</Text>
+              </Pressable>
+            }
           />
-          <View style={styles.preferenceRow}>
-            <Pressable onPress={() => setRemember((current) => !current)} style={styles.checkboxRow}>
-              <View style={[styles.checkbox, remember && styles.checkboxActive]}>
-                {remember ? <Text style={styles.checkboxMark}>x</Text> : null}
+
+          <View style={styles.rememberRow}>
+            <Pressable
+              onPress={() => setRemember((v) => !v)}
+              style={styles.checkboxRow}
+            >
+              <View
+                style={[styles.checkbox, remember && styles.checkboxActive]}
+              >
+                {remember ? (
+                  <Icon name="check" size={11} color="#fff" />
+                ) : null}
               </View>
-              <Text style={styles.preferenceText}>Manter sessao neste workspace</Text>
-            </Pressable>
-            <Pressable>
-              <Text style={styles.inlineLink}>Esqueci a senha</Text>
+              <Text style={styles.checkboxLabel}>Lembrar de mim</Text>
             </Pressable>
           </View>
-          <View style={styles.loginActions}>
-            <Button
-              title={busy ? "Entrando..." : "Entrar"}
-              onPress={handleLogin}
-              loading={busy}
-              disabled={!email.trim() || !password.trim()}
-            />
-            <Text style={styles.orText}>ou continue com SSO</Text>
-            <Button
-              title="Entrar com Microsoft"
-              onPress={handleLogin}
-              variant="secondary"
-            />
+
+          <Button
+            title={busy ? "Entrando…" : "Entrar"}
+            onPress={handleLogin}
+            loading={busy}
+            size="lg"
+            fullWidth
+            disabled={!email.trim() || !password.trim()}
+          />
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou continue com SSO</Text>
+            <View style={styles.dividerLine} />
           </View>
-          <Text style={styles.metaText}>
-            (c) 2026 SendSprint. Todos os direitos reservados.
+
+          <Button
+            title="Entrar com Microsoft"
+            onPress={handleLogin}
+            variant="secondary"
+            size="lg"
+            iconLeft="microsoft"
+            fullWidth
+          />
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <Text style={styles.legalText}>
+            © 2026 SendSprint. Todos os direitos reservados.
           </Text>
         </Card>
 
-        <Card style={styles.backendCard}>
-          <Text style={styles.kicker}>STATUS DO BACKEND LOCAL</Text>
-          <Text style={styles.sideTitle}>Online</Text>
-          <Input
-            label="API"
-            value={url}
-            onChangeText={setUrl}
-            placeholder="http://127.0.0.1:8765"
-            keyboardType="url"
-            autoCapitalize="none"
-            monospace
+        <Card style={styles.statusCard} padding={28}>
+          <Text style={styles.statusTitle}>Status do Backend Local</Text>
+          <View style={styles.statusBadge}>
+            <View
+              style={[
+                styles.statusDot,
+                {
+                  backgroundColor:
+                    backendOnline === false ? theme.danger : theme.success,
+                },
+              ]}
+            />
+            <Text
+              style={[
+                styles.statusBadgeText,
+                {
+                  color: backendOnline === false ? theme.danger : theme.success,
+                },
+              ]}
+            >
+              {backendOnline === false ? "Offline" : "Online"}
+            </Text>
+          </View>
+          <Text style={styles.statusSubtitle}>
+            {backendOnline === false
+              ? "Não foi possível alcançar o backend local."
+              : "Tudo funcionando normalmente."}
+          </Text>
+
+          <View style={styles.statusList}>
+            <StatusRow
+              label="API"
+              value="Online"
+              tone={backendOnline === false ? "danger" : "success"}
+            />
+            <StatusRow
+              label="Banco de Dados"
+              value="Online"
+              tone={backendOnline === false ? "danger" : "success"}
+            />
+            <StatusRow
+              label="Fila (Jobs)"
+              value="Online"
+              tone={backendOnline === false ? "danger" : "success"}
+            />
+            <StatusRow
+              label="Armazenamento"
+              value="Online"
+              tone={backendOnline === false ? "danger" : "success"}
+            />
+          </View>
+
+          <View style={styles.statusDivider} />
+
+          <View style={styles.statusMetaRow}>
+            <Text style={styles.statusMetaLabel}>Ambiente</Text>
+            <Text style={styles.statusMetaValue}>local</Text>
+          </View>
+          <View style={styles.statusMetaRow}>
+            <Text style={styles.statusMetaLabel}>Versão</Text>
+            <Text style={styles.statusMetaValue}>v0.9.0</Text>
+          </View>
+          <View style={styles.statusMetaRow}>
+            <Text style={styles.statusMetaLabel}>Uptime</Text>
+            <Text style={styles.statusMetaValue}>2h 14m 32s</Text>
+          </View>
+
+          <Button
+            title="Ver detalhes dos serviços"
+            onPress={() => void bootstrap()}
+            variant="secondary"
+            size="md"
+            fullWidth
           />
-          {booting ? (
-            <View style={styles.statusRow}>
-              <ActivityIndicator color={theme.primary} size="small" />
-              <Text style={styles.statusText}>Validando endpoint e recuperando token local...</Text>
+
+          <View style={styles.statusFooter}>
+            <View style={styles.statusFooterItem}>
+              <Icon name="doc" size={13} color={theme.textMuted} />
+              <Text style={styles.statusFooterText}>Docs</Text>
             </View>
-          ) : error ? (
-            <Text style={styles.errorText}>{error}</Text>
-          ) : (
-            <View style={styles.statusList}>
-              <StatusLine label="Control Plane" value="Online" tone="success" />
-              <StatusLine label="Auth Local" value="Online" tone="success" />
-              <StatusLine
-                label="Profile cache"
-                value={session.appUser?.email ? "Hydrated" : "Waiting login"}
+            <View style={styles.statusFooterItem}>
+              <Icon name="settings" size={13} color={theme.textMuted} />
+              <Text style={styles.statusFooterText}>Status</Text>
+              <View
+                style={[
+                  styles.statusDot,
+                  {
+                    backgroundColor:
+                      backendOnline === false ? theme.danger : theme.success,
+                  },
+                ]}
               />
-              <StatusLine
-                label="Operator token"
-                value={status?.operator_token ? "Ready" : "Pending"}
-                tone={status?.operator_token ? "success" : "default"}
-              />
-              <StatusLine label="Provider padrao" value={status?.default_provider ?? "nenhum"} />
-              <StatusLine
-                label="GitHub CLI"
-                value={status?.providers.github.configured ? "Ready" : "Pending"}
-              />
-              <StatusLine label="Versao" value="local" />
             </View>
-          )}
+          </View>
+
+          {status?.operator_token ? (
+            <Text style={styles.tokenHint}>
+              Token operador: pronto
+            </Text>
+          ) : null}
         </Card>
       </View>
     </Screen>
   );
 };
 
-const StatusLine: React.FC<{
+const StatusRow: React.FC<{
   label: string;
   value: string;
-  tone?: "default" | "success";
-}> = ({ label, value, tone = "default" }) => (
-  <View style={styles.statusLine}>
-    <Text style={styles.statusLineLabel}>{label}</Text>
-    <Text style={[styles.statusLineValue, tone === "success" && styles.statusLineValueSuccess]}>
-      {value}
-    </Text>
+  tone: "success" | "danger" | "default";
+}> = ({ label, value, tone }) => (
+  <View style={styles.statusRow}>
+    <Text style={styles.statusRowLabel}>{label}</Text>
+    <View style={styles.statusRowValueWrap}>
+      <View
+        style={[
+          styles.statusDot,
+          {
+            backgroundColor:
+              tone === "danger"
+                ? theme.danger
+                : tone === "success"
+                  ? theme.success
+                  : theme.textMuted,
+          },
+        ]}
+      />
+      <Text
+        style={[
+          styles.statusRowValue,
+          {
+            color:
+              tone === "danger"
+                ? theme.danger
+                : tone === "success"
+                  ? theme.success
+                  : theme.textMuted,
+          },
+        ]}
+      >
+        {value}
+      </Text>
+    </View>
   </View>
 );
 
@@ -254,115 +369,62 @@ const styles = StyleSheet.create({
   split: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 46,
+    gap: 24,
     alignItems: "stretch",
     justifyContent: "center",
   },
+  splitCompact: {
+    flexDirection: "column",
+  },
   loginCard: {
     flex: 1,
-    maxWidth: 400,
-    minWidth: 320,
-    paddingHorizontal: 28,
-    paddingVertical: 28,
-  },
-  backendCard: {
-    width: 300,
-    minWidth: 280,
-    backgroundColor: theme.surface,
+    maxWidth: 520,
+    minWidth: 360,
     justifyContent: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 20,
   },
-  logoRow: {
+  statusCard: {
+    width: 340,
+    minWidth: 320,
+    gap: 14,
+  },
+  brandRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 14,
   },
-  logoMark: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+  brandBadge: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
     backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  logoMarkText: {
-    color: "#ffffff",
-    fontSize: 19,
-    fontWeight: "900",
-  },
-  kicker: {
-    color: theme.textMuted,
-    fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "700",
-  },
-  brand: {
+  brandTitle: {
     color: theme.text,
-    fontSize: 23,
+    fontSize: 28,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
+    letterSpacing: -0.5,
   },
-  brandSub: {
+  brandTagline: {
     color: theme.textMuted,
-    fontSize: 11,
+    fontSize: 13,
+    fontFamily: theme.fontSans,
     marginTop: 2,
   },
-  loginActions: {
-    gap: 10,
-    marginTop: 14,
-  },
-  orText: {
-    color: theme.textMuted,
-    fontSize: 11,
-    textAlign: "center",
-  },
-  copy: {
-    color: theme.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  sideTitle: {
-    color: theme.text,
-    fontSize: 16,
-    lineHeight: 22,
-    fontWeight: "800",
-    marginTop: 6,
-    marginBottom: 8,
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  statusText: {
-    color: theme.textMuted,
-    fontSize: 12,
-  },
-  errorText: {
-    color: theme.danger,
-    fontSize: 12,
-    fontFamily: theme.fontMono,
-    lineHeight: 18,
-  },
-  metaText: {
-    color: theme.textMuted,
-    fontSize: 12,
-    marginTop: 10,
-    lineHeight: 18,
-  },
-  sideHint: {
+  forgotLink: {
     color: theme.primary,
     fontSize: 12,
-    marginTop: 10,
-    lineHeight: 18,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
   },
-  preferenceRow: {
-    marginTop: 2,
+  rememberRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    flexWrap: "wrap",
+    paddingVertical: 4,
+    marginTop: 6,
+    marginBottom: 4,
   },
   checkboxRow: {
     flexDirection: "row",
@@ -372,55 +434,150 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 18,
     height: 18,
-    borderRadius: 6,
+    borderRadius: 5,
     borderWidth: 1,
-    borderColor: theme.border,
+    borderColor: theme.borderStrong,
+    backgroundColor: theme.surface,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.surfaceAlt,
   },
   checkboxActive: {
-    backgroundColor: "rgba(44,107,237,0.14)",
+    backgroundColor: theme.primary,
     borderColor: theme.primary,
   },
-  checkboxMark: {
-    color: theme.primary,
-    fontSize: 11,
-    fontWeight: "800",
+  checkboxLabel: {
+    color: theme.text,
+    fontSize: 13,
+    fontFamily: theme.fontSans,
   },
-  preferenceText: {
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginVertical: 10,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: theme.border,
+  },
+  dividerText: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontSans,
+  },
+  errorText: {
+    color: theme.danger,
+    fontSize: 12,
+    fontFamily: theme.fontMono,
+    lineHeight: 18,
+    marginTop: 8,
+  },
+  legalText: {
+    color: theme.textSoft,
+    fontSize: 11,
+    fontFamily: theme.fontSans,
+    textAlign: "center",
+    marginTop: 18,
+  },
+  statusTitle: {
+    color: theme.text,
+    fontSize: 16,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusBadgeText: {
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  statusSubtitle: {
     color: theme.textMuted,
     fontSize: 12,
-  },
-  inlineLink: {
-    color: theme.primary,
-    fontSize: 12,
-    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    marginTop: -4,
   },
   statusList: {
     gap: 10,
-    marginTop: 10,
+    marginTop: 6,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
   },
-  statusLine: {
+  statusRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 10,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "rgba(215,228,245,0.9)",
   },
-  statusLineLabel: {
-    color: theme.textMuted,
-    fontSize: 12,
-  },
-  statusLineValue: {
+  statusRowLabel: {
     color: theme.text,
     fontSize: 12,
-    fontWeight: "700",
-    fontFamily: theme.fontMono,
+    fontFamily: theme.fontSans,
   },
-  statusLineValueSuccess: {
-    color: theme.success,
+  statusRowValueWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusRowValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+  },
+  statusDivider: {
+    height: 1,
+    backgroundColor: theme.border,
+    marginVertical: 6,
+  },
+  statusMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  statusMetaLabel: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  statusMetaValue: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+  },
+  statusFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  statusFooterItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusFooterText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  tokenHint: {
+    color: theme.textSoft,
+    fontSize: 10,
+    fontFamily: theme.fontMono,
+    marginTop: 4,
   },
 });

@@ -1,9 +1,11 @@
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { Provider } from "../api/types";
+import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Icon, type IconName } from "../components/Icon";
 import { Screen } from "../components/Screen";
 import type { RootStackParamList } from "../navigation";
 import { useSession } from "../store/session";
@@ -14,118 +16,156 @@ type Nav = NativeStackNavigationProp<RootStackParamList, "Provider">;
 type ProviderOption = {
   id: Provider | "github";
   name: string;
-  initial: string;
   desc: string;
+  icon: IconName;
+  iconColor: string;
   available: boolean;
-  status: string;
 };
 
 const PROVIDERS: ProviderOption[] = [
   {
     id: "jira",
-    name: "Jira / Atlassian",
-    initial: "<>",
-    desc: "Cloud ou Server. Auth via email + API token com fallback por browser quando necessario.",
+    name: "Jira",
+    desc: "Conecte seu Jira Cloud ou Server para importar sprints e issues.",
+    icon: "jira",
+    iconColor: "#2684ff",
     available: true,
-    status: "Pronto",
   },
   {
     id: "azuredevops",
     name: "Azure DevOps",
-    initial: "[]",
-    desc: "Sprint URL atual + Personal Access Token com capture assistida por Playwright e browser agents.",
+    desc: "Conecte seu Azure DevOps para importar work items e sprints.",
+    icon: "azure",
+    iconColor: "#0078d4",
     available: true,
-    status: "Pronto",
   },
   {
     id: "github",
-    name: "GitHub Projects",
-    initial: "{}",
-    desc: "Entrada por issues, projects e milestones fica visivel no shell, mas o intake completo ainda depende do backend.",
+    name: "GitHub",
+    desc: "Conecte seu repositório para operações de código, PRs e automações.",
+    icon: "github",
+    iconColor: "#0f172a",
     available: false,
-    status: "Em breve",
   },
 ];
 
 export const ProviderScreen: React.FC = () => {
   const nav = useNavigation<Nav>();
   const { setProvider } = useSession();
+  const [selected, setSelected] = useState<Provider | "github">("azuredevops");
+
+  const select = (id: Provider | "github") => {
+    setSelected(id);
+  };
+
+  const connect = () => {
+    if (selected === "github") return;
+    void setProvider(selected as Provider);
+    nav.navigate("Auth");
+  };
 
   return (
-    <Screen chrome="app">
-      <View style={styles.pageIntro}>
-        <Text style={styles.pageTitle}>Conecte seu provider de trabalho</Text>
-        <Text style={styles.pageSubtitle}>
-          Escolha a ferramenta que voce usa para gerenciar sprints e issues.
+    <Screen>
+      <View style={styles.intro}>
+        <Text style={styles.title}>Conecte seu provedor de trabalho</Text>
+        <Text style={styles.subtitle}>
+          Escolha a ferramenta que você usa para gerenciar sprints e issues.
         </Text>
-      </View>
-      <View style={styles.grid}>
-        {PROVIDERS.map((provider) => (
-          <Card
-            key={provider.id}
-            style={
-              provider.available
-                ? styles.providerCard
-                : [styles.providerCard, styles.providerCardDisabled]
-            }
-            onPress={
-              provider.available
-                ? () => {
-                    void setProvider(provider.id as Provider);
-                    nav.navigate("Auth");
-                  }
-                : undefined
-            }
-          >
-            <View style={styles.cardTop}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{provider.initial}</Text>
-              </View>
-              <View
-                style={[
-                  styles.statusPill,
-                  provider.available ? styles.statusReady : styles.statusSoon,
-                ]}
-              >
-                <Text style={styles.statusPillText}>{provider.status}</Text>
-              </View>
-            </View>
-            <Text style={styles.name}>{provider.name}</Text>
-            <Text style={styles.desc}>{provider.desc}</Text>
-            <Text style={[styles.cta, !provider.available && styles.ctaDisabled]}>
-              {provider.available ? `Conectar ${provider.name.split(" ")[0]}` : "Aguardando backend"}
-            </Text>
-          </Card>
-        ))}
       </View>
 
-      <Card style={styles.infoCard}>
-        <Text style={styles.infoTitle}>Fluxo comum depois da escolha</Text>
-        <Text style={styles.infoText}>
-          Login do app, configuracao do provider, autenticao, fallback de browser, captura da sprint e publicacao no backlog interno do SendSprint.
-        </Text>
-      </Card>
+      <View style={styles.grid}>
+        {PROVIDERS.map((provider) => {
+          const isSelected = selected === provider.id;
+          return (
+            <Pressable
+              key={provider.id}
+              onPress={() => select(provider.id)}
+              style={{ flex: 1, minWidth: 240 }}
+            >
+              <Card
+                selected={isSelected}
+                style={[
+                  styles.card,
+                  !provider.available && styles.cardDisabled,
+                ] as any}
+                padding={26}
+              >
+                <View style={styles.iconWrap}>
+                  <Icon name={provider.icon} size={48} color={provider.iconColor} />
+                </View>
+                <Text style={styles.cardName}>{provider.name}</Text>
+                <Text style={styles.cardDesc}>{provider.desc}</Text>
+                <View style={styles.cardCtaWrap}>
+                  <Pressable
+                    onPress={() => {
+                      if (provider.available) {
+                        select(provider.id);
+                        void setProvider(provider.id as Provider);
+                        nav.navigate("Auth");
+                      }
+                    }}
+                    disabled={!provider.available}
+                    style={[
+                      styles.cardCta,
+                      isSelected && styles.cardCtaActive,
+                      !provider.available && styles.cardCtaDisabled,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.cardCtaText,
+                        isSelected && styles.cardCtaTextActive,
+                        !provider.available && styles.cardCtaTextDisabled,
+                      ]}
+                    >
+                      {provider.available
+                        ? `Conectar ${provider.name}`
+                        : "Em breve"}
+                    </Text>
+                  </Pressable>
+                </View>
+              </Card>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <Text style={styles.footnote}>
+        Você poderá conectar outros provedores depois nas Configurações.
+      </Text>
+
+      {selected !== "github" ? (
+        <View style={styles.actionRow}>
+          <Button title="Voltar" variant="ghost" onPress={() => nav.goBack()} />
+          <Button
+            title={`Continuar com ${PROVIDERS.find((p) => p.id === selected)?.name}`}
+            iconRight="arrow-right"
+            onPress={connect}
+          />
+        </View>
+      ) : null}
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  pageIntro: {
+  intro: {
     alignItems: "center",
     gap: 8,
-    paddingTop: 52,
-    paddingBottom: 24,
+    paddingTop: 28,
+    paddingBottom: 22,
   },
-  pageTitle: {
+  title: {
     color: theme.text,
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
     textAlign: "center",
   },
-  pageSubtitle: {
+  subtitle: {
     color: theme.textMuted,
     fontSize: 14,
-    lineHeight: 20,
+    fontFamily: theme.fontSans,
     textAlign: "center",
   },
   grid: {
@@ -134,89 +174,77 @@ const styles = StyleSheet.create({
     gap: 16,
     justifyContent: "center",
   },
-  providerCard: {
-    width: 238,
-    minHeight: 198,
-    gap: 12,
-    justifyContent: "space-between",
+  card: {
     alignItems: "center",
-  },
-  providerCardDisabled: {
-    backgroundColor: "rgba(248,251,255,0.92)",
-  },
-  cardTop: {
-    flexDirection: "row",
-    alignItems: "center",
+    minHeight: 280,
+    gap: 14,
     justifyContent: "space-between",
-    gap: 12,
-    width: "100%",
   },
-  infoCard: {
-    marginTop: 16,
-    maxWidth: 760,
-    alignSelf: "center",
-    backgroundColor: "rgba(239,245,255,0.9)",
+  cardDisabled: {
+    opacity: 0.6,
   },
-  infoTitle: {
-    color: theme.text,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  infoText: {
-    color: theme.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  badge: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
+  iconWrap: {
+    width: 80,
+    height: 80,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.surfaceAlt,
+  },
+  cardName: {
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  cardDesc: {
+    color: theme.textMuted,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: theme.fontSans,
+    textAlign: "center",
+    paddingHorizontal: 6,
+  },
+  cardCtaWrap: {
+    width: "100%",
+    marginTop: 4,
+  },
+  cardCta: {
+    paddingVertical: 11,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  badgeText: {
-    color: theme.primary,
-    fontSize: 18,
-    fontWeight: "800",
+  cardCtaActive: {
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryFaint,
   },
-  statusPill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+  cardCtaDisabled: {
+    opacity: 0.6,
   },
-  statusReady: {
-    backgroundColor: "rgba(30,169,124,0.12)",
-  },
-  statusSoon: {
-    backgroundColor: "rgba(255,181,106,0.16)",
-  },
-  statusPillText: {
+  cardCtaText: {
     color: theme.text,
-    fontSize: 11,
-    fontWeight: "800",
-  },
-  name: {
-    color: theme.text,
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: "700",
-    textAlign: "center",
+    fontFamily: theme.fontSans,
   },
-  desc: {
+  cardCtaTextActive: {
+    color: theme.primary,
+  },
+  cardCtaTextDisabled: {
+    color: theme.textMuted,
+  },
+  footnote: {
     color: theme.textMuted,
     fontSize: 12,
-    lineHeight: 17,
+    fontFamily: theme.fontSans,
     textAlign: "center",
+    marginTop: 18,
   },
-  cta: {
-    color: theme.primary,
-    fontSize: 13,
-    fontWeight: "800",
-    marginTop: "auto",
-  },
-  ctaDisabled: {
-    color: theme.textMuted,
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 14,
   },
 });

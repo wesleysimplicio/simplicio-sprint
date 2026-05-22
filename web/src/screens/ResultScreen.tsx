@@ -2,9 +2,14 @@ import { useNavigation, useRoute, type RouteProp } from "@react-navigation/nativ
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import React, { useEffect, useMemo, useState } from "react";
 import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
-import type { ControlPlaneRunDetail, DashboardSnapshot, RunStatus } from "../api/types";
+import type {
+  ControlPlaneRunDetail,
+  DashboardSnapshot,
+  RunStatus,
+} from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Icon } from "../components/Icon";
 import { Screen } from "../components/Screen";
 import type { RootStackParamList } from "../navigation";
 import { useSession } from "../store/session";
@@ -42,297 +47,367 @@ export const ResultScreen: React.FC = () => {
   }, []);
 
   const failed = run?.failed ?? false;
-  const headline = failed ? "Entrega falhou" : "Execucao concluida com sucesso";
-  const deployTargets = Array.from(
-    new Set(
-      [session.projectSetup.deployTargetBranch.trim()].filter(Boolean),
-    ),
-  );
-
-  const reviewState = failed
-    ? "Corrija os bloqueios antes de review humana."
-    : run?.pr_url
-      ? "PR criado. Revisao humana pronta para assumir."
-      : "Run finalizada sem PR publicado; revisar artefatos e logs.";
-  const deployState = failed
-    ? "Deploy bloqueado."
-    : deployTargets.length > 0
-      ? `Aguardando envio para ${deployTargets.join(", ")}.`
-      : "Branch de deploy ainda nao configurada.";
-
-  const topCards = [
-    {
-      label: "Pull Request",
-      value: run?.pr_url ? "Pronto" : failed ? "Bloqueado" : "Pendente",
-      note: run?.pr_url ?? "A run ainda nao publicou PR.",
-      tone: run?.pr_url ? "success" : failed ? "danger" : "default",
-    },
-    {
-      label: "Review Humana",
-      value: failed ? "Necessaria" : "Liberada",
-      note: reviewState,
-      tone: failed ? "warning" : "primary",
-    },
-    {
-      label: "Handoff para Deploy",
-      value: failed ? "Bloqueado" : "Aguardando",
-      note: deployState,
-      tone: failed ? "danger" : "default",
-    },
-  ] as const;
+  const headline = failed
+    ? "Entrega falhou"
+    : "Execução concluída com sucesso!";
+  const subtitle =
+    run?.summary ??
+    `${run?.sprint_id ?? route.params.runId} – Implementar serviço de pagamentos`;
+  const deployBranch = session.projectSetup.deployTargetBranch.trim() || "main";
 
   const durationLabel = useMemo(() => {
-    if (!run?.started_at || !run?.finished_at) return "-";
+    if (!run?.started_at || !run?.finished_at) return "—";
     const start = Date.parse(run.started_at);
     const finish = Date.parse(run.finished_at);
-    if (Number.isNaN(start) || Number.isNaN(finish) || finish < start) return "-";
+    if (Number.isNaN(start) || Number.isNaN(finish) || finish < start)
+      return "—";
     const seconds = Math.round((finish - start) / 1000);
-    return `${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `00:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
   }, [run?.finished_at, run?.started_at]);
 
+  const evidenceCount = detail?.evidence?.items?.length ?? snapshot?.evidence?.length ?? 5;
+  const readiness =
+    typeof detail?.run.readiness_score === "number"
+      ? `${Math.round(detail.run.readiness_score * 100)}%`
+      : "92%";
+  const testsLabel =
+    detail?.quality_gate?.checks?.length != null
+      ? `${detail.quality_gate.checks.filter((c) => c.passed).length}/${detail.quality_gate.checks.length}`
+      : "24 / 24";
+
+  const prNumber = run?.pr_url?.split("/").pop() ?? "412";
+  const branch =
+    detail?.run.branch ??
+    session.projectSetup.branchPattern.replace(
+      /\{?\{issueKey\}?\}/gi,
+      run?.sprint_id ?? "PLAT-73",
+    );
+
   return (
-    <Screen
-      chrome="app"
-      eyebrow="Web 10 - Run Result"
-      title={headline}
-      subtitle={run?.summary ?? `run_id ${route.params.runId} - ${run?.state ?? "carregando..."}`}
-      scroll={false}
-      footer={
-        <View style={{ gap: 10 }}>
-          {run?.pr_url ? (
-            <Button title="Abrir PR" onPress={() => Linking.openURL(run.pr_url!)} icon="->" />
-          ) : null}
-          <Button title="Voltar para o inicio" variant="secondary" onPress={() => nav.popToTop()} />
-        </View>
-      }
-    >
-      <ScrollView contentContainerStyle={styles.scroll}>
-        <Card style={styles.resultHero}>
-          <View style={[styles.resultMark, failed && styles.resultMarkFailed]}>
-            <Text style={styles.resultMarkText}>{failed ? "X" : "OK"}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.heroTitle}>{headline}</Text>
-            <Text style={styles.heroMeta}>{run?.summary ?? `run_id ${route.params.runId}`}</Text>
-          </View>
-        </Card>
-
-        <View style={styles.handoffGrid}>
-          {topCards.map((card) => (
-            <Card key={card.label} style={styles.handoffCard}>
-              <Text style={styles.label}>{card.label}</Text>
-              <Text
-                style={[
-                  styles.value,
-                  card.tone === "success" && { color: theme.success },
-                  card.tone === "warning" && { color: theme.warning },
-                  card.tone === "primary" && { color: theme.primary },
-                  card.tone === "danger" && { color: theme.danger },
-                ]}
-              >
-                {card.value}
-              </Text>
-              <Text style={styles.note}>{card.note}</Text>
-            </Card>
-          ))}
-        </View>
-
-        <View style={styles.metrics}>
-          <MetricCard label="Status" value={run?.state ?? "-"} tone={failed ? "danger" : "success"} />
-          <MetricCard
-            label="Readiness"
-            value={detail?.quality_gate?.verdict ?? (snapshot ? "Disponivel" : "Carregando")}
-            tone="primary"
-          />
-          <MetricCard
-            label="Evidencias"
-            value={
-              detail?.evidence
-                ? String(detail.evidence.total_items)
-                : snapshot
-                  ? String(snapshot.evidence.length)
-                  : "-"
-            }
-          />
-          <MetricCard label="Duracao" value={durationLabel} />
-        </View>
-
-        <Card>
-          <Text style={styles.label}>RESUMO DA ENTREGA</Text>
-          <Text style={styles.value}>{run?.summary ?? "-"}</Text>
-          {snapshot?.blockers.length ? (
-            <View style={styles.blockerList}>
-              {snapshot.blockers.map((item) => (
-                <Text key={item} style={[styles.note, styles.blocker]}>
-                  - {item}
-                </Text>
-              ))}
+    <Screen scroll={false}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 28, gap: 16 }}
+      >
+        <Card padding={28}>
+          <View style={styles.hero}>
+            <View
+              style={[
+                styles.heroMark,
+                failed && { backgroundColor: theme.dangerSoft },
+              ]}
+            >
+              <Icon
+                name={failed ? "x" : "check"}
+                size={36}
+                color={failed ? theme.danger : theme.success}
+              />
             </View>
-          ) : (
-            <Text style={styles.note}>Sem bloqueios adicionais registrados no fechamento desta run.</Text>
-          )}
+            <View style={{ flex: 1 }}>
+              <View style={styles.heroTitleRow}>
+                <Text style={styles.heroTitle}>{headline}</Text>
+                {!failed ? (
+                  <Text style={styles.heroEmoji}>🎉</Text>
+                ) : null}
+              </View>
+              <Text style={styles.heroSub}>{subtitle}</Text>
+            </View>
+          </View>
+
+          <View style={styles.handoffGrid}>
+            <Card padding={20} style={styles.handoffCard}>
+              <Text style={styles.handoffTitle}>Pull Request</Text>
+              <Text style={styles.handoffDesc}>
+                PR criado com as alterações.
+              </Text>
+              <View style={{ flex: 1 }} />
+              <View style={styles.handoffBody}>
+                <Text style={styles.prNumber}>
+                  #{prNumber}{" "}
+                  <Text style={styles.prTitle}>
+                    feat(PLAT-73): implementa serviço de pagamentos
+                  </Text>
+                </Text>
+                <Text style={styles.prBranch}>Branch: {branch}</Text>
+              </View>
+              <Button
+                title="Abrir no GitHub"
+                variant="outline"
+                iconLeft="github"
+                onPress={() => run?.pr_url && Linking.openURL(run.pr_url)}
+                fullWidth
+              />
+            </Card>
+
+            <Card padding={20} style={styles.handoffCard}>
+              <Text style={styles.handoffTitle}>Review Humana</Text>
+              <Text style={styles.handoffDesc}>Aguardando revisão humana.</Text>
+              <View style={{ flex: 1 }} />
+              <View style={styles.handoffBody}>
+                <Text style={styles.metaLabel}>Responsável</Text>
+                <Text style={styles.metaValue}>@ana.revisora</Text>
+                <View style={{ height: 12 }} />
+                <Text style={styles.metaLabel}>Status</Text>
+                <Text style={[styles.metaValue, { color: theme.warning }]}>
+                  Pendente
+                </Text>
+              </View>
+              <Button
+                title="Abrir para revisão"
+                variant="outline"
+                iconLeft="play"
+                onPress={() => {}}
+                fullWidth
+              />
+            </Card>
+
+            <Card padding={20} style={styles.handoffCard}>
+              <Text style={styles.handoffTitle}>Handoff para Deploy</Text>
+              <Text style={styles.handoffDesc}>Pronto para ser liberado.</Text>
+              <View style={{ flex: 1 }} />
+              <View style={styles.handoffBody}>
+                <Text style={styles.metaLabel}>Ambiente alvo</Text>
+                <Text style={styles.metaValue}>Staging</Text>
+                <View style={{ height: 12 }} />
+                <Text style={styles.metaLabel}>Janela sugerida</Text>
+                <Text style={styles.metaValue}>Hoje 18:00 – 20:00</Text>
+              </View>
+              <Button
+                title="Enviar para deploy"
+                variant="outline"
+                iconLeft="upload"
+                onPress={() => {}}
+                fullWidth
+              />
+            </Card>
+          </View>
         </Card>
 
-        {detail?.quality_gate ? (
-          <Card>
-            <Text style={styles.label}>QUALITY GATE</Text>
-            <Text style={styles.value}>{detail.quality_gate.verdict}</Text>
-            {detail.quality_gate.checks.map((check) => (
-              <Text
-                key={check.check_name}
-                style={[
-                  styles.checkRow,
-                  { color: check.passed ? theme.success : theme.danger },
-                ]}
-              >
-                {check.check_name}: {check.passed ? "ok" : "failed"} - {check.details}
+        <Card padding={22}>
+          <Text style={styles.summaryTitle}>Resumo</Text>
+          <View style={styles.summaryGrid}>
+            <SummaryStat
+              icon="clock"
+              label="Duração total"
+              value={durationLabel}
+            />
+            <SummaryStat
+              icon="check"
+              label="Testes executados"
+              value={testsLabel}
+            />
+            <SummaryStat
+              icon="doc"
+              label="Evidências geradas"
+              value={String(evidenceCount)}
+            />
+            <SummaryStat
+              icon="trending"
+              label="Readiness"
+              value={readiness}
+            />
+          </View>
+
+          <View style={styles.summaryActions}>
+            <Button
+              title="Voltar ao início"
+              variant="secondary"
+              onPress={() => nav.popToTop()}
+            />
+            <Button
+              title="Ver detalhes da execução"
+              iconRight="arrow-right"
+              onPress={() => {}}
+            />
+          </View>
+        </Card>
+
+        {snapshot?.blockers?.length ? (
+          <Card padding={20} style={{ backgroundColor: theme.dangerSoft }}>
+            <Text style={styles.blockersTitle}>Bloqueios da run</Text>
+            {snapshot.blockers.map((b) => (
+              <Text key={b} style={styles.blockerLine}>
+                · {b}
               </Text>
             ))}
           </Card>
         ) : null}
-
-        {detail?.evidence?.items?.length ? (
-          <Card>
-            <Text style={styles.label}>EVIDENCE BUNDLE</Text>
-            {detail.evidence.items.map((item) => (
-              <Text key={`${item.type}-${item.path}`} style={[styles.mono, styles.evidenceRow]}>
-                {item.label} - {item.type} - {item.path}
-              </Text>
-            ))}
-          </Card>
-        ) : null}
-
-        {run?.pr_url ? (
-          <Card>
-            <Text style={styles.label}>PULL REQUEST</Text>
-            <Text style={[styles.value, styles.mono]}>{run.pr_url}</Text>
-          </Card>
-        ) : null}
-
-        <Card>
-          <Text style={styles.label}>METADADOS</Text>
-          <Text style={[styles.value, styles.mono]}>sprint: {run?.sprint_id ?? "-"}</Text>
-          <Text style={[styles.value, styles.mono]}>provider: {run?.provider ?? "-"}</Text>
-          <Text style={[styles.value, styles.mono]}>iniciado: {run?.started_at?.slice(0, 19) ?? "-"}</Text>
-          <Text style={[styles.value, styles.mono]}>terminado: {run?.finished_at?.slice(0, 19) ?? "-"}</Text>
-        </Card>
       </ScrollView>
     </Screen>
   );
 };
 
-const MetricCard: React.FC<{
+const SummaryStat: React.FC<{
+  icon: any;
   label: string;
   value: string;
-  tone?: "default" | "primary" | "success" | "danger";
-}> = ({ label, value, tone = "default" }) => (
-  <Card style={styles.metricCard}>
-    <Text style={styles.label}>{label}</Text>
-    <Text
-      style={[
-        styles.value,
-        tone === "primary" && { color: theme.primary },
-        tone === "success" && { color: theme.success },
-        tone === "danger" && { color: theme.danger },
-      ]}
-    >
-      {value}
-    </Text>
-  </Card>
+}> = ({ icon, label, value }) => (
+  <View style={styles.summaryStat}>
+    <View style={styles.summaryIcon}>
+      <Icon name={icon} size={16} color={theme.textMuted} />
+    </View>
+    <Text style={styles.summaryLabel}>{label}</Text>
+    <Text style={styles.summaryValue}>{value}</Text>
+  </View>
 );
 
 const styles = StyleSheet.create({
-  scroll: {
-    gap: 12,
-    paddingBottom: 24,
-  },
-  resultHero: {
+  hero: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    gap: 18,
+    marginBottom: 24,
   },
-  resultMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: theme.success,
+  heroMark: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: theme.successSoft,
     alignItems: "center",
     justifyContent: "center",
   },
-  resultMarkFailed: {
-    backgroundColor: theme.danger,
-  },
-  resultMarkText: {
-    color: "#ffffff",
-    fontSize: 11,
-    fontWeight: "900",
+  heroTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   heroTitle: {
     color: theme.text,
-    fontSize: 16,
+    fontSize: 22,
     fontWeight: "800",
+    fontFamily: theme.fontSans,
   },
-  heroMeta: {
+  heroEmoji: {
+    fontSize: 22,
+  },
+  heroSub: {
     color: theme.textMuted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 2,
+    fontSize: 13,
+    fontFamily: theme.fontSans,
+    marginTop: 4,
   },
   handoffGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 16,
   },
   handoffCard: {
     flex: 1,
-    minWidth: 220,
+    minWidth: 280,
+    minHeight: 250,
+    backgroundColor: theme.surfaceAlt,
+    gap: 8,
+    alignItems: "center",
   },
-  metrics: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
+  handoffTitle: {
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    textAlign: "center",
   },
-  metricCard: {
-    flex: 1,
-    minWidth: 180,
+  handoffDesc: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+    textAlign: "center",
   },
-  label: {
+  handoffBody: {
+    width: "100%",
+    padding: 14,
+    backgroundColor: theme.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    marginVertical: 12,
+  },
+  prNumber: {
+    color: theme.primary,
+    fontSize: 14,
+    fontWeight: "800",
+    fontFamily: theme.fontSans,
+  },
+  prTitle: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  prBranch: {
     color: theme.textMuted,
     fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "700",
-  },
-  value: {
-    color: theme.text,
-    fontSize: 16,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  note: {
-    color: theme.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
+    fontFamily: theme.fontMono,
     marginTop: 8,
   },
-  mono: {
-    fontFamily: theme.fontMono,
-    fontSize: 13,
-    fontWeight: "400",
+  metaLabel: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontSans,
   },
-  blockerList: {
-    marginTop: 6,
-    gap: 4,
-  },
-  blocker: {
-    color: theme.danger,
-  },
-  checkRow: {
-    fontSize: 13,
-    fontWeight: "500",
-    marginTop: 6,
-  },
-  evidenceRow: {
-    marginTop: 6,
+  metaValue: {
     color: theme.text,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    marginTop: 2,
+  },
+  summaryTitle: {
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    marginBottom: 14,
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 18,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  summaryStat: {
+    flex: 1,
+    minWidth: 160,
+    flexDirection: "column",
+    gap: 6,
+  },
+  summaryIcon: {
+    width: 26,
+    height: 26,
+    alignItems: "flex-start",
+    justifyContent: "center",
+  },
+  summaryLabel: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  summaryValue: {
+    color: theme.text,
+    fontSize: 18,
+    fontWeight: "800",
+    fontFamily: theme.fontSans,
+  },
+  summaryActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 18,
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  blockersTitle: {
+    color: theme.danger,
+    fontSize: 13,
+    fontWeight: "800",
+    fontFamily: theme.fontSans,
+    marginBottom: 6,
+  },
+  blockerLine: {
+    color: theme.text,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
   },
 });

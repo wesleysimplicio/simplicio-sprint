@@ -1,585 +1,766 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { getApiErrorMessage } from "../api/client";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { ControlPlaneRunSummary } from "../api/types";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
+import { Icon } from "../components/Icon";
+import { Input, SelectInput } from "../components/Input";
 import { Screen } from "../components/Screen";
 import {
   loadSupportTickets,
   saveSupportTickets,
   type SupportTicket,
   type SupportTicketCategory,
+  type SupportTicketStatus,
 } from "../supportCenterStore";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
 
 const CATEGORIES: Array<{ key: SupportTicketCategory; label: string }> = [
   { key: "bug", label: "Bug" },
-  { key: "integration", label: "Integracao" },
+  { key: "integration", label: "Integração" },
   { key: "workflow", label: "Workflow" },
   { key: "feature", label: "Feature" },
   { key: "question", label: "Pergunta" },
   { key: "billing", label: "Billing" },
 ];
 
+type Tab = "tickets" | "knowledge" | "backlog";
+
+const TABS: Array<{ key: Tab; label: string }> = [
+  { key: "tickets", label: "Chamados" },
+  { key: "knowledge", label: "Base de conhecimento" },
+  { key: "backlog", label: "Backlog de promoções" },
+];
+
+const PLACEHOLDER_TICKETS: SupportTicket[] = [
+  {
+    id: "4821",
+    category: "integration",
+    status: "new",
+    title: "Falha ao importar sprint do Jira",
+    description:
+      "Ao tentar importar o sprint Sprint 24, ocorre erro 400 ao buscar issues.",
+    linkedRunId: null,
+    createdBy: "joao.operador",
+    createdAt: new Date(Date.now() - 15 * 60_000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    diagnostics: {
+      provider: "jira",
+      sprintId: "24",
+      sprintName: "Sprint 24",
+      repoCount: 3,
+      runCount: 0,
+    },
+  },
+  {
+    id: "4815",
+    category: "bug",
+    status: "triaged",
+    title: "Execução travada no passo 7",
+    description: "Run não avança do passo 7 (Fix loop).",
+    linkedRunId: "run-001",
+    createdBy: "marina.costa",
+    createdAt: new Date(Date.now() - 42 * 60_000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    diagnostics: {
+      provider: "azuredevops",
+      sprintId: null,
+      sprintName: "Pagamentos",
+      repoCount: 1,
+      runCount: 1,
+    },
+  },
+  {
+    id: "4807",
+    category: "integration",
+    status: "new",
+    title: "Integração GitHub indisponível",
+    description: "GitHub MCP retornando 503.",
+    linkedRunId: null,
+    createdBy: "rafael.nogueira",
+    createdAt: new Date(Date.now() - 3600_000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    diagnostics: {
+      provider: "github",
+      sprintId: null,
+      sprintName: "Infraestrutura",
+      repoCount: 2,
+      runCount: 0,
+    },
+  },
+  {
+    id: "4799",
+    category: "question",
+    status: "resolved",
+    title: "Erro de autenticação SSO",
+    description: "Resolvido após renovação do certificado.",
+    linkedRunId: null,
+    createdBy: "thiago.martins",
+    createdAt: new Date(Date.now() - 2 * 3600_000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    diagnostics: {
+      provider: null,
+      sprintId: null,
+      sprintName: "Todos",
+      repoCount: 0,
+      runCount: 0,
+    },
+  },
+  {
+    id: "4791",
+    category: "feature",
+    status: "new",
+    title: "Solicitação de novo provedor",
+    description: "Solicitação para integrar Bitbucket.",
+    linkedRunId: null,
+    createdBy: "camila.souza",
+    createdAt: new Date(Date.now() - 3 * 3600_000).toISOString(),
+    updatedAt: new Date().toISOString(),
+    diagnostics: {
+      provider: null,
+      sprintId: null,
+      sprintName: "Mobile",
+      repoCount: 1,
+      runCount: 0,
+    },
+  },
+];
+
 export const SupportCenterScreen: React.FC = () => {
   const { api, session } = useSession();
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [runs, setRuns] = useState<ControlPlaneRunSummary[]>([]);
+  const [tab, setTab] = useState<Tab>("tickets");
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [category, setCategory] = useState<SupportTicketCategory>("bug");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [linkedRunId, setLinkedRunId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const load = async (background = false) => {
-    if (!background) setLoading(true);
-    setError(null);
-    try {
-      const [runList, localTickets] = await Promise.all([
-        api.listControlPlaneRuns(),
-        loadSupportTickets(),
-      ]);
-      const sortedTickets = localTickets.sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
-      setRuns(runList);
-      setTickets(sortedTickets);
-      setSelectedTicketId((current) => current ?? sortedTickets[0]?.id ?? null);
-    } catch (nextError) {
-      setError(getApiErrorMessage(nextError));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<SupportTicketStatus | "all">(
+    "all",
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [improvementTitle, setImprovementTitle] = useState(
+    "Melhorar robustez da importação de sprints do Jira",
+  );
+  const [improvementCategory, setImprovementCategory] = useState("Integração");
+  const [improvementPriority, setImprovementPriority] = useState("Alta");
+  const [runs, setRuns] = useState<ControlPlaneRunSummary[]>([]);
 
   useEffect(() => {
-    void load();
-  }, [session.currentSprint?.sprintId]);
+    (async () => {
+      const stored = await loadSupportTickets();
+      const seeded = stored.length > 0 ? stored : PLACEHOLDER_TICKETS;
+      setTickets(seeded);
+      setSelectedId(seeded[0]?.id ?? null);
+      try {
+        setRuns(await api.listControlPlaneRuns());
+      } catch {
+        // ignore
+      }
+    })();
+  }, [api]);
 
-  const relevantRuns = useMemo(() => {
-    if (!session.currentSprint) return runs.slice(0, 8);
-    return runs
-      .filter(
-        (run) =>
-          run.sprint_id === session.currentSprint?.sprintId &&
-          String(run.provider) === String(session.currentSprint?.provider),
-      )
-      .slice(0, 8);
-  }, [runs, session.currentSprint]);
-
-  const metrics = useMemo(
-    () => ({
-      newCount: tickets.filter((ticket) => ticket.status === "new").length,
-      triagedCount: tickets.filter((ticket) => ticket.status === "triaged").length,
-      backlogCount: tickets.filter((ticket) => ticket.status === "backlog_candidate").length,
-      resolvedCount: tickets.filter((ticket) => ticket.status === "resolved").length,
-    }),
-    [tickets],
-  );
-
-  const selectedTicket = useMemo(
-    () => tickets.find((ticket) => ticket.id === selectedTicketId) ?? null,
-    [selectedTicketId, tickets],
-  );
-
-  const createTicket = async () => {
-    if (!title.trim() || !description.trim()) return;
-    setSaving(true);
-    try {
-      const now = new Date().toISOString();
-      const next: SupportTicket = {
-        id: `support-${Date.now().toString(36)}`,
-        category,
-        status: "new",
-        title: title.trim(),
-        description: description.trim(),
-        linkedRunId,
-        createdBy: session.appUser?.email ?? "local-operator",
-        createdAt: now,
-        updatedAt: now,
-        diagnostics: {
-          provider: session.currentSprint?.provider ?? session.provider ?? null,
-          sprintId: session.currentSprint?.sprintId ?? null,
-          sprintName: session.currentSprint?.sprintName ?? null,
-          repoCount: session.projectSetup.repositories.length,
-          runCount: relevantRuns.length,
-        },
-      };
-      const updated = [next, ...tickets];
-      await saveSupportTickets(updated);
-      setTickets(updated);
-      setSelectedTicketId(next.id);
-      setTitle("");
-      setDescription("");
-      setLinkedRunId(null);
-      setCategory("bug");
-    } finally {
-      setSaving(false);
+  const filtered = useMemo(() => {
+    let list = tickets;
+    if (statusFilter !== "all") {
+      list = list.filter((t) => t.status === statusFilter);
     }
-  };
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.id.includes(q) ||
+          t.diagnostics.sprintName?.toLowerCase().includes(q),
+      );
+    }
+    return list;
+  }, [tickets, search, statusFilter]);
 
-  const setTicketStatus = async (
-    ticketId: string,
-    status: SupportTicket["status"],
-    backlogReason?: string | null,
-  ) => {
-    const now = new Date().toISOString();
-    const updated = tickets.map((ticket) =>
-      ticket.id === ticketId
+  const selected = useMemo(
+    () => tickets.find((t) => t.id === selectedId) ?? filtered[0] ?? null,
+    [filtered, selectedId, tickets],
+  );
+
+  const promoteTicket = async () => {
+    if (!selected) return;
+    const next = tickets.map((t) =>
+      t.id === selected.id
         ? {
-            ...ticket,
-            status,
-            backlogReason: backlogReason ?? ticket.backlogReason ?? null,
-            updatedAt: now,
+            ...t,
+            status: "backlog_candidate" as SupportTicketStatus,
+            backlogReason: improvementTitle,
           }
-        : ticket,
+        : t,
     );
-    setTickets(updated);
-    await saveSupportTickets(updated);
+    setTickets(next);
+    await saveSupportTickets(next);
   };
-
-  if (loading) {
-    return (
-      <Screen
-        chrome="app"
-        eyebrow="Web 15 - Support Center"
-        title="Support center"
-        subtitle="Carregando tickets locais, runs e diagnosticos do workspace..."
-      >
-        <ActivityIndicator color={theme.primary} style={{ marginTop: 48 }} />
-      </Screen>
-    );
-  }
 
   return (
     <Screen
-      chrome="app"
-      eyebrow="Web 15 - Support Center"
-      title="Support center"
-      subtitle="Cada item de suporte pode ser tratado, resolvido localmente ou promovido para backlog candidato."
-      scroll={false}
+      chrome="manager"
+      title="Central de suporte"
+      actions={
+        <Button
+          title="Novo chamado"
+          iconLeft="plus"
+          onPress={() => {}}
+        />
+      }
     >
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load(true);
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        {error ? (
-          <Card style={styles.errorCard}>
-            <Text style={styles.kicker}>SUPPORT ERROR</Text>
-            <Text style={styles.errorText}>{error}</Text>
-          </Card>
-        ) : null}
-
-        <View style={styles.metrics}>
-          <MetricCard label="Novos" value={String(metrics.newCount)} />
-          <MetricCard label="Triados" value={String(metrics.triagedCount)} accent="primary" />
-          <MetricCard label="Candidatos backlog" value={String(metrics.backlogCount)} accent="warning" />
-          <MetricCard label="Resolvidos" value={String(metrics.resolvedCount)} accent="success" />
+      <Card padding={0}>
+        <View style={styles.tabBar}>
+          {TABS.map((t) => (
+            <Pressable
+              key={t.key}
+              onPress={() => setTab(t.key)}
+              style={[styles.tab, tab === t.key && styles.tabActive]}
+            >
+              <Text
+                style={[
+                  styles.tabText,
+                  tab === t.key && styles.tabTextActive,
+                ]}
+              >
+                {t.label}
+              </Text>
+            </Pressable>
+          ))}
         </View>
+      </Card>
 
-        <View style={styles.split}>
-          <Card style={styles.primaryPanel}>
-            <Text style={styles.kicker}>ABRIR NOVO CASO</Text>
-            <View style={styles.categoryRow}>
-              {CATEGORIES.map((option) => (
-                <Card
-                  key={option.key}
-                  onPress={() => setCategory(option.key)}
-                  selected={category === option.key}
-                  style={styles.categoryCard}
+      {tab === "tickets" ? (
+        <View style={styles.layout}>
+          <View style={styles.listCol}>
+            <View style={styles.toolbar}>
+              <View style={{ flex: 1, minWidth: 160 }}>
+                <Input
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="Buscar chamados…"
+                  iconLeft="search"
+                />
+              </View>
+              <SelectInput
+                value={
+                  statusFilter === "all" ? "Status: Todos" : statusFilter
+                }
+                onPress={() =>
+                  setStatusFilter(
+                    statusFilter === "all" ? "new" : "all",
+                  )
+                }
+              />
+              <SelectInput
+                value="Prioridade: Todas"
+                onPress={() => {}}
+              />
+              <SelectInput value="Mais filtros" onPress={() => {}} />
+            </View>
+
+            <View style={{ gap: 10 }}>
+              {filtered.map((t) => (
+                <Pressable
+                  key={t.id}
+                  onPress={() => setSelectedId(t.id)}
+                  style={[
+                    styles.ticketCard,
+                    selected?.id === t.id && styles.ticketCardActive,
+                  ]}
                 >
-                  <Text style={styles.categoryLabel}>{option.label}</Text>
-                </Card>
+                  <View style={styles.ticketHead}>
+                    <Text style={styles.ticketId}>#{t.id}</Text>
+                    <Text style={styles.ticketTime}>
+                      {timeAgo(t.createdAt)}
+                    </Text>
+                  </View>
+                  <Text style={styles.ticketTitle} numberOfLines={1}>
+                    {t.title}
+                  </Text>
+                  <View style={styles.ticketBottom}>
+                    <Text style={styles.ticketProject}>
+                      {t.diagnostics.sprintName ?? "—"}
+                    </Text>
+                    <StatusBadge status={t.status} />
+                    <PriorityBadge category={t.category} />
+                  </View>
+                </Pressable>
               ))}
             </View>
 
-            <View style={styles.formField}>
-              <Text style={styles.fieldLabel}>Titulo</Text>
-              <TextInput
-                value={title}
-                onChangeText={setTitle}
-                placeholder="Ex: Azure fallback nao importou a sprint"
-                placeholderTextColor={theme.textMuted}
-                style={styles.input}
-              />
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.fieldLabel}>Descricao</Text>
-              <TextInput
-                value={description}
-                onChangeText={setDescription}
-                placeholder="Descreva o problema, o impacto e os passos para reproduzir."
-                placeholderTextColor={theme.textMuted}
-                multiline
-                textAlignVertical="top"
-                style={[styles.input, styles.textarea]}
-              />
-            </View>
-
-            <View style={styles.formField}>
-              <Text style={styles.fieldLabel}>Run vinculada</Text>
-              <View style={styles.runChoices}>
-                <Button
-                  title={linkedRunId ? "Limpar vinculo" : "Sem vinculo"}
-                  variant="secondary"
-                  onPress={() => setLinkedRunId(null)}
-                />
-                {relevantRuns.slice(0, 4).map((run) => (
-                  <Button
-                    key={run.run_id}
-                    title={run.run_id.slice(0, 10)}
-                    variant={linkedRunId === run.run_id ? "primary" : "secondary"}
-                    onPress={() => setLinkedRunId(run.run_id)}
+            <View style={styles.paginator}>
+              <Text style={styles.paginatorText}>
+                Mostrando 1 a {filtered.length} de {tickets.length} chamados
+              </Text>
+              <View style={styles.pageDots}>
+                <View style={styles.pageBtn}>
+                  <Icon name="chevron-left" size={14} color={theme.textMuted} />
+                </View>
+                <View style={[styles.pageBtn, styles.pageBtnActive]}>
+                  <Text style={styles.pageBtnTextActive}>1</Text>
+                </View>
+                <View style={styles.pageBtn}>
+                  <Text style={styles.pageBtnText}>2</Text>
+                </View>
+                <View style={styles.pageBtn}>
+                  <Text style={styles.pageBtnText}>3</Text>
+                </View>
+                <View style={styles.pageBtn}>
+                  <Text style={styles.pageBtnText}>4</Text>
+                </View>
+                <View style={styles.pageBtn}>
+                  <Text style={styles.pageBtnText}>5</Text>
+                </View>
+                <View style={styles.pageBtn}>
+                  <Icon
+                    name="chevron-right"
+                    size={14}
+                    color={theme.textMuted}
                   />
-                ))}
+                </View>
               </View>
             </View>
-
-            <Button
-              title="Registrar suporte"
-              onPress={() => void createTicket()}
-              loading={saving}
-              disabled={!title.trim() || !description.trim()}
-            />
-          </Card>
-
-          <View style={styles.sideStack}>
-            <Card>
-              <Text style={styles.kicker}>CASOS ABERTOS</Text>
-              {tickets.length === 0 ? (
-                <Text style={styles.emptyText}>Nenhum caso local registrado ainda.</Text>
-              ) : (
-                tickets.map((ticket) => (
-                  <Card
-                    key={ticket.id}
-                    onPress={() => setSelectedTicketId(ticket.id)}
-                    selected={selectedTicketId === ticket.id}
-                    style={styles.ticketListCard}
-                  >
-                    <View style={styles.ticketHead}>
-                      <Text style={styles.ticketTitle}>{ticket.title}</Text>
-                      <StatusPill status={ticket.status} />
-                    </View>
-                    <Text style={styles.ticketMeta}>
-                      {ticket.category} - {ticket.createdBy} - {ticket.updatedAt.slice(0, 16).replace("T", " ")}
-                    </Text>
-                  </Card>
-                ))
-              )}
-            </Card>
-
-            <Card>
-              <Text style={styles.kicker}>DIAGNOSTICOS ANEXADOS</Text>
-              <SupportRow label="Usuario" value={session.appUser?.email ?? "local-operator"} />
-              <SupportRow label="Sprint" value={session.currentSprint?.sprintName ?? "nenhuma"} />
-              <SupportRow label="Provider" value={session.currentSprint?.provider ?? session.provider ?? "nao definido"} />
-              <SupportRow label="Repos locais" value={String(session.projectSetup.repositories.length)} />
-              <SupportRow label="Runs recentes" value={String(relevantRuns.length)} />
-            </Card>
           </View>
-        </View>
 
-        <Card>
-          <Text style={styles.kicker}>DETALHE E TRIAGEM</Text>
-          {!selectedTicket ? (
-            <Text style={styles.emptyText}>Selecione um caso para ver o detalhe.</Text>
-          ) : (
-            <>
-              <View style={styles.ticketHead}>
-                <Text style={styles.detailTitle}>{selectedTicket.title}</Text>
-                <StatusPill status={selectedTicket.status} />
-              </View>
-              <Text style={styles.ticketMeta}>
-                {selectedTicket.category} - {selectedTicket.createdBy} - {selectedTicket.updatedAt.slice(0, 16).replace("T", " ")}
-              </Text>
-              <Text style={styles.ticketBody}>{selectedTicket.description}</Text>
-              <Text style={styles.ticketMeta}>
-                sprint={selectedTicket.diagnostics.sprintName ?? "none"} - repos={selectedTicket.diagnostics.repoCount} - runs={selectedTicket.diagnostics.runCount}
-                {selectedTicket.linkedRunId ? ` - run=${selectedTicket.linkedRunId}` : ""}
-              </Text>
-              {selectedTicket.backlogReason ? (
-                <Text style={styles.ticketBacklog}>backlog: {selectedTicket.backlogReason}</Text>
-              ) : null}
-              <View style={styles.ticketActions}>
-                <Button title="Triar" variant="secondary" onPress={() => void setTicketStatus(selectedTicket.id, "triaged")} />
-                <Button
-                  title="Virar backlog"
-                  variant="secondary"
-                  onPress={() =>
-                    void setTicketStatus(
-                      selectedTicket.id,
-                      "backlog_candidate",
-                      "Triage local sinalizou gap de produto ou fluxo.",
-                    )
-                  }
+          {selected ? (
+            <View style={styles.detailCol}>
+              <Card padding={22}>
+                <View style={styles.detailHeader}>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.detailHeadRow}>
+                      <Text style={styles.detailId}>#{selected.id}</Text>
+                      <Text style={styles.detailTitle}>{selected.title}</Text>
+                      <StatusBadge status={selected.status} />
+                      <PriorityBadge category={selected.category} />
+                    </View>
+                    <Text style={styles.detailMeta}>
+                      {selected.diagnostics.sprintName ?? "—"} · Criado por{" "}
+                      {selected.createdBy} · {timeAgo(selected.createdAt)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.detailTabs}>
+                  <Text style={[styles.detailTab, styles.detailTabActive]}>
+                    Detalhes
+                  </Text>
+                  <Text style={styles.detailTab}>Atividade</Text>
+                  <Text style={styles.detailTab}>Anexos</Text>
+                  <Text style={styles.detailTab}>Relacionados</Text>
+                </View>
+
+                <View style={styles.detailBody}>
+                  <Text style={styles.detailSection}>Descrição</Text>
+                  <Text style={styles.detailText}>{selected.description}</Text>
+                  {selected.diagnostics.sprintName ? (
+                    <>
+                      <Text style={[styles.detailSection, { marginTop: 18 }]}>
+                        Ambiente
+                      </Text>
+                      <Text style={styles.detailText}>
+                        {selected.diagnostics.provider ?? "—"} · Sprint{" "}
+                        {selected.diagnostics.sprintName} · Projeto{" "}
+                        {selected.diagnostics.sprintName}
+                      </Text>
+                    </>
+                  ) : null}
+                  <Text style={[styles.detailSection, { marginTop: 18 }]}>
+                    Impacto
+                  </Text>
+                  <Text style={styles.detailText}>
+                    Bloqueando importação de sprints e execução de tarefas.
+                  </Text>
+
+                  <Text style={[styles.detailSection, { marginTop: 18 }]}>
+                    Atribuído para
+                  </Text>
+                  <View style={styles.assigneeRow}>
+                    <View style={styles.assigneeAvatar}>
+                      <Text style={styles.assigneeAvatarText}>SN</Text>
+                    </View>
+                    <Text style={styles.assigneeName}>Suporte Nível 2</Text>
+                  </View>
+                </View>
+              </Card>
+
+              <Card padding={20} style={styles.promoteCard}>
+                <Text style={styles.promoteTitle}>Promoção para backlog</Text>
+                <Text style={styles.promoteSub}>
+                  Transforme este caso em uma melhoria do produto.
+                </Text>
+
+                <View style={{ height: 12 }} />
+                <Input
+                  label="Título da melhoria"
+                  value={improvementTitle}
+                  onChangeText={setImprovementTitle}
                 />
-                <Button title="Resolver" variant="secondary" onPress={() => void setTicketStatus(selectedTicket.id, "resolved")} />
-              </View>
-            </>
-          )}
+                <View style={{ height: 12 }} />
+                <Text style={styles.fieldLabel}>Categoria</Text>
+                <SelectInput
+                  value={improvementCategory}
+                  onPress={() => setImprovementCategory("Integração")}
+                />
+                <View style={{ height: 12 }} />
+                <Text style={styles.fieldLabel}>Prioridade sugerida</Text>
+                <SelectInput
+                  value={improvementPriority}
+                  onPress={() => setImprovementPriority("Alta")}
+                />
+
+                <View style={{ height: 16 }} />
+                <Button
+                  title="Promover para backlog"
+                  fullWidth
+                  onPress={() => void promoteTicket()}
+                />
+              </Card>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      {tab === "knowledge" ? (
+        <Card padding={22}>
+          <Text style={styles.placeholderTitle}>Base de conhecimento</Text>
+          <Text style={styles.placeholderText}>
+            Artigos, runbooks e respostas comuns para o time de suporte.
+          </Text>
         </Card>
-      </ScrollView>
+      ) : null}
+
+      {tab === "backlog" ? (
+        <Card padding={22}>
+          <Text style={styles.placeholderTitle}>Backlog de promoções</Text>
+          <Text style={styles.placeholderText}>
+            Chamados promovidos a melhorias de produto, agrupados por categoria.
+          </Text>
+        </Card>
+      ) : null}
     </Screen>
   );
 };
 
-const MetricCard: React.FC<{
-  label: string;
-  value: string;
-  accent?: "default" | "primary" | "warning" | "success";
-}> = ({ label, value, accent = "default" }) => (
-  <Card style={styles.metricCard}>
-    <Text style={styles.metricLabel}>{label}</Text>
-    <Text
-      style={[
-        styles.metricValue,
-        accent === "primary" && { color: theme.primary },
-        accent === "warning" && { color: theme.warning },
-        accent === "success" && { color: theme.success },
-      ]}
-    >
-      {value}
-    </Text>
-  </Card>
-);
-
-const SupportRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <View style={styles.inlineRow}>
-    <Text style={styles.inlineLabel}>{label}</Text>
-    <Text style={styles.inlineValue}>{value}</Text>
-  </View>
-);
-
-const StatusPill: React.FC<{ status: SupportTicket["status"] }> = ({ status }) => {
-  const label =
-    status === "backlog_candidate"
-      ? "backlog"
-      : status === "resolved"
-        ? "resolved"
-        : status;
+const StatusBadge: React.FC<{ status: SupportTicketStatus }> = ({ status }) => {
+  const map: Record<
+    SupportTicketStatus,
+    { label: string; bg: string; fg: string }
+  > = {
+    new: { label: "Aberto", bg: theme.successSoft, fg: theme.success },
+    triaged: { label: "Em análise", bg: theme.warningSoft, fg: theme.warning },
+    backlog_candidate: {
+      label: "Promovido",
+      bg: theme.infoSoft,
+      fg: theme.info,
+    },
+    resolved: { label: "Resolvido", bg: theme.surfaceMuted, fg: theme.textMuted },
+  };
+  const cfg = map[status];
   return (
-    <View
-      style={[
-        styles.statusPill,
-        status === "triaged" && styles.statusTriaged,
-        status === "backlog_candidate" && styles.statusBacklog,
-        status === "resolved" && styles.statusResolved,
-      ]}
-    >
-      <Text style={styles.statusText}>{label}</Text>
+    <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
+      <Text style={[styles.statusBadgeText, { color: cfg.fg }]}>
+        {cfg.label}
+      </Text>
     </View>
   );
 };
 
+const PriorityBadge: React.FC<{ category: SupportTicketCategory }> = ({
+  category,
+}) => {
+  const tone =
+    category === "bug" || category === "integration"
+      ? { bg: theme.dangerSoft, fg: theme.danger, label: "Alta" }
+      : category === "billing" || category === "workflow"
+        ? { bg: theme.warningSoft, fg: theme.warning, label: "Média" }
+        : { bg: theme.successSoft, fg: theme.success, label: "Baixa" };
+  return (
+    <View style={[styles.priorityBadge, { backgroundColor: tone.bg }]}>
+      <Text style={[styles.statusBadgeText, { color: tone.fg }]}>
+        {tone.label}
+      </Text>
+    </View>
+  );
+};
+
+const timeAgo = (iso: string): string => {
+  const ms = Date.now() - Date.parse(iso);
+  const min = Math.floor(ms / 60000);
+  if (min < 60) return `Há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `Há ${h} h`;
+  const d = Math.floor(h / 24);
+  return `Há ${d} d`;
+};
+
 const styles = StyleSheet.create({
-  scroll: {
-    gap: 12,
-    paddingBottom: 24,
-  },
-  metrics: {
+  tabBar: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
+    paddingHorizontal: 22,
+    paddingTop: 14,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
-  metricCard: {
-    flex: 1,
-    minWidth: 170,
+  tab: {
+    paddingHorizontal: 6,
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+    marginRight: 22,
   },
-  metricLabel: {
+  tabActive: {
+    borderBottomColor: theme.primary,
+  },
+  tabText: {
     color: theme.textMuted,
-    fontSize: 11,
-    letterSpacing: 2,
-    textTransform: "uppercase",
+    fontSize: 13,
+    fontFamily: theme.fontSans,
   },
-  metricValue: {
-    color: theme.text,
-    fontSize: 28,
-    fontWeight: "800",
-    marginTop: 6,
-  },
-  split: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  primaryPanel: {
-    flex: 1,
-    minWidth: 420,
-  },
-  sideStack: {
-    width: 340,
-    minWidth: 320,
-    gap: 12,
-  },
-  kicker: {
+  tabTextActive: {
     color: theme.primary,
-    fontSize: 11,
-    letterSpacing: 2,
-    fontWeight: "800",
-    marginBottom: 8,
-  },
-  categoryRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginBottom: 12,
-  },
-  categoryCard: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  categoryLabel: {
-    color: theme.text,
-    fontSize: 12,
     fontWeight: "700",
   },
-  formField: {
-    gap: 6,
-    marginBottom: 12,
+  layout: {
+    flexDirection: "row",
+    gap: 16,
+    flexWrap: "wrap",
+    alignItems: "flex-start",
   },
-  fieldLabel: {
-    color: theme.textMuted,
-    fontSize: 12,
-    letterSpacing: 1.5,
-    textTransform: "uppercase",
+  listCol: {
+    flex: 1,
+    minWidth: 480,
+    gap: 12,
   },
-  input: {
+  detailCol: {
+    width: 460,
+    minWidth: 380,
+    gap: 16,
+  },
+  toolbar: {
+    flexDirection: "row",
+    gap: 10,
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  ticketCard: {
     backgroundColor: theme.surface,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: theme.border,
-    borderRadius: theme.radius,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: theme.text,
-    fontSize: 15,
-  },
-  textarea: {
-    minHeight: 120,
-  },
-  runChoices: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    padding: 14,
     gap: 8,
   },
-  inlineRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-  },
-  inlineLabel: {
-    color: theme.text,
-    fontSize: 13,
-    fontWeight: "700",
-  },
-  inlineValue: {
-    color: theme.textMuted,
-    fontSize: 12,
-    fontFamily: theme.fontMono,
-  },
-  ticketListCard: {
-    marginTop: 10,
+  ticketCardActive: {
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryFaint,
   },
   ticketHead: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 12,
     alignItems: "center",
+  },
+  ticketId: {
+    color: theme.primary,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: theme.fontMono,
+  },
+  ticketTime: {
+    color: theme.textMuted,
+    fontSize: 11,
+    fontFamily: theme.fontSans,
   },
   ticketTitle: {
     color: theme.text,
-    fontSize: 15,
-    fontWeight: "700",
-    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
   },
-  detailTitle: {
+  ticketBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  ticketProject: {
+    flex: 1,
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  priorityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  paginator: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  paginatorText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  pageDots: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  pageBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: theme.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pageBtnActive: {
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
+  },
+  pageBtnText: {
+    color: theme.text,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  pageBtnTextActive: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  detailHeader: {
+    marginBottom: 12,
+  },
+  detailHeadRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flexWrap: "wrap",
+  },
+  detailId: {
     color: theme.text,
     fontSize: 18,
     fontWeight: "800",
-    flex: 1,
-  },
-  ticketMeta: {
-    color: theme.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  ticketBody: {
-    color: theme.text,
-    fontSize: 13,
-    lineHeight: 20,
-    marginTop: 8,
-  },
-  ticketBacklog: {
-    color: theme.warning,
-    fontSize: 12,
-    marginTop: 8,
     fontFamily: theme.fontMono,
   },
-  ticketActions: {
-    marginTop: 12,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  statusPill: {
-    borderRadius: 999,
-    backgroundColor: "rgba(44,107,237,0.10)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  statusTriaged: {
-    backgroundColor: "rgba(255,181,106,0.16)",
-  },
-  statusBacklog: {
-    backgroundColor: "rgba(193,138,23,0.14)",
-  },
-  statusResolved: {
-    backgroundColor: "rgba(30,169,124,0.12)",
-  },
-  statusText: {
+  detailTitle: {
     color: theme.text,
-    fontSize: 11,
-    fontWeight: "800",
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    flexShrink: 1,
   },
-  emptyText: {
+  detailMeta: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+    marginTop: 6,
+  },
+  detailTabs: {
+    flexDirection: "row",
+    gap: 18,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+    marginBottom: 12,
+  },
+  detailTab: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+    paddingBottom: 4,
+  },
+  detailTabActive: {
+    color: theme.primary,
+    borderBottomWidth: 2,
+    borderBottomColor: theme.primary,
+  },
+  detailBody: {
+    gap: 4,
+  },
+  detailSection: {
+    color: theme.text,
+    fontSize: 13,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  detailText: {
     color: theme.textMuted,
     fontSize: 13,
-    lineHeight: 20,
+    fontFamily: theme.fontSans,
+    lineHeight: 19,
+    marginTop: 4,
   },
-  errorCard: {
-    backgroundColor: "rgba(207,81,97,0.08)",
-    borderColor: "rgba(207,81,97,0.22)",
+  assigneeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
   },
-  errorText: {
-    color: theme.danger,
+  assigneeAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.surfaceMuted,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  assigneeAvatarText: {
+    color: theme.textMuted,
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  assigneeName: {
+    color: theme.text,
     fontSize: 13,
-    lineHeight: 20,
+    fontFamily: theme.fontSans,
+  },
+  promoteCard: {
+    backgroundColor: theme.surface,
+  },
+  promoteTitle: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  promoteSub: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+    marginTop: 4,
+  },
+  fieldLabel: {
+    color: theme.text,
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+    marginBottom: 6,
+  },
+  placeholderTitle: {
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+  },
+  placeholderText: {
+    color: theme.textMuted,
+    fontSize: 13,
+    fontFamily: theme.fontSans,
+    marginTop: 6,
   },
 });
