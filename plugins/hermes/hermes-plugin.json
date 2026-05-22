@@ -1,0 +1,64 @@
+{
+  "$schema": "https://hermes-agent.dev/schemas/plugin.v1.json",
+  "name": "sendsprint",
+  "version": "0.3.0",
+  "description": "SendSprint — multi-agent sprint-to-PR delivery (Jira / Azure DevOps). Hermes uses SendSprint as the local control plane and delivery executor.",
+  "author": {
+    "name": "Wesley Simplicio",
+    "email": "wesleybob4@gmail.com"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/wesleysimplicio/sendsprint",
+  "runtime": {
+    "type": "python-cli",
+    "entrypoint": "sendsprint",
+    "min_version": "0.22.0",
+    "install": "pip install sendsprint && playwright install chromium"
+  },
+  "capabilities": [
+    "sprint-read",
+    "architecture-mapping",
+    "tech-detection",
+    "lint",
+    "test",
+    "e2e",
+    "security-scan",
+    "fix-loop",
+    "commit-push",
+    "pr-create",
+    "pr-review"
+  ],
+  "skills": [
+    { "path": "./skills/sendsprint.md", "name": "sendsprint" }
+  ],
+  "commands": [
+    { "name": "sprint", "path": "./commands/sprint.md", "exec": "sendsprint sprint" },
+    { "name": "doctor", "path": "./commands/doctor.md", "exec": "sendsprint doctor" },
+    { "name": "watch", "path": "./commands/watch.md", "exec": "sendsprint watch" },
+    { "name": "full", "path": "./commands/full.md", "exec": "sendsprint full" },
+    { "name": "web", "path": "./commands/web.md", "exec": "sendsprint web" }
+  ],
+  "hooks": {
+    "pre_commit": "./hooks/pre-commit.sh",
+    "post_edit": "./hooks/post-edit.sh",
+    "session_start": "./hooks/session-start.sh"
+  },
+  "triggers": {
+    "phrases": {
+      "pt-BR": ["rode o sendsprint", "executar sprint", "entregar sprint", "processar sprint do jira", "processar sprint do ado"],
+      "en": ["run sendsprint", "ship my sprint", "deliver sprint", "process jira sprint", "process ado sprint"],
+      "es": ["ejecutar sprint", "procesar sprint", "entregar sprint"]
+    },
+    "slash": ["/sendsprint", "/sendsprint-doctor", "/sendsprint-watch", "/sendsprint-full"]
+  },
+  "env": {
+    "required_for_jira": ["JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"],
+    "required_for_ado": ["AZURE_DEVOPS_ORG", "AZURE_DEVOPS_PROJECT", "AZURE_DEVOPS_PAT"],
+    "optional": ["PLAYWRIGHT_CDP_URL", "LLM_PROVIDER", "LLM_MODEL"]
+  },
+  "policy": {
+    "security": "flag-only",
+    "fix_loop_max_rounds": 3,
+    "transport_order": ["mcp", "api", "playwright"]
+  }
+}

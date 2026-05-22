@@ -1,0 +1,31 @@
+{
+  "name": "sendsprint",
+  "version": "0.3.0",
+  "description": "SendSprint — multi-agent sprint-to-PR delivery automation for Jira and Azure DevOps. Plugs the SendSprint Python CLI into Claude Code as commands, agents, skills and hooks.",
+  "author": {
+    "name": "Wesley Simplicio",
+    "email": "wesleybob4@gmail.com"
+  },
+  "homepage": "https://github.com/wesleysimplicio/sendsprint",
+  "repository": "https://github.com/wesleysimplicio/sendsprint",
+  "license": "MIT",
+  "keywords": [
+    "sprint",
+    "jira",
+    "azure-devops",
+    "delivery",
+    "automation",
+    "playwright",
+    "agent"
+  ],
+  "runtime": {
+    "type": "python-cli",
+    "entrypoint": "sendsprint",
+    "min_version": "0.22.0",
+    "install_hint": "pip install sendsprint && playwright install chromium"
+  },
+  "commands": "./commands",
+  "agents": "./agents",
+  "skills": "./skills",
+  "hooks": "./hooks/hooks.json"
+}

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
+import shutil
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -29,6 +31,8 @@ class PluginProfile:
     default_target: str
     runtime_command: str
     notes: tuple[str, ...] = ()
+    package_dir: str | None = None
+    packaged_target: str | None = None
 
 
 PLUGIN_PROFILES: dict[PluginPlatform, PluginProfile] = {
@@ -39,6 +43,8 @@ PLUGIN_PROFILES: dict[PluginPlatform, PluginProfile] = {
         default_target=".claude/skills/sendsprint/SKILL.md",
         runtime_command="sendsprint sprint",
         notes=("Ralph-style repair loops should inspect SendSprint artifacts first.",),
+        package_dir="claude-code",
+        packaged_target=".claude/plugins/sendsprint",
     ),
     "codex": PluginProfile(
         platform="codex",
@@ -47,6 +53,8 @@ PLUGIN_PROFILES: dict[PluginPlatform, PluginProfile] = {
         default_target="AGENTS.md",
         runtime_command="sendsprint sprint",
         notes=("Codex can wrap long-running delivery with /goal when requested.",),
+        package_dir="codex",
+        packaged_target=".codex/plugins/sendsprint",
     ),
     "hermes": PluginProfile(
         platform="hermes",
@@ -55,6 +63,8 @@ PLUGIN_PROFILES: dict[PluginPlatform, PluginProfile] = {
         default_target=".hermes/skills/sendsprint.md",
         runtime_command="sendsprint full --workspace workspace.yaml",
         notes=("Hermes should use SendSprint as a local control-plane module.",),
+        package_dir="hermes",
+        packaged_target=".hermes/plugins/sendsprint",
     ),
     "openclaw": PluginProfile(
         platform="openclaw",
@@ -63,6 +73,8 @@ PLUGIN_PROFILES: dict[PluginPlatform, PluginProfile] = {
         default_target=".openclaw/skills/sendsprint.md",
         runtime_command="sendsprint preflight <provider> <id> --workspace workspace.yaml",
         notes=("OpenClaw is positioned as review/security validation around SendSprint.",),
+        package_dir="openclaw",
+        packaged_target=".openclaw/plugins/sendsprint",
     ),
     "cursor": PluginProfile(
         platform="cursor",
@@ -133,8 +145,15 @@ def install_plugins(
     force: bool = False,
     dry_run: bool = False,
     write_manifest: bool = True,
+    packaged: bool = False,
 ) -> PluginInstallResult:
-    """Install SendSprint plugin manifests into a repo-local plugin structure."""
+    """Install SendSprint plugin manifests into a repo-local plugin structure.
+
+    When ``packaged=True``, copy the full plugin package tree (commands, agents,
+    skills, hooks, manifest) for hosts that support it (``claude``, ``codex``,
+    ``hermes``, ``openclaw``). Hosts without a packaged form fall back to the
+    flat rule file install.
+    """
     repo = Path(repo_path).expanduser().resolve()
     if not repo.exists():
         raise FileNotFoundError(f"repo path not found: {repo}")
@@ -144,6 +163,25 @@ def install_plugins(
     installed: list[dict[str, str]] = []
     for platform in selected:
         profile = PLUGIN_PROFILES[platform]
+        if packaged and profile.package_dir and profile.packaged_target:
+            target_dir = _target(repo, profile.packaged_target)
+            _install_package(
+                target_dir,
+                profile.package_dir,
+                result,
+                force=force,
+                dry_run=dry_run,
+            )
+            installed.append(
+                {
+                    "platform": profile.platform,
+                    "display_name": profile.display_name,
+                    "target": profile.packaged_target,
+                    "runtime_command": profile.runtime_command,
+                    "mode": "packaged",
+                }
+            )
+            continue
         target = _target(repo, profile.default_target)
         _write_plugin_file(
             target,
@@ -158,6 +196,7 @@ def install_plugins(
                 "display_name": profile.display_name,
                 "target": profile.default_target,
                 "runtime_command": profile.runtime_command,
+                "mode": "flat",
             }
         )
 
@@ -233,3 +272,48 @@ def _target(repo: Path, rel: str) -> Path:
     if target != repo and repo not in target.parents:
         raise ValueError(f"refusing to write outside repo: {rel}")
     return target
+
+
+def _locate_plugin_package_dir(name: str) -> Path:
+    """Find the source directory for a packaged plugin.
+
+    Search order:
+      1. ``sendsprint/_plugin_packages/<name>`` (when bundled in the wheel).
+      2. ``plugins/<name>`` relative to the repo root (source checkout).
+    """
+    bundled = Path(__file__).parent / "_plugin_packages" / name
+    if bundled.is_dir():
+        return bundled
+    source = Path(__file__).parent.parent / "plugins" / name
+    if source.is_dir():
+        return source
+    raise FileNotFoundError(
+        f"plugin package '{name}' not found (looked in {bundled} and {source})"
+    )
+
+
+def _install_package(
+    target_dir: Path,
+    package_name: str,
+    result: PluginInstallResult,
+    *,
+    force: bool,
+    dry_run: bool,
+) -> None:
+    """Copy the packaged plugin tree into ``target_dir``."""
+    source = _locate_plugin_package_dir(package_name)
+    for src_file in sorted(p for p in source.rglob("*") if p.is_file()):
+        rel = src_file.relative_to(source)
+        dest = target_dir / rel
+        if dest.exists() and not force:
+            result.skipped.append(dest)
+            continue
+        bucket = result.updated if dest.exists() else result.created
+        bucket.append(dest)
+        if dry_run:
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src_file, dest)
+        if src_file.suffix == ".sh":
+            with contextlib.suppress(OSError):
+                dest.chmod(dest.stat().st_mode | 0o111)

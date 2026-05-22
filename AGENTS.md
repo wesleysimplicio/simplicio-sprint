@@ -161,6 +161,25 @@ default sprint, scope) live in `~/.config/sendsprint/profile.yaml` (chmod 600).
 | Hermes | `skills/hermes/hermes.md` | per-tool location |
 | Openclaw | `skills/openclaw/openclaw.md` | per-tool location |
 
+### Full plugin packages (Claude Code, Codex, Hermes, OpenClaw)
+
+For these four hosts SendSprint ships a **complete plugin package** under
+[`plugins/`](./plugins/) — not just a rule file. Each package has its own
+manifest, commands, sub-agents (where applicable), embedded skill and hooks:
+
+| Host | Package | Manifest | Install with |
+|---|---|---|---|
+| Claude Code | `plugins/claude-code/` | `.claude-plugin/plugin.json` | `sendsprint plugins install --packaged --platform claude` |
+| Codex | `plugins/codex/` | `plugin.toml` + `AGENTS.md` + `config.toml` | `sendsprint plugins install --packaged --platform codex` |
+| Hermes | `plugins/hermes/` | `hermes-plugin.json` | `sendsprint plugins install --packaged --platform hermes` |
+| OpenClaw | `plugins/openclaw/` | `openclaw-plugin.json` | `sendsprint plugins install --packaged --platform openclaw` |
+
+`--packaged` falls back to the flat rule file for hosts without a package
+(Cursor, Windsurf, Kiro, Antigravity, Copilot). The source of truth for
+package contents is `plugins/<host>/`; the wheel ships them under
+`sendsprint/_plugin_packages/<host>/` via the
+`[tool.hatch.build.targets.wheel.force-include]` entry in `pyproject.toml`.
+
 ---
 
 ## 5. Code patterns (HARD RULES)
