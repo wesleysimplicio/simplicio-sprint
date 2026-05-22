@@ -608,6 +608,11 @@ def run_flow(
     autonomy_level = parse_autonomy_level(
         "deploy-callback" if full_mode else autonomy or default_autonomy
     )
+    profile_state = _ensure_branch_preferences(
+        profile_state,
+        workspace_provides=ws is not None,
+        interactive=not dry_run,
+    )
     flow = SprintFlow(
         operator=operator,
         workspace=ws,
@@ -615,6 +620,8 @@ def run_flow(
         code_generation=code_generation,
         deploy=deploy_config,
         autonomy_policy=AutonomyPolicy(level=autonomy_level),
+        default_base_branch=profile_state.branch.default_base_branch,
+        branch_name_template=profile_state.branch.branch_name_template,
     )
 
     sprint_id = None
@@ -1217,6 +1224,12 @@ def sprint(
 
     autonomy_level = parse_autonomy_level("deploy-callback" if full_mode else None)
 
+    p = _ensure_branch_preferences(
+        p,
+        workspace_provides=ws is not None,
+        interactive=not dry_run,
+    )
+
     flow = SprintFlow(
         operator=operator,
         workspace=ws,
@@ -1224,6 +1237,8 @@ def sprint(
         code_generation=code_generation,
         deploy=deploy_config,
         autonomy_policy=AutonomyPolicy(level=autonomy_level),
+        default_base_branch=p.branch.default_base_branch,
+        branch_name_template=p.branch.branch_name_template,
     )
     result = flow.bootstrap(
         sprint_id=sprint_id,
@@ -1511,11 +1526,31 @@ def configure_defaults_cmd(
         "--auto-full-mode/--no-auto-full-mode",
         help="Route `sendsprint sprint` to continuous full mode when a default workspace exists.",
     ),
+    branch_template: str | None = typer.Option(
+        None,
+        "--branch-template",
+        help=(
+            "Branch name template for new features "
+            "(e.g. 'feature/{number}-{title}'). Stored in profile.branch."
+        ),
+    ),
+    base_branch: str | None = typer.Option(
+        None,
+        "--base-branch",
+        help="Base branch / PR target for new features (e.g. main, develop).",
+    ),
 ) -> None:
     """Persist the local operational defaults for SendSprint."""
     resolved_repo = repo_path.expanduser().resolve()
     resolved_workspace = workspace_file.expanduser().resolve() if workspace_file else None
     auto_full = bool(auto_full_mode and resolved_workspace)
+    branch_updates: dict[str, object] = {}
+    if branch_template is not None:
+        branch_updates["branch.branch_name_template"] = branch_template
+        branch_updates["branch.prompted"] = True
+    if base_branch is not None:
+        branch_updates["branch.default_base_branch"] = base_branch
+        branch_updates["branch.prompted"] = True
     profile_mod.update(
         default_repo_path=str(resolved_repo),
         default_workspace=str(resolved_workspace) if resolved_workspace else None,
@@ -1528,11 +1563,16 @@ def configure_defaults_cmd(
             "runtime.auto_full_mode": auto_full,
             "runtime.watch_interval_minutes": watch_interval,
             "runtime.default_mode": "full",
+            **branch_updates,
         },
     )
     console.print(f"[green]defaults configured[/green] repo={resolved_repo}")
     if resolved_workspace:
         console.print(f"[green]workspace default[/green] {resolved_workspace}")
+    if branch_template is not None:
+        console.print(f"[green]branch template[/green] {branch_template}")
+    if base_branch is not None:
+        console.print(f"[green]base branch[/green] {base_branch}")
     else:
         console.print(
             "[yellow]note:[/yellow] no default workspace configured; "
@@ -1741,6 +1781,51 @@ def _interactive_picker() -> tuple[str, list[str] | None]:
         keys = [k.strip() for k in raw.split(",") if k.strip()]
         return "all", keys or None
     return "mine", None
+
+
+_DEFAULT_BRANCH_TEMPLATE = "feature/{number}-{title}"
+_DEFAULT_BASE_BRANCH = "main"
+
+
+def _ensure_branch_preferences(
+    profile_state: profile_mod.Profile,
+    *,
+    workspace_provides: bool,
+    interactive: bool = True,
+) -> profile_mod.Profile:
+    """Ask once for branch name template and base branch; persist to profile.
+
+    The prompt fires only when:
+      - no workspace.yaml has these values (the workspace is the local source of truth),
+      - the profile has not yet been prompted (``branch.prompted`` is False),
+      - and we are running in an interactive context (``stdin.isatty()``).
+
+    After the first call, ``branch.prompted`` is set to True even when the user
+    accepted the defaults so we never bother them again. To re-prompt explicitly,
+    the user can run ``sendsprint configure-defaults`` (or edit profile.yaml).
+    """
+    if profile_state.branch.prompted:
+        return profile_state
+    if workspace_provides:
+        return profile_mod.update(**{"branch.prompted": True})
+    if not interactive or not sys.stdin.isatty():
+        return profile_state
+    console.print(
+        "[bold cyan]one-time branch setup[/bold cyan] "
+        "(saved to ~/.config/sendsprint/profile.yaml — asked only once)"
+    )
+    console.print("[dim]template tokens: {number} {key} {id} {title} {repo}[/dim]")
+    template_default = profile_state.branch.branch_name_template or _DEFAULT_BRANCH_TEMPLATE
+    base_default = profile_state.branch.default_base_branch or _DEFAULT_BASE_BRANCH
+    template = typer.prompt("branch name template", default=template_default)
+    base = typer.prompt("base branch (target for new feature PRs)", default=base_default)
+    return profile_mod.update(
+        **{
+            "branch.branch_name_template": template.strip() or template_default,
+            "branch.default_base_branch": base.strip() or base_default,
+            "branch.prompted": True,
+        }
+    )
 
 
 catalog_app = typer.Typer(

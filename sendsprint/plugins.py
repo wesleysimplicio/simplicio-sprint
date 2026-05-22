@@ -206,11 +206,7 @@ def result_to_json(result: PluginInstallResult) -> dict[str, object]:
 
 
 def _read_template(name: str) -> str:
-    return (
-        resources.files("sendsprint.plugin_templates")
-        .joinpath(name)
-        .read_text(encoding="utf-8")
-    )
+    return resources.files("sendsprint.plugin_templates").joinpath(name).read_text(encoding="utf-8")
 
 
 def _write_plugin_file(

@@ -56,6 +56,26 @@ sendsprint run jira 42 --workspace workspace.yaml --scope mine -o report.json
 sendsprint run azuredevops "Sprint 12" --repo ./repo
 ```
 
+## First-run prompts (one-time, persisted)
+
+The first interactive `sendsprint sprint` or `sendsprint run` without a
+workspace.yaml that pins the values asks for:
+
+- **branch name template** (default `feature/{number}-{title}`),
+  tokens `{number}`, `{key}`, `{id}`, `{title}`, `{repo}`;
+- **base branch** for new feature PRs (default `main`).
+
+Stored at `~/.config/sendsprint/profile.yaml` under `branch:`. The
+`branch.prompted: true` flag guarantees no re-prompt on later runs.
+Non-interactive override:
+
+```bash
+sendsprint configure-defaults --branch-template "<template>" --base-branch <branch>
+```
+
+If a workspace.yaml provides the values, the prompt is silently
+skipped and the profile is still marked prompted.
+
 ---
 
 ## Padrão de código

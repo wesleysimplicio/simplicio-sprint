@@ -115,10 +115,7 @@ class RouteDecision(BaseModel):
     signals: list[str] = Field(default_factory=list)
 
     def gate_message(self) -> str:
-        return (
-            f"{self.item_key}: low-confidence route to {self.repo_label} blocked "
-            f"({self.reason})"
-        )
+        return f"{self.item_key}: low-confidence route to {self.repo_label} blocked ({self.reason})"
 
 
 def route_item_to_repo(

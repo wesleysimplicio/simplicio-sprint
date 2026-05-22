@@ -79,9 +79,7 @@ def auth_jira(req: JiraAuthRequest) -> AuthResponse:
                     "jira.email": req.email,
                     "jira.last_sprint_url": req.sprint_url or None,
                     "jira.default_sprint_id": (
-                        int(req.sprint_id)
-                        if req.sprint_id and req.sprint_id.isdigit()
-                        else None
+                        int(req.sprint_id) if req.sprint_id and req.sprint_id.isdigit() else None
                     ),
                 },
             )
@@ -128,7 +126,7 @@ def auth_azure(req: AzureAuthRequest) -> AuthResponse:
     parsed = parse_azure_sprint_url(req.sprint_url) if req.sprint_url else None
     org = (req.organization or (parsed.organization if parsed else "")).strip("/")
     project = (req.project or (parsed.project if parsed else "")).strip("/")
-    team = (req.team or (parsed.team if parsed else "")).strip("/") or None
+    team = (req.team or (parsed.team if parsed else "") or "").strip("/") or None
     user_email = (req.user_email or "").strip().lower() or None
     account = f"{org}/{project}" if org and project else ""
     pat = (req.pat or "").strip()

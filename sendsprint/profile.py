@@ -47,6 +47,16 @@ class LlmProfile(BaseModel):
     model: str = "claude-opus-4-7"
 
 
+class BranchProfile(BaseModel):
+    """User-level branch naming defaults, asked once at first interactive run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    branch_name_template: str | None = None
+    default_base_branch: str | None = None
+    prompted: bool = False
+
+
 class RuntimeProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -71,6 +81,7 @@ class Profile(BaseModel):
     azuredevops: AzureDevopsProfile = Field(default_factory=AzureDevopsProfile)
     llm: LlmProfile = Field(default_factory=LlmProfile)
     runtime: RuntimeProfile = Field(default_factory=RuntimeProfile)
+    branch: BranchProfile = Field(default_factory=BranchProfile)
     updated_at: str | None = None  # ISO 8601 UTC
 
 
