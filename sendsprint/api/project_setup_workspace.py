@@ -49,15 +49,15 @@ def _repo_to_workspace_repo(project_setup: dict[str, object], raw: object) -> di
         raise ValueError("Each repository needs a local repo path.")
     if _looks_remote(repo_path):
         repo_name = str(raw.get("name") or repo_path)
-        raise ValueError(
-            f"Repository '{repo_name}' must point to a local path, not a remote URL."
-        )
+        raise ValueError(f"Repository '{repo_name}' must point to a local path, not a remote URL.")
     return {
         "name": str(raw.get("name") or "").strip() or Path(repo_path).name,
         "path": repo_path,
         "project": str(raw.get("project") or "").strip() or None,
         "role": _map_repo_role(str(raw.get("role") or "other")),
-        "pr_target_branch": _resolve_project_setup_value(project_setup, raw, "deployTargetBranch", "dev"),
+        "pr_target_branch": _resolve_project_setup_value(
+            project_setup, raw, "deployTargetBranch", "dev"
+        ),
         "branch_pattern": _resolve_project_setup_value(project_setup, raw, "branchPattern"),
         "commit_pattern": _resolve_project_setup_value(project_setup, raw, "commitPattern"),
         "validation_commands": _string_list(raw.get("validationCommands")),

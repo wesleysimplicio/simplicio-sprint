@@ -95,8 +95,7 @@ def detect_browser_agents() -> list[BrowserAgentAvailability]:
             continue
 
         reason = (
-            "set "
-            f"{env_name} to enable this browser-agent adapter"
+            f"set {env_name} to enable this browser-agent adapter"
             if key != "codex"
             else "codex executable not found on PATH"
         )

@@ -243,4 +243,3 @@ class BacklogStateStore:
         sprint.updated_at = _now_utc()
         self.save(state)
         return card
-

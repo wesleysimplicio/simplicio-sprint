@@ -1814,17 +1814,11 @@ def _ensure_branch_preferences(
         "[bold cyan]one-time branch setup[/bold cyan] "
         "(saved to ~/.config/sendsprint/profile.yaml — asked only once)"
     )
-    console.print(
-        "[dim]template tokens: {number} {key} {id} {title} {repo}[/dim]"
-    )
-    template_default = (
-        profile_state.branch.branch_name_template or _DEFAULT_BRANCH_TEMPLATE
-    )
+    console.print("[dim]template tokens: {number} {key} {id} {title} {repo}[/dim]")
+    template_default = profile_state.branch.branch_name_template or _DEFAULT_BRANCH_TEMPLATE
     base_default = profile_state.branch.default_base_branch or _DEFAULT_BASE_BRANCH
     template = typer.prompt("branch name template", default=template_default)
-    base = typer.prompt(
-        "base branch (target for new feature PRs)", default=base_default
-    )
+    base = typer.prompt("base branch (target for new feature PRs)", default=base_default)
     return profile_mod.update(
         **{
             "branch.branch_name_template": template.strip() or template_default,
