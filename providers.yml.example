@@ -1,0 +1,19 @@
+# SendSprint v2 cloud-first dispatcher — copy to providers.yml and tune.
+#
+# Spec: .specs/v2/cloud-dispatcher.md (INFRA + ROUTER sub-issues).
+#
+# Adapters with cloud=false (cursor, windsurf, kiro spikes) are still listed
+# so the router can resolve their declared fallback. Drop them from the list
+# entirely if you want the router to forget about them.
+
+max_parallel: 3        # how many dispatches run concurrently
+poll_interval_s: 10    # seconds between poll() calls per ticket
+timeout_s: 1800        # wall-clock budget per ticket (30 min)
+
+providers:
+  - name: claude       # first-class: needs ANTHROPIC_API_KEY
+  - name: codex        # first-class: needs OPENAI_API_KEY + CODEX_ENVIRONMENT_ID
+  - name: copilot      # first-class: needs GITHUB_TOKEN + COPILOT_TARGET_REPO
+  - name: cursor       # spike: cloud=false, falls back to claude
+  - name: windsurf     # spike: cloud=false, falls back to claude
+  - name: kiro         # spike: cloud=false, falls back to codex
