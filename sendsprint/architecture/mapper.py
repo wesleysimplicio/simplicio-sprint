@@ -84,11 +84,48 @@ class LlmProjectMapperSubstrate:
         return report
 
 
+SIMPLICIO_PROMPT_MARKER_START = "<!-- simplicio-prompt:start -->"
+SIMPLICIO_PROMPT_MARKER_FILES = (
+    "CLAUDE.md",
+    "AGENTS.md",
+    "CONVENTIONS.md",
+    ".cursorrules",
+    ".cursor/rules/simplicio-prompt.mdc",
+    ".github/copilot-instructions.md",
+    ".clinerules/simplicio-prompt.md",
+)
+
+
+class SimplicioPromptSubstrate:
+    """Recognize repos seeded with the simplicio-prompt instruction block.
+
+    The simplicio-prompt npm package does not write a dedicated lock file; it
+    embeds an HTML start/end marker inside per-IDE instruction files (CLAUDE.md,
+    AGENTS.md, .cursorrules, .github/copilot-instructions.md, etc.). Presence of
+    the start marker in any of those files is the canonical signal.
+    """
+
+    name = "simplicio-prompt"
+
+    def inspect(self, repo_path: Path) -> ArchitectureReport | None:
+        if not _has_simplicio_prompt_marker(repo_path):
+            return None
+        report = _native_report(repo_path)
+        report.mapping_substrate = self.name
+        report.has_agentic_starter = True
+        report.missing = _missing(report)
+        report.score = _score(report)
+        return report
+
+
 class ArchitectureMapper:
     """Inspects a repo path and produces an ArchitectureReport."""
 
     def __init__(self, substrates: list[MappingSubstrate] | None = None) -> None:
-        self.substrates = substrates or [LlmProjectMapperSubstrate()]
+        self.substrates = substrates or [
+            SimplicioPromptSubstrate(),
+            LlmProjectMapperSubstrate(),
+        ]
 
     def inspect(self, repo_path: str | Path) -> ArchitectureReport:
         root = Path(repo_path).resolve()
@@ -142,6 +179,20 @@ def _first_existing_dir(root: Path, dirs: tuple[str, ...]) -> Path | None:
 
 def _any_path_exists(root: Path, paths: tuple[str, ...]) -> bool:
     return any((root / p).exists() for p in paths)
+
+
+def _has_simplicio_prompt_marker(root: Path) -> bool:
+    for relative in SIMPLICIO_PROMPT_MARKER_FILES:
+        candidate = root / relative
+        if not candidate.is_file():
+            continue
+        try:
+            text = candidate.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if SIMPLICIO_PROMPT_MARKER_START in text:
+            return True
+    return False
 
 
 def _missing(report: ArchitectureReport) -> list[str]:

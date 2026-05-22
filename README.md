@@ -90,7 +90,9 @@ day now tries to ensure the localhost dashboard is up and opens
 `sendsprint full --workspace ...` starts the continuous watch loop in that mode.
 `sendsprint configure-defaults` persists repo/workspace defaults plus startup
 checks for package dependencies, `llm-project-mapper` refresh, dashboard
-bootstrap, and Python fallback when the web UI is blocked.
+bootstrap, and Python fallback when the web UI is blocked. The
+`simplicio-prompt` instruction block is also refreshed silently on every
+startup (default on; toggle via `--no-update-simplicio-prompt`).
 
 
 Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.

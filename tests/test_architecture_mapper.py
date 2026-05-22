@@ -115,3 +115,43 @@ def test_llm_project_mapper_substrate_marks_repo_as_mapped(tmp_path: Path) -> No
     assert report.has_skill_catalog is True
     assert report.has_agent_catalog is True
     assert report.is_mapped is True
+
+
+def test_simplicio_prompt_substrate_detects_marker_in_claude_md(tmp_path: Path) -> None:
+    (tmp_path / "CLAUDE.md").write_text(
+        "# CLAUDE.md\n\n"
+        "<!-- simplicio-prompt:start -->\n"
+        "prompt body\n"
+        "<!-- simplicio-prompt:end -->\n"
+    )
+    report = ArchitectureMapper().inspect(tmp_path)
+    assert report.mapping_substrate == "simplicio-prompt"
+    assert report.has_agentic_starter is True
+    assert report.is_mapped is True
+
+
+def test_simplicio_prompt_substrate_detects_marker_in_cursor_rules(tmp_path: Path) -> None:
+    rules_dir = tmp_path / ".cursor" / "rules"
+    rules_dir.mkdir(parents=True)
+    (rules_dir / "simplicio-prompt.mdc").write_text(
+        "<!-- simplicio-prompt:start -->\nbody\n<!-- simplicio-prompt:end -->\n"
+    )
+    report = ArchitectureMapper().inspect(tmp_path)
+    assert report.mapping_substrate == "simplicio-prompt"
+
+
+def test_simplicio_prompt_substrate_skipped_when_marker_absent(tmp_path: Path) -> None:
+    (tmp_path / "CLAUDE.md").write_text("# CLAUDE.md\n\nplain instructions without the marker\n")
+    report = ArchitectureMapper().inspect(tmp_path)
+    assert report.mapping_substrate == "native"
+
+
+def test_simplicio_prompt_takes_precedence_over_llm_project_mapper(tmp_path: Path) -> None:
+    (tmp_path / ".llm-project-mapper.json").write_text("{}")
+    (tmp_path / ".skills").mkdir(parents=True)
+    (tmp_path / ".skills" / "README.md").write_text("# Skills")
+    (tmp_path / "CLAUDE.md").write_text(
+        "<!-- simplicio-prompt:start -->\nbody\n<!-- simplicio-prompt:end -->\n"
+    )
+    report = ArchitectureMapper().inspect(tmp_path)
+    assert report.mapping_substrate == "simplicio-prompt"

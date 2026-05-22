@@ -109,6 +109,7 @@ flowchart TD
     CLI --> BOOT["runtime_bootstrap.py"]
     BOOT --> DOC["doctor.py"]
     BOOT --> MAP["llm-project-mapper --update"]
+    BOOT --> SPR["simplicio-prompt --install-all (silent)"]
     BOOT --> LOCAL["web_runtime.py"]
     LOCAL --> API["FastAPI API :8765"]
     LOCAL --> UI["Expo Web :8081"]
@@ -165,6 +166,7 @@ Todo comando principal (`run`, `sprint`, `watch`, `full`) passa por bootstrap op
 4. opcionalmente:
    - verificar dependências com `doctor.py`;
    - atualizar `llm-project-mapper`;
+   - atualizar `simplicio-prompt` (default ligado, execução silenciosa);
    - subir API local;
    - subir UI web;
    - abrir browser uma vez por dia;
@@ -181,6 +183,7 @@ Todo comando principal (`run`, `sprint`, `watch`, `full`) passa por bootstrap op
 ### Comandos efetivos usados no bootstrap
 
 - `npx -y @wesleysimplicio/llm-project-mapper@latest --update`
+- `npx -y simplicio-prompt@latest --install-all` (silencioso, default ligado)
 - `python -m sendsprint.api`
 - `npm run dev -- --port 8081 --non-interactive`
 

@@ -41,6 +41,7 @@ def test_operational_bootstrap_updates_mapper_and_uses_python_fallback(
         runtime=RuntimeProfile(
             verify_dependencies_on_start=True,
             update_llm_project_mapper_on_start=True,
+            update_simplicio_prompt_on_start=False,
             start_dashboard_on_start=True,
             open_browser_on_start=False,
             fallback_to_python_when_web_blocked=True,
@@ -79,7 +80,84 @@ def test_operational_bootstrap_warns_when_npx_missing(monkeypatch, tmp_path: Pat
         runtime=RuntimeProfile(
             verify_dependencies_on_start=True,
             update_llm_project_mapper_on_start=True,
+            update_simplicio_prompt_on_start=False,
         ),
     )
 
     assert any(note.name == "llm-project-mapper" for note in report.notes)
+
+
+def test_operational_bootstrap_updates_simplicio_prompt(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        "sendsprint.runtime_bootstrap.run_doctor",
+        lambda *args, **kwargs: SimpleNamespace(ok=True),
+    )
+    monkeypatch.setattr(
+        "sendsprint.runtime_bootstrap.ensure_localhost_control_plane",
+        lambda **kwargs: SimpleNamespace(
+            api_url="http://127.0.0.1:8765",
+            ui_url="http://localhost:8081",
+            api_running=True,
+            api_started=True,
+            ui_running=True,
+            ui_started=True,
+            warnings=[],
+        ),
+    )
+    monkeypatch.setattr("sendsprint.runtime_bootstrap.shutil.which", lambda command: "npx")
+
+    commands: list[list[str]] = []
+
+    def fake_run(cmd, **kwargs):
+        commands.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "ok", "")
+
+    report = run_operational_bootstrap(
+        tmp_path,
+        runtime=RuntimeProfile(
+            verify_dependencies_on_start=False,
+            update_llm_project_mapper_on_start=False,
+            update_simplicio_prompt_on_start=True,
+            start_dashboard_on_start=False,
+            open_browser_on_start=False,
+        ),
+        runner=fake_run,
+    )
+
+    assert report.simplicio_prompt_updated is True
+    assert commands == [["npx", "-y", "simplicio-prompt@latest", "--install-all"]]
+    assert any(
+        note.name == "simplicio-prompt" and note.status == "ok" for note in report.notes
+    )
+
+
+def test_operational_bootstrap_warns_when_npx_missing_for_simplicio_prompt(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr("sendsprint.runtime_bootstrap.shutil.which", lambda command: None)
+    monkeypatch.setattr(
+        "sendsprint.runtime_bootstrap.ensure_localhost_control_plane",
+        lambda **kwargs: SimpleNamespace(
+            api_url="http://127.0.0.1:8765",
+            ui_url="http://localhost:8081",
+            api_running=False,
+            api_started=False,
+            ui_running=False,
+            ui_started=False,
+            warnings=[],
+        ),
+    )
+
+    report = run_operational_bootstrap(
+        tmp_path,
+        runtime=RuntimeProfile(
+            verify_dependencies_on_start=False,
+            update_llm_project_mapper_on_start=False,
+            update_simplicio_prompt_on_start=True,
+            start_dashboard_on_start=False,
+            open_browser_on_start=False,
+        ),
+    )
+
+    assert report.simplicio_prompt_updated is False
+    assert any(note.name == "simplicio-prompt" and note.status == "warn" for note in report.notes)
