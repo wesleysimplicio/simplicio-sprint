@@ -492,8 +492,30 @@ install repo-local plugin adapters for the main assistant hosts:
 
 ```bash
 sendsprint plugins list
-sendsprint plugins install --repo . --all
+sendsprint plugins install --repo . --all                       # flat rule files (all hosts)
+sendsprint plugins install --repo . --packaged --all            # full plugin packages where supported
+sendsprint plugins install --repo . --packaged --platform claude  # one host at a time
 ```
+
+### Full plugin packages
+
+Four hosts ship a **complete plugin package** (manifest + commands + agents +
+skills + hooks), not just a rule file. Source lives in
+[`plugins/`](./plugins/):
+
+| Host | Package | Manifest | Install target |
+|---|---|---|---|
+| Claude Code | `plugins/claude-code/` | `.claude-plugin/plugin.json` | `.claude/plugins/sendsprint/` |
+| Codex CLI | `plugins/codex/` | `plugin.toml` + `AGENTS.md` + `config.toml` | `.codex/plugins/sendsprint/` |
+| Hermes Agent | `plugins/hermes/` | `hermes-plugin.json` | `.hermes/plugins/sendsprint/` |
+| OpenClaw | `plugins/openclaw/` | `openclaw-plugin.json` | `.openclaw/plugins/sendsprint/` |
+
+`--packaged` runs the full-tree install for the four hosts above and falls back
+to the flat rule file for the rest (Cursor, Windsurf, Kiro, Antigravity,
+Copilot). See [plugins/README.md](./plugins/README.md) for per-host install
+notes.
+
+### Flat rule files (legacy mode)
 
 | File | Platform |
 |------|---------|

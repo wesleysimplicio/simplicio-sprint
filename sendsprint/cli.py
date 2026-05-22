@@ -340,10 +340,25 @@ def plugin_install_cmd(
     force: bool = typer.Option(False, "--force", help="Overwrite existing plugin files"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show changes without writing"),
     json_output: bool = typer.Option(False, "--json", help="Print install result as JSON"),
+    packaged: bool = typer.Option(
+        False,
+        "--packaged",
+        help=(
+            "Install the full plugin package (commands, agents, skills, hooks, manifest) "
+            "instead of the flat rule file. Supported for claude, codex, hermes and "
+            "openclaw; other platforms fall back to flat install."
+        ),
+    ),
 ) -> None:
     """Install repo-local plugins for Claude, Codex, Hermes, OpenClaw, Cursor and Copilot."""
     selected = None if all_platforms or not platform else _parse_plugin_platforms(platform)
-    result = install_plugins(repo_path, platforms=selected, force=force, dry_run=dry_run)
+    result = install_plugins(
+        repo_path,
+        platforms=selected,
+        force=force,
+        dry_run=dry_run,
+        packaged=packaged,
+    )
     payload = plugin_result_to_json(result)
 
     if json_output:

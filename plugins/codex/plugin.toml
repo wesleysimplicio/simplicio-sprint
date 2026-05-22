@@ -1,0 +1,45 @@
+# SendSprint — Codex CLI plugin manifest
+# Drop this folder into ~/.codex/plugins/sendsprint (or use `sendsprint plugins install --platform codex --packaged`).
+# Codex auto-loads AGENTS.md, merges `config.toml`, registers prompts under prompts/, and runs hooks declared in hooks/hooks.json.
+
+[plugin]
+name = "sendsprint"
+version = "0.3.0"
+description = "SendSprint multi-agent sprint delivery flow as a Codex plugin (Jira/ADO → PR)."
+author = "Wesley Simplicio <wesleybob4@gmail.com>"
+license = "MIT"
+homepage = "https://github.com/wesleysimplicio/sendsprint"
+
+[runtime]
+type = "python-cli"
+entrypoint = "sendsprint"
+min_version = "0.22.0"
+install_hint = "pip install sendsprint && playwright install chromium"
+
+[layout]
+agents_md = "AGENTS.md"
+config_snippet = "config.toml"
+prompts_dir = "prompts"
+hooks_file = "hooks/hooks.json"
+
+[triggers]
+phrases_pt = [
+  "rode o sendsprint",
+  "executar sprint",
+  "entregar sprint",
+  "processar sprint do jira",
+  "processar sprint do ado",
+]
+phrases_en = [
+  "run sendsprint",
+  "ship my sprint",
+  "deliver sprint",
+  "process jira sprint",
+  "process ado sprint",
+]
+phrases_es = [
+  "ejecutar sprint",
+  "procesar sprint",
+  "entregar sprint",
+]
+slash = ["/sendsprint", "/sendsprint-doctor", "/sendsprint-watch"]
