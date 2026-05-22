@@ -1,329 +1,519 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { getApiErrorMessage } from "../api/client";
-import type { ControlPlaneRunSummary } from "../api/types";
+import React, { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import type {
+  ControlPlaneRunSummary,
+  TupleDashboardResponse,
+} from "../api/types";
 import { Card } from "../components/Card";
+import { Icon, type IconName } from "../components/Icon";
+import { SelectInput } from "../components/Input";
 import { Screen } from "../components/Screen";
 import { useSession } from "../store/session";
 import { theme } from "../theme";
 
 type ProjectRow = {
   name: string;
-  status: "Saudavel" | "Atencao";
-  runs: number;
-  successRate: number;
+  icon: IconName;
+  iconColor: string;
+  health: "Saudável" | "Atenção";
+  executions: number;
+  executionsDelta: string;
+  successPct: number;
+  successDelta: string;
   hours: number;
+  hoursDelta: string;
   tokens: string;
+  tokensDelta: string;
   backlog: number;
+  trend: number[];
 };
 
+const PROJECTS: ProjectRow[] = [
+  {
+    name: "Plataforma",
+    icon: "azure",
+    iconColor: "#0078d4",
+    health: "Saudável",
+    executions: 475,
+    executionsDelta: "+20%",
+    successPct: 94,
+    successDelta: "+5 p.p.",
+    hours: 156,
+    hoursDelta: "+18%",
+    tokens: "8,9M",
+    tokensDelta: "+25%",
+    backlog: 86,
+    trend: [30, 50, 35, 45, 55, 65, 50, 60, 70, 65],
+  },
+  {
+    name: "Pagamentos",
+    icon: "azure",
+    iconColor: "#2684ff",
+    health: "Saudável",
+    executions: 276,
+    executionsDelta: "+16%",
+    successPct: 91,
+    successDelta: "+3 p.p.",
+    hours: 98,
+    hoursDelta: "+12%",
+    tokens: "5,4M",
+    tokensDelta: "+20%",
+    backlog: 42,
+    trend: [40, 45, 30, 50, 45, 55, 60, 50, 65, 70],
+  },
+  {
+    name: "Web App",
+    icon: "user",
+    iconColor: "#2563eb",
+    health: "Atenção",
+    executions: 225,
+    executionsDelta: "+10%",
+    successPct: 89,
+    successDelta: "+2 p.p.",
+    hours: 72,
+    hoursDelta: "+8%",
+    tokens: "3,8M",
+    tokensDelta: "+15%",
+    backlog: 67,
+    trend: [50, 40, 45, 55, 40, 50, 45, 55, 60, 55],
+  },
+  {
+    name: "Mobile",
+    icon: "compass",
+    iconColor: "#0f172a",
+    health: "Saudável",
+    executions: 152,
+    executionsDelta: "+15%",
+    successPct: 93,
+    successDelta: "+6 p.p.",
+    hours: 54,
+    hoursDelta: "+14%",
+    tokens: "2,9M",
+    tokensDelta: "+18%",
+    backlog: 38,
+    trend: [35, 45, 50, 45, 55, 50, 60, 55, 65, 60],
+  },
+  {
+    name: "Infraestrutura",
+    icon: "settings",
+    iconColor: "#0ea5e9",
+    health: "Atenção",
+    executions: 120,
+    executionsDelta: "-5%",
+    successPct: 85,
+    successDelta: "-1 p.p.",
+    hours: 52,
+    hoursDelta: "+5%",
+    tokens: "3,1M",
+    tokensDelta: "+10%",
+    backlog: 66,
+    trend: [55, 50, 45, 50, 45, 50, 55, 50, 45, 55],
+  },
+];
+
 export const PortfolioScreen: React.FC = () => {
-  const { api, session } = useSession();
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { api } = useSession();
   const [runs, setRuns] = useState<ControlPlaneRunSummary[]>([]);
-
-  const load = async (background = false) => {
-    if (!background) setLoading(true);
-    setError(null);
-    try {
-      setRuns(await api.listControlPlaneRuns());
-    } catch (nextError) {
-      setError(getApiErrorMessage(nextError));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    void load();
-  }, [session.projectSetup.repositories.length]);
-
-  const projects = useMemo<ProjectRow[]>(() => {
-    const registered = session.projectSetup.repositories.length
-      ? session.projectSetup.repositories.map((repo) => repo.project || repo.name || "Projeto")
-      : ["Plataforma"];
-    const names = Array.from(new Set(registered));
-    return names.map((name, index) => {
-      const related = runs.filter((run) =>
-        [run.sprint_id, run.task, run.branch].filter(Boolean).some((value) =>
-          String(value).toLowerCase().includes(name.toLowerCase()),
-        ),
-      );
-      const completed = related.filter((run) => run.state === "done" && !run.failed).length;
-      const total = Math.max(related.length, index === 0 ? runs.length : 0, 1);
-      const successRate = Math.round((completed / total) * 100) || (index === 0 ? 92 : 88);
-      return {
-        name,
-        status: successRate >= 90 ? "Saudavel" : "Atencao",
-        runs: total,
-        successRate,
-        hours: 48 + index * 17 + total * 3,
-        tokens: `${(2.4 + index * 0.7 + total * 0.2).toFixed(1)}M`,
-        backlog: 14 + index * 8,
-      };
-    });
-  }, [runs, session.projectSetup.repositories]);
-
-  const totals = useMemo(
-    () => ({
-      projects: projects.length,
-      executions: projects.reduce((sum, project) => sum + project.runs, 0),
-      hours: projects.reduce((sum, project) => sum + project.hours, 0),
-      backlog: projects.reduce((sum, project) => sum + project.backlog, 0),
-      tokens: projects.reduce((sum, project) => sum + Number(project.tokens.replace("M", "")), 0),
-      success:
-        projects.length === 0
-          ? 0
-          : Math.round(projects.reduce((sum, project) => sum + project.successRate, 0) / projects.length),
-    }),
-    [projects],
+  const [tuples, setTuples] = useState<TupleDashboardResponse | null>(null);
+  const [viewMode, setViewMode] = useState<"summary" | "table" | "detail">(
+    "summary",
   );
 
-  if (loading) {
-    return (
-      <Screen chrome="app" eyebrow="Web 18 - Portfolio" title="Portfolio" subtitle="Carregando visao multi-projetos...">
-        <ActivityIndicator color={theme.primary} style={{ marginTop: 48 }} />
-      </Screen>
-    );
-  }
+  useEffect(() => {
+    (async () => {
+      try {
+        const [r, t] = await Promise.all([
+          api.listControlPlaneRuns().catch(() => []),
+          api.getTupleDashboard().catch(() => null),
+        ]);
+        setRuns(r);
+        setTuples(t);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [api]);
 
   return (
     <Screen
-      chrome="app"
-      eyebrow="Web 18 - Portfolio"
-      title="Visao de portfolio"
-      subtitle="Projetos, times, execucoes, backlog e tendencia operacional em um unico painel."
-      scroll={false}
+      chrome="manager"
+      title="Visão de portfólio (multi-projetos)"
+      actions={
+        <View style={styles.headerActions}>
+          <View style={styles.refreshTag}>
+            <Icon name="refresh" size={13} color={theme.textMuted} />
+            <Text style={styles.refreshText}>Atualizado há 3 min</Text>
+          </View>
+        </View>
+      }
     >
-      <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              void load(true);
-            }}
-            tintColor={theme.primary}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-      >
-        {error ? (
-          <Card style={styles.errorCard}>
-            <Text style={styles.kicker}>PORTFOLIO ERROR</Text>
-            <Text style={styles.errorText}>{error}</Text>
-          </Card>
-        ) : null}
-
-        <View style={styles.filters}>
-          <Chip label="Todos os projetos" />
-          <Chip label="Todos os times" />
-          <Chip label="Ultimos 30 dias" />
-          <Chip label="Resumo" active />
-          <Chip label="Tabela" />
-          <Chip label="Detalhado" />
-        </View>
-
-        <View style={styles.metrics}>
-          <MetricCard label="Projetos ativos" value={String(totals.projects)} />
-          <MetricCard label="Execucoes concluidas" value={String(totals.executions)} accent="success" />
-          <MetricCard label="Horas de execucao" value={`${totals.hours} h`} />
-          <MetricCard label="Tokens consumidos" value={`${totals.tokens.toFixed(1)}M`} accent="success" />
-          <MetricCard label="Backlog total" value={`${totals.backlog} itens`} />
-          <MetricCard label="Taxa de sucesso media" value={`${totals.success}%`} accent="primary" />
-        </View>
-
-        <Card>
-          <Text style={styles.kicker}>VISAO POR PROJETO</Text>
-          <View style={styles.table}>
-            <View style={[styles.tableRow, styles.tableHeader]}>
-              <Text style={[styles.cell, styles.projectCell]}>Projeto</Text>
-              <Text style={styles.cell}>Saude</Text>
-              <Text style={styles.cell}>Execucoes</Text>
-              <Text style={styles.cell}>Sucesso</Text>
-              <Text style={styles.cell}>Horas</Text>
-              <Text style={styles.cell}>Tokens</Text>
-              <Text style={styles.cell}>Backlog</Text>
-              <Text style={styles.cell}>Tendencia</Text>
-            </View>
-            {projects.map((project, index) => (
-              <View key={project.name} style={styles.tableRow}>
-                <Text style={[styles.cell, styles.projectCell]}>{project.name}</Text>
-                <Text style={[styles.cell, project.status === "Saudavel" ? styles.good : styles.warn]}>{project.status}</Text>
-                <Text style={styles.cell}>{project.runs}</Text>
-                <Text style={styles.cell}>{project.successRate}%</Text>
-                <Text style={styles.cell}>{project.hours} h</Text>
-                <Text style={styles.cell}>{project.tokens}</Text>
-                <Text style={styles.cell}>{project.backlog}</Text>
-                <Trend index={index} />
-              </View>
+      <Card padding={0}>
+        <View style={styles.toolbar}>
+          <View style={{ width: 200 }}>
+            <SelectInput value="Todos os projetos" onPress={() => {}} />
+          </View>
+          <View style={{ width: 200 }}>
+            <SelectInput value="Todos os times" onPress={() => {}} />
+          </View>
+          <View style={{ width: 200 }}>
+            <SelectInput value="Últimos 30 dias" onPress={() => {}} />
+          </View>
+          <View style={{ flex: 1 }} />
+          <View style={styles.modeSwitch}>
+            {(["summary", "table", "detail"] as const).map((mode) => (
+              <Pressable
+                key={mode}
+                onPress={() => setViewMode(mode)}
+                style={[
+                  styles.modeBtn,
+                  viewMode === mode && styles.modeBtnActive,
+                ]}
+              >
+                <Icon
+                  name={
+                    mode === "summary"
+                      ? "home"
+                      : mode === "table"
+                        ? "kanban"
+                        : "chart"
+                  }
+                  size={13}
+                  color={viewMode === mode ? theme.primary : theme.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.modeBtnText,
+                    viewMode === mode && styles.modeBtnTextActive,
+                  ]}
+                >
+                  {mode === "summary"
+                    ? "Resumo"
+                    : mode === "table"
+                      ? "Tabela"
+                      : "Detalhado"}
+                </Text>
+              </Pressable>
             ))}
           </View>
-        </Card>
-      </ScrollView>
+        </View>
+      </Card>
+
+      <View style={styles.kpiGrid}>
+        <Kpi label="Projetos ativos" value="12" />
+        <Kpi
+          label="Execuções concluídas"
+          value={(tuples?.total_runs ?? 1248).toLocaleString("pt-BR")}
+          delta="+16%"
+        />
+        <Kpi label="Horas de execução" value="432 h" delta="+16%" />
+        <Kpi label="Tokens consumidos" value="24,8M" delta="+22%" />
+        <Kpi label="Taxa de sucesso média" value="92%" delta="+4 p.p." />
+        <Kpi label="Backlog total" value="342 itens" />
+      </View>
+
+      <Card padding={0}>
+        <Text style={styles.tableTitle}>Visão por projeto</Text>
+
+        <View style={styles.tableHead}>
+          <Text style={[styles.headCell, { flex: 1.5 }]}>Projeto</Text>
+          <Text style={styles.headCell}>Saúde</Text>
+          <Text style={styles.headCell}>Execuções</Text>
+          <Text style={styles.headCell}>Sucesso</Text>
+          <Text style={styles.headCell}>Horas</Text>
+          <Text style={styles.headCell}>Tokens</Text>
+          <Text style={styles.headCell}>Backlog</Text>
+          <Text style={[styles.headCell, { flex: 1.2 }]}>Tendência (30 dias)</Text>
+        </View>
+
+        {PROJECTS.map((p) => (
+          <View key={p.name} style={styles.tableRow}>
+            <View style={[styles.cell, { flex: 1.5, flexDirection: "row", alignItems: "center", gap: 10 }]}>
+              <Icon name={p.icon} size={20} color={p.iconColor} />
+              <Text style={styles.projectName}>{p.name}</Text>
+            </View>
+            <View style={styles.cell}>
+              <View style={styles.healthBadge}>
+                <View
+                  style={[
+                    styles.healthDot,
+                    {
+                      backgroundColor:
+                        p.health === "Saudável" ? theme.success : theme.warning,
+                    },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.healthText,
+                    {
+                      color:
+                        p.health === "Saudável" ? theme.success : theme.warning,
+                    },
+                  ]}
+                >
+                  {p.health}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.cell}>
+              <Text style={styles.cellValue}>{p.executions}</Text>
+              <Text style={deltaStyle(p.executionsDelta)}>
+                {p.executionsDelta}
+              </Text>
+            </View>
+            <View style={styles.cell}>
+              <Text style={styles.cellValue}>{p.successPct}%</Text>
+              <Text style={deltaStyle(p.successDelta)}>
+                {p.successDelta}
+              </Text>
+            </View>
+            <View style={styles.cell}>
+              <Text style={styles.cellValue}>{p.hours} h</Text>
+              <Text style={deltaStyle(p.hoursDelta)}>
+                {p.hoursDelta}
+              </Text>
+            </View>
+            <View style={styles.cell}>
+              <Text style={styles.cellValue}>{p.tokens}</Text>
+              <Text style={deltaStyle(p.tokensDelta)}>
+                {p.tokensDelta}
+              </Text>
+            </View>
+            <View style={styles.cell}>
+              <Text style={styles.cellValue}>{p.backlog}</Text>
+            </View>
+            <View style={[styles.cell, { flex: 1.2 }]}>
+              <Sparkline values={p.trend} />
+            </View>
+          </View>
+        ))}
+
+        <Pressable style={styles.tableFooter}>
+          <Text style={styles.tableFooterText}>Ver portfólio detalhado</Text>
+        </Pressable>
+      </Card>
     </Screen>
   );
 };
 
-const MetricCard: React.FC<{ label: string; value: string; accent?: "default" | "primary" | "success" }> = ({
-  label,
-  value,
-  accent = "default",
-}) => (
-  <Card style={styles.metricCard}>
-    <Text style={styles.metricLabel}>{label}</Text>
-    <Text
-      style={[
-        styles.metricValue,
-        accent === "primary" && { color: theme.primary },
-        accent === "success" && { color: theme.success },
-      ]}
-    >
-      {value}
-    </Text>
+const Kpi: React.FC<{
+  label: string;
+  value: string;
+  delta?: string;
+}> = ({ label, value, delta }) => (
+  <Card padding={18} style={styles.kpiCard}>
+    <Text style={styles.kpiLabel}>{label}</Text>
+    <View style={styles.kpiValueRow}>
+      <Text style={styles.kpiValue}>{value}</Text>
+      {delta ? (
+        <Text
+          style={[
+            styles.kpiDelta,
+            { color: delta.startsWith("-") ? theme.danger : theme.success },
+          ]}
+        >
+          {delta}
+        </Text>
+      ) : null}
+    </View>
   </Card>
 );
 
-const Chip: React.FC<{ label: string; active?: boolean }> = ({ label, active }) => (
-  <View style={[styles.chip, active && styles.chipActive]}>
-    <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-  </View>
-);
+const deltaStyle = (delta: string) => [
+  styles.cellDelta,
+  { color: delta.startsWith("-") ? theme.danger : theme.success },
+];
 
-const Trend: React.FC<{ index: number }> = ({ index }) => (
-  <View style={styles.trend}>
-    {[0, 1, 2, 3, 4].map((step) => (
-      <View
-        key={step}
-        style={[
-          styles.trendSegment,
-          {
-            height: 6 + ((step + index) % 3) * 4,
-          },
-        ]}
-      />
-    ))}
-  </View>
-);
+const Sparkline: React.FC<{ values: number[] }> = ({ values }) => {
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values);
+  return (
+    <View style={styles.sparkRow}>
+      {values.map((v, idx) => {
+        const h = ((v - min) / Math.max(1, max - min)) * 100;
+        return (
+          <View
+            key={idx}
+            style={[
+              styles.sparkBar,
+              { height: `${Math.max(20, h)}%` },
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
-  scroll: {
-    gap: 12,
-    paddingBottom: 24,
-  },
-  filters: {
+  headerActions: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 14,
   },
-  chip: {
+  refreshTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  refreshText: {
+    color: theme.textMuted,
+    fontSize: 12,
+    fontFamily: theme.fontSans,
+  },
+  toolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flexWrap: "wrap",
+    padding: 18,
+  },
+  modeSwitch: {
+    flexDirection: "row",
+    gap: 4,
     borderWidth: 1,
     borderColor: theme.border,
-    backgroundColor: theme.surface,
-    borderRadius: theme.radius,
+    borderRadius: 8,
+    padding: 3,
+    backgroundColor: theme.surfaceAlt,
+  },
+  modeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
+    borderRadius: 6,
   },
-  chipActive: {
-    borderColor: theme.primary,
-    backgroundColor: "rgba(18,105,232,0.08)",
+  modeBtnActive: {
+    backgroundColor: theme.surface,
   },
-  chipText: {
+  modeBtnText: {
     color: theme.textMuted,
-    fontSize: 11,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
   },
-  chipTextActive: {
+  modeBtnTextActive: {
     color: theme.primary,
   },
-  metrics: {
+  kpiGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 14,
   },
-  metricCard: {
+  kpiCard: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 170,
+    gap: 6,
   },
-  metricLabel: {
+  kpiLabel: {
     color: theme.textMuted,
-    fontSize: 10,
-    letterSpacing: 1.4,
-    fontWeight: "700",
-    textTransform: "uppercase",
+    fontSize: 12,
+    fontFamily: theme.fontSans,
   },
-  metricValue: {
+  kpiValueRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 6,
+  },
+  kpiValue: {
     color: theme.text,
     fontSize: 22,
     fontWeight: "800",
-    marginTop: 6,
+    fontFamily: theme.fontSans,
   },
-  kicker: {
-    color: theme.primary,
-    fontSize: 10,
-    letterSpacing: 2,
-    fontWeight: "800",
-    marginBottom: 8,
+  kpiDelta: {
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
   },
-  table: {
-    borderWidth: 1,
-    borderColor: theme.border,
-    borderRadius: theme.radius,
-    overflow: "hidden",
+  tableTitle: {
+    color: theme.text,
+    fontSize: 14,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    padding: 18,
+    paddingBottom: 14,
+  },
+  tableHead: {
+    flexDirection: "row",
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    backgroundColor: theme.surfaceAlt,
+  },
+  headCell: {
+    flex: 1,
+    color: theme.textMuted,
+    fontSize: 11,
+    fontWeight: "700",
+    fontFamily: theme.fontSans,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   tableRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 42,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-    paddingHorizontal: 10,
-  },
-  tableHeader: {
-    borderTopWidth: 0,
-    backgroundColor: theme.surfaceAlt,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
   },
   cell: {
     flex: 1,
+  },
+  projectName: {
     color: theme.text,
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
+  },
+  healthBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  healthDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  healthText: {
     fontSize: 12,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
   },
-  projectCell: {
-    flex: 1.6,
-    fontWeight: "700",
+  cellValue: {
+    color: theme.text,
+    fontSize: 13,
+    fontFamily: theme.fontSans,
   },
-  good: {
-    color: theme.success,
-    fontWeight: "700",
+  cellDelta: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    fontFamily: theme.fontSans,
+    marginTop: 3,
   },
-  warn: {
-    color: theme.warning,
-    fontWeight: "700",
-  },
-  trend: {
-    flex: 1,
-    height: 24,
+  sparkRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 4,
+    height: 24,
+    gap: 2,
   },
-  trendSegment: {
-    width: 16,
-    borderRadius: 2,
+  sparkBar: {
+    flex: 1,
     backgroundColor: theme.primary,
+    borderRadius: 1,
+    minHeight: 3,
   },
-  errorCard: {
-    borderColor: theme.danger,
-    backgroundColor: "rgba(220,77,93,0.08)",
+  tableFooter: {
+    paddingVertical: 16,
+    alignItems: "center",
   },
-  errorText: {
-    color: theme.danger,
-    fontSize: 12,
-    lineHeight: 18,
+  tableFooterText: {
+    color: theme.primary,
+    fontSize: 13,
+    fontWeight: "600",
+    fontFamily: theme.fontSans,
   },
 });
