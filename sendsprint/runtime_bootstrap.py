@@ -26,6 +26,7 @@ class OperationalBootstrapReport:
     doctor: DoctorReport | None = None
     dashboard: LocalhostRuntimeStatus | None = None
     mapper_updated: bool = False
+    simplicio_prompt_updated: bool = False
     python_fallback_active: bool = False
     notes: list[BootstrapNote] = field(default_factory=list)
 
@@ -61,6 +62,9 @@ def run_operational_bootstrap(
 
     if runtime.update_llm_project_mapper_on_start:
         _update_llm_project_mapper(report, runner=runner)
+
+    if runtime.update_simplicio_prompt_on_start:
+        _update_simplicio_prompt(report, runner=runner)
 
     if runtime.start_dashboard_on_start:
         status = ensure_localhost_control_plane(open_browser=runtime.open_browser_on_start)
@@ -113,6 +117,44 @@ def _update_llm_project_mapper(report: OperationalBootstrapReport, *, runner: Ru
     report.notes.append(
         BootstrapNote(
             name="llm-project-mapper",
+            status="warn",
+            message=message[:500],
+        )
+    )
+
+
+def _update_simplicio_prompt(report: OperationalBootstrapReport, *, runner: Runner) -> None:
+    if not shutil.which("npx"):
+        report.notes.append(
+            BootstrapNote(
+                name="simplicio-prompt",
+                status="warn",
+                message="npx not found; skipping simplicio-prompt update",
+            )
+        )
+        return
+    result = runner(
+        ["npx", "-y", "simplicio-prompt@latest", "--install-all"],
+        cwd=str(report.repo_path),
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+    if result.returncode == 0:
+        report.simplicio_prompt_updated = True
+        report.notes.append(
+            BootstrapNote(
+                name="simplicio-prompt",
+                status="ok",
+                message="simplicio-prompt updated",
+            )
+        )
+        return
+    message = (result.stderr or result.stdout).strip() or "simplicio-prompt update failed"
+    report.notes.append(
+        BootstrapNote(
+            name="simplicio-prompt",
             status="warn",
             message=message[:500],
         )

@@ -62,6 +62,7 @@ class RuntimeProfile(BaseModel):
 
     verify_dependencies_on_start: bool = True
     update_llm_project_mapper_on_start: bool = False
+    update_simplicio_prompt_on_start: bool = True
     start_dashboard_on_start: bool = True
     open_browser_on_start: bool = True
     fallback_to_python_when_web_blocked: bool = True

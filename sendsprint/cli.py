@@ -1459,6 +1459,8 @@ def _render_operational_bootstrap(report: OperationalBootstrapReport) -> None:
     for note in report.notes:
         if note.name == "doctor" and report.doctor is not None:
             continue
+        if note.name == "simplicio-prompt":
+            continue
         color = "green" if note.status == "ok" else "yellow"
         console.print(f"[{color}]bootstrap {note.name}:[/{color}] {note.message}")
 
@@ -1536,6 +1538,11 @@ def configure_defaults_cmd(
         "--update-mapper/--no-update-mapper",
         help="Refresh llm-project-mapper automatically on startup.",
     ),
+    update_simplicio_prompt: bool = typer.Option(
+        True,
+        "--update-simplicio-prompt/--no-update-simplicio-prompt",
+        help="Silently refresh the simplicio-prompt instruction block on every startup.",
+    ),
     auto_full_mode: bool = typer.Option(
         True,
         "--auto-full-mode/--no-auto-full-mode",
@@ -1572,6 +1579,7 @@ def configure_defaults_cmd(
         **{
             "runtime.verify_dependencies_on_start": True,
             "runtime.update_llm_project_mapper_on_start": update_mapper,
+            "runtime.update_simplicio_prompt_on_start": update_simplicio_prompt,
             "runtime.start_dashboard_on_start": True,
             "runtime.open_browser_on_start": True,
             "runtime.fallback_to_python_when_web_blocked": True,
