@@ -287,9 +287,7 @@ def _locate_plugin_package_dir(name: str) -> Path:
     source = Path(__file__).parent.parent / "plugins" / name
     if source.is_dir():
         return source
-    raise FileNotFoundError(
-        f"plugin package '{name}' not found (looked in {bundled} and {source})"
-    )
+    raise FileNotFoundError(f"plugin package '{name}' not found (looked in {bundled} and {source})")
 
 
 def _install_package(
