@@ -100,26 +100,49 @@ worktree and a local CLI, no vendor account.
 
 ## Sub-issue detail
 
-### INGEST — Ingestion: Azure DevOps -> normalized task
+### INGEST — Ingestion: any tracker -> normalized task
 
 **Labels:** `cloud-dispatch,ingestion`
 
 **Context:** SendSprint stops being the source of truth. It reads work items
-from the current sprint via the Azure DevOps MCP and emits a normalized task
-that turns into the PROMPT consumed by the provider cloud.
+from whichever tracker the project uses and emits a normalized task that
+turns into the PROMPT consumed by the provider cloud (or local loop).
 
-**Acceptance Criteria:**
+The operator family covers eleven sources today:
 
-- [ ] Reads current-sprint work items via the Azure DevOps MCP
+| Source       | Module                                | Status     | "Sprint" model      |
+|--------------|---------------------------------------|------------|---------------------|
+| jira         | `operators.jira_operator`             | wired      | sprint (Jira agile) |
+| azuredevops  | `operators.azure_devops_operator`     | wired      | iteration path      |
+| github       | `operators.github_operator`           | wired      | milestone           |
+| gitlab       | `operators.gitlab_operator`           | scaffold   | iteration/milestone |
+| bitbucket    | `operators.bitbucket_operator`        | scaffold   | issues query        |
+| gitee        | `operators.gitee_operator`            | scaffold   | milestone           |
+| linear       | `operators.linear_operator`           | scaffold   | cycle               |
+| clickup      | `operators.clickup_operator`          | scaffold   | list / folder       |
+| trello       | `operators.trello_operator`           | scaffold   | board / list        |
+| slack        | `operators.slack_operator`            | scaffold   | tagged messages     |
+| hermes       | `operators.hermes_operator`           | scaffold   | kanban board        |
+
+Each scaffold validates credentials and raises `TransportUnavailable("not yet
+wired")`; the per-source sub-issues (`*-INGEST`) drop in real REST/GraphQL
+clients without touching the contract.
+
+**Acceptance Criteria (covered or pending per source):**
+
+- [ ] Reads current-sprint work items via the canonical transport
+      (mcp -> api -> playwright) for every operator
 - [ ] Emits a task in the canonical format (Contexto, AC, Out of scope, Test
       plan unit+e2e, DoD, Pegadinhas, Source: link work item)
 - [ ] Idempotent: re-running does not duplicate, it updates on change
 - [ ] Output is a direct prompt for the adapters (no extra translation)
+- [ ] `Sprint.source` enum covers every wired tracker
 
 **Out of scope:** agent execution (separate sub-issue).
 
-**DoD:** Runs against a real sprint, emits at least one valid task carrying
-the work-item link.
+**DoD:** Runs against at least three real trackers (Jira / Azure DevOps /
+GitHub today), emits at least one valid task per source carrying the
+work-item link.
 
 ### IFACE — ProviderAdapter: common interface
 
