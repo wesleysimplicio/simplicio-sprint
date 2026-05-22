@@ -1,231 +1,474 @@
 ---
 name: hyperframes
-description: Renderiza as evidências de uma entrega como vídeo MP4 usando HyperFrames (HTML→MP4 via Node + FFmpeg). Ative quando o usuário pedir vídeo/clipe de evidência de uma sprint, RunReport ou EvidenceBundle, ou quando uma entrega precisar de prova visual além do JSON.
+description: Author HTML→video compositions with the HyperFrames framework. Use whenever the user wants to create, edit, or extend a video composition — including SendSprint delivery-evidence clips. Covers composition data-* attributes, timeline contract, layout-before-animation, scene transitions, deterministic-render rules, design.md sourcing, and quality-check workflow. Companion skills cover CLI (hyperframes-cli), media preprocessing (hyperframes-media), reusable blocks (hyperframes-registry), and animation (hyperframes-gsap).
 ---
 
-# Skill: `hyperframes`
+# HyperFrames
 
-Transforma `RunReport` / `EvidenceBundle` do SendSprint em um vídeo MP4 de evidência usando o framework open-source **HyperFrames** (https://github.com/wesleysimplicio/hyperframes — fork local) ou o upstream (https://github.com/heygen-com/hyperframes). Composições são HTML com `data-*` attributes — sem React, sem DSL proprietária. Sem código vendado dentro do `sendsprint/`; tudo é gerado sob demanda pelo agente.
+HTML is the source of truth for video. A composition is an HTML file with `data-*` attributes for timing, a GSAP timeline for animation, and CSS for appearance. The framework handles clip visibility, media playback, and timeline sync.
 
----
+> Mirror of the upstream `skills/hyperframes/SKILL.md` from https://github.com/wesleysimplicio/hyperframes (fork of https://github.com/heygen-com/hyperframes, Apache 2.0). When this file references `references/<x>.md`, `palettes/<x>.md`, or `visual-styles.md` and the file is not present locally, read the upstream version at `https://raw.githubusercontent.com/wesleysimplicio/hyperframes/main/skills/hyperframes/<path>` before invoking the advanced feature.
 
-## Trigger
+## Approach
 
-Ative essa skill quando o usuário disser/pedir qualquer um destes:
+### Discovery (exploratory requests only)
 
-- pt-BR: "vídeo da entrega", "evidência em vídeo", "renderizar evidências", "gerar clipe da sprint", "hyperframes", "vídeo de prova da entrega"
-- en: "render evidence video", "delivery video", "evidence clip", "hyperframes the run", "video proof of delivery"
-- es: "vídeo de entrega", "evidencia en vídeo"
+For open-ended requests ("make me a product launch video", "create something for our brand") where the user hasn't committed to a direction, understand intent before picking colors:
 
-Ative implicitamente quando:
+- **Audience** — who watches this? Developers? Executives? General consumers?
+- **Platform** — where does it play? Social (15s), website hero, product demo, internal?
+- **Priority** — what matters most? Motion quality? Content accuracy? Brand fidelity? Speed?
+- **Variations** — does the user want options, or a single best shot?
 
-- Existe um `evidence-bundles/evidence-<run_id>/manifest.json` ou `.sendsprint/evidence/<run_id>/bundle.json` no repo e o usuário pede "prova", "evidência visual", "video de demo" da última sprint.
-- Há screenshots em `test-results/` ou no `EvidenceBundle.items` com `type=screenshot` e o objetivo é apresentar para stakeholder não-técnico.
-- O comando `sendsprint bundle-evidence` foi executado e o usuário quer "subir o nível" da entrega.
+For specific requests ("add a title card", "fix the timing on scene 3"), skip discovery.
 
-**Não** ative para:
+For exploratory requests, consider offering 2-3 variations that differ meaningfully — not just color swaps, but different pacing, energy levels, or structural approaches. One safe/expected, one ambitious. Don't mandate this — it's a tool available when appropriate.
 
-- Vídeos institucionais/marketing — esses moram em `video/` (Remotion).
-- Geração de PR body — use `agents/pr_body_builder.py`.
+### Step 1: Design system
 
----
+If `design.md` or `DESIGN.md` exists in the project, read it first (check both casings — they're different files on Linux). It's the source of truth for brand colors, fonts, and constraints. Use its exact values — don't invent colors or substitute fonts. Any format works (YAML frontmatter, prose, tables — just extract the values).
 
-## Steps
+If it names fonts you can't find locally (no `fonts/` directory with `.woff2` files, not a built-in font), warn the user before writing HTML: "design.md specifies [font name] but no font files found. Please add .woff2 files to `fonts/` or I'll fall back to [closest built-in alternative]."
 
-1. **Localize o input**. Pergunte/encontre um destes:
-   - `report.json` (estrutura `sendsprint.models.reports.RunReport`).
-   - `bundle.json` (estrutura `sendsprint.evidence.EvidenceBundle`).
-   - Diretório de evidências (`evidence-bundles/evidence-<run_id>/`).
-2. **Cheque o toolchain** com `node --version`, `ffmpeg -version` e `npx hyperframes --version`. Se algum estiver ausente, registre como `status="skipped"` e ofereça instalar (`npm install -g hyperframes` ou usar `npx hyperframes` direto) — NUNCA falsifique sucesso.
-3. **Gere a composição HTML** em `hyperframes-out/composition.html`. Use o template em `## Composition template` abaixo. Estrutura mínima:
-   - 1 cena `intro` (4s): título da sprint + workspace.
-   - 1 cena `summary` (4s): contagem de steps OK/total, número de PRs, scope.
-   - N cenas `step` (4s cada): uma por `StepReport`, com status colorido (`ok|failed|skipped`).
-   - N cenas `screenshot` (2.5s cada): uma por `TestEvidence(kind="screenshot")` com `path` válido.
-   - 1 cena `outro` (3s): URLs dos PRs criados.
-4. **Escape user content**. Tudo que vier do report (sprint_id, workspace, step.name, step.message, pr.url) passa por `html.escape` em Python ou equivalente. Bug clássico: `sprint_id="<script>"` injeta no `<title>`.
-5. **Renderize o MP4** (opcional, se toolchain disponível):
-   ```bash
-   npx hyperframes render hyperframes-out/composition.html \
-     --out hyperframes-out/evidence-<run_id>.mp4
-   ```
-   Timeout: 600s. Captura `stderr` em caso de exit code ≠ 0.
-6. **Anexe ao bundle**. Se existe um `EvidenceBundle`, adicione o MP4 como item:
-   ```python
-   from sendsprint.evidence import BundleManager, EvidenceItemType
-   mgr = BundleManager()
-   bundle = mgr.load_bundle(run_id)
-   mgr.add_item(bundle, EvidenceItemType.screenshot, "hyperframes-out/evidence-<run_id>.mp4",
-                metadata={"title": "delivery video", "kind": "video/mp4"})
-   ```
-7. **Reporte**. Console output em formato Rich, status colorido (green=ok, yellow=skipped, red=failed) — espelha o padrão dos outros agents.
+If no `design.md` exists, offer the user a choice:
 
----
+1. **User named a style or mood?** → Read `visual-styles.md` for the 8 named presets. Pick the closest match.
+2. **Want to browse options visually?** → Run the design picker workflow.
+3. **Want to skip and go fast?** → Ask: mood, light or dark, any brand colors/fonts? Then pick a palette from `house-style.md` (mirror in this folder).
 
-## Padrões
+**design.md defines the brand. It does not define video composition rules.** Use brand colors at video-appropriate scale — not at web-UI opacity.
 
-- **Naming**: arquivo de saída sempre `composition.html` no diretório alvo. MP4 segue `evidence-<run_id>.mp4`.
-- **Estrutura HTML**: 1 root `<div data-composition-id data-width data-height data-fps>` com `<section class="scene scene--<kind>" data-start data-duration>` internos. Cada `data-start` ≥ ao `data-start + data-duration` da cena anterior (sem overlap).
-- **Resolução padrão**: 1920×1080 @ 30 fps — mesmo do `video/` Remotion stack.
-- **Tema**: paleta dark (`--bg:#0b0f1a`, `--fg:#e8ecff`, `--ok:#6ee7b7`, `--fail:#fca5a5`, `--skip:#fcd34d`, `--accent:#818cf8`). Consistente com `video/src/theme.ts`.
-- **Fallback obrigatório**: se `shutil.which("npx") is None` ou `hyperframes` não instalado, retorne `StepReport(status="skipped", message="…")` — padrão documentado em `AGENTS.md` §5.
-- **Evite**: vendar a lib `hyperframes` no `pyproject.toml`. É opcional, fica fora das dependências do `sendsprint`.
-- **Evite**: misturar com o pipeline Remotion (`video/`) — esse renderiza vídeos institucionais, não evidências por entrega.
-- **Prefira**: subprocess wrapper que aceita `runner=` injetável (para testes com `monkeypatch`).
+### Step 2: Prompt expansion
 
----
+Always run on every composition (except single-scene pieces and trivial edits). Grounds the user's intent against `design.md` and `house-style.md` and produces a consistent intermediate that every downstream agent reads the same way.
 
-## Composition template
+### Step 3: Plan
 
-Use isso como ponto de partida ao gerar o HTML (Python f-string ou template engine — não importa):
+Before writing HTML, think at a high level:
+
+1. **What** — what should the viewer experience? Identify the narrative arc, key moments, and emotional beats.
+2. **Structure** — how many compositions, which are sub-compositions vs inline, what tracks carry what (video, audio, overlays, captions).
+3. **Rhythm** — declare your scene rhythm before implementing. Which scenes are quick hits, which are holds, where do shaders land, where does energy peak. Name the pattern: `fast-fast-SLOW-fast-SHADER-hold`.
+4. **Timing** — which clips drive the duration, where do transitions land, what's the pacing.
+5. **Layout** — build the end-state first. See "Layout Before Animation" below.
+6. **Animate** — then add motion using the rules below.
+
+**Build what was asked.** A request for "a title card" is not a request for "a title card + 3 supporting scenes + ambient music + captions." Every scene, every element, every tween should earn its place. If additional scenes or elements would genuinely improve the piece, propose them — don't add them.
+
+<HARD-GATE>
+Before writing ANY composition HTML — verify you have a visual identity from Step 1. If you're reaching for `#333`, `#3b82f6`, or `Roboto`, you skipped it.
+</HARD-GATE>
+
+## Layout Before Animation
+
+Position every element where it should be at its **most visible moment** — the frame where it's fully entered, correctly placed, and not yet exiting. Write this as static HTML+CSS first. No GSAP yet.
+
+**Why this matters:** If you position elements at their animated start state (offscreen, scaled to 0, opacity 0) and tween them to where you think they should land, you're guessing the final layout. Overlaps are invisible until the video renders. By building the end state first, you can see and fix layout problems before adding any motion.
+
+### The process
+
+1. **Identify the hero frame** for each scene — the moment when the most elements are simultaneously visible. This is the layout you build.
+2. **Write static CSS** for that frame. The `.scene-content` container MUST fill the full scene using `width: 100%; height: 100%; padding: Npx;` with `display: flex; flex-direction: column; gap: Npx; box-sizing: border-box`. Use padding to push content inward — NEVER `position: absolute; top: Npx` on a content container. Absolute-positioned content containers overflow when content is taller than the remaining space. Reserve `position: absolute` for decoratives only.
+3. **Add entrances with `gsap.from()`** — animate FROM offscreen/invisible TO the CSS position. The CSS position is the ground truth; the tween describes the journey to get there. (In sub-compositions loaded via `data-composition-src`, prefer `gsap.fromTo()`.)
+4. **Add exits with `gsap.to()`** — animate TO offscreen/invisible FROM the CSS position.
+
+### Example
+
+```css
+/* scene-content fills the scene, padding positions content */
+.scene-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 120px 160px;
+  gap: 24px;
+  box-sizing: border-box;
+}
+.title    { font-size: 120px; }
+.subtitle { font-size: 42px; }
+```
+
+**WRONG — hardcoded dimensions and absolute positioning:**
+
+```css
+.scene-content {
+  position: absolute;
+  top: 200px;
+  left: 160px;
+  width: 1920px;
+  height: 1080px;
+  display: flex;
+}
+```
+
+```js
+// Step 3: Animate INTO those positions
+tl.from(".title",    { y: 60, opacity: 0, duration: 0.6, ease: "power3.out" }, 0);
+tl.from(".subtitle", { y: 40, opacity: 0, duration: 0.5, ease: "power3.out" }, 0.2);
+tl.from(".logo",     { scale: 0.8, opacity: 0, duration: 0.4, ease: "power2.out" }, 0.3);
+
+// Step 4: Animate OUT from those positions
+tl.to(".title",    { y: -40, opacity: 0, duration: 0.4, ease: "power2.in" }, 3);
+tl.to(".subtitle", { y: -30, opacity: 0, duration: 0.3, ease: "power2.in" }, 3.1);
+tl.to(".logo",     { scale: 0.9, opacity: 0, duration: 0.3, ease: "power2.in" }, 3.2);
+```
+
+### When elements share space across time
+
+If element A exits before element B enters in the same area, both should have correct CSS positions for their respective hero frames. The timeline ordering guarantees they never visually coexist — but if you skip the layout step, you won't catch the case where they accidentally overlap due to a timing error.
+
+### What counts as intentional overlap
+
+Layered effects (glow behind text, shadow elements, background patterns) and z-stacked designs (card stacks, depth layers) are intentional. The layout step is about catching **unintentional** overlap — two headlines landing on top of each other, a stat covering a label, content bleeding off-frame.
+
+## Data Attributes
+
+### All Clips
+
+| Attribute          | Required                          | Values                                                 |
+| ------------------ | --------------------------------- | ------------------------------------------------------ |
+| `id`               | Yes                               | Unique identifier                                      |
+| `data-start`       | Yes                               | Seconds or clip ID reference (`"el-1"`, `"intro + 2"`) |
+| `data-duration`    | Required for img/div/compositions | Seconds. Video/audio defaults to media duration.       |
+| `data-track-index` | Yes                               | Integer. Same-track clips cannot overlap.              |
+| `data-media-start` | No                                | Trim offset into source (seconds)                      |
+| `data-volume`      | No                                | 0-1 (default 1)                                        |
+
+`data-track-index` does **not** affect visual layering — use CSS `z-index`.
+
+### Composition Clips
+
+| Attribute                    | Required | Values                                                            |
+| ---------------------------- | -------- | ----------------------------------------------------------------- |
+| `data-composition-id`        | Yes      | Unique composition ID                                             |
+| `data-start`                 | Yes      | Start time (root composition: use `"0"`)                          |
+| `data-duration`              | Yes      | Takes precedence over GSAP timeline duration                      |
+| `data-width` / `data-height` | Yes      | Pixel dimensions (1920x1080 or 1080x1920)                         |
+| `data-composition-src`       | No       | Path to external HTML file                                        |
+| `data-variable-values`       | No       | JSON object of per-instance variable overrides on a sub-comp host |
+
+On the root `<html>` element:
+
+| Attribute                    | Required | Values                                                                                                         |
+| ---------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `data-composition-variables` | No       | JSON array of declared variables (`id`/`type`/`label`/`default`) — drives Studio editing UI and defaults for `getVariables()` |
+
+## Composition Structure
+
+Sub-compositions loaded via `data-composition-src` use a `<template>` wrapper. **Standalone compositions (the main `index.html`) do NOT use `<template>`** — they put the `data-composition-id` div directly in `<body>`. Using `<template>` on a standalone file hides all content from the browser and breaks rendering.
+
+Sub-composition structure:
+
+```html
+<template id="my-comp-template">
+  <div data-composition-id="my-comp" data-width="1920" data-height="1080">
+    <!-- content -->
+    <style>
+      [data-composition-id="my-comp"] {
+        /* scoped styles */
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      // tweens...
+      window.__timelines["my-comp"] = tl;
+    </script>
+  </div>
+</template>
+```
+
+Load in root:
+
+```html
+<div
+  id="el-1"
+  data-composition-id="my-comp"
+  data-composition-src="compositions/my-comp.html"
+  data-start="0"
+  data-duration="10"
+  data-track-index="1"
+></div>
+```
+
+## Variables (Parametrized Compositions)
+
+Render the same composition with different content — title, theme color, prices, captions — without editing the source HTML.
+
+**Three-step pattern:**
+
+1. **Declare** variables on the composition's `<html>` root with `data-composition-variables`. Each entry needs `id`, `type` (one of `string`, `number`, `color`, `boolean`, `enum`), `label`, and `default`. Enum entries also need `options: [{value, label}, ...]`.
+2. **Read** the resolved values inside the composition's script with `window.__hyperframes.getVariables()`. Returns the merged result of declared defaults + per-instance overrides + CLI overrides.
+3. **Override** at render time with `npx hyperframes render --variables '{...}'` (top-level) or with `data-variable-values='{...}'` on the host element (per-instance for sub-comps).
 
 ```html
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<title>SendSprint evidence — {run_id}</title>
-<style>
-  :root {
-    color-scheme: dark;
-    --bg:#0b0f1a; --fg:#e8ecff; --muted:#8a93b8;
-    --ok:#6ee7b7; --fail:#fca5a5; --skip:#fcd34d; --accent:#818cf8;
-  }
-  body { margin:0; background:var(--bg); color:var(--fg);
-         font-family: ui-sans-serif, system-ui, sans-serif; }
-  .scene { position:absolute; inset:0; padding:96px; box-sizing:border-box;
-           display:flex; flex-direction:column; justify-content:center; gap:24px; }
-  .scene h1 { font-size:96px; margin:0; }
-  .scene h2 { font-size:56px; margin:0; color:var(--accent); }
-  .scene p  { font-size:32px; margin:0; color:var(--muted); }
-  .scene .status-ok { color:var(--ok); }
-  .scene .status-failed { color:var(--fail); }
-  .scene .status-skipped { color:var(--skip); }
-  .scene img { max-width:100%; max-height:720px; border-radius:16px; object-fit:contain; }
-  .pill { display:inline-block; padding:4px 12px; border-radius:999px;
-          background:rgba(129,140,248,0.15); font-size:24px; color:var(--accent); }
-</style>
-</head>
-<body>
-<div data-composition-id="sendsprint-evidence-{run_id}"
-     data-width="1920" data-height="1080" data-fps="30">
-
-  <section class="scene scene--intro" data-start="0.00" data-duration="4.00">
-    <span class="pill">SendSprint</span>
-    <h1>SendSprint Delivery</h1>
-    <p>Sprint {sprint_id} — {workspace}</p>
-  </section>
-
-  <section class="scene scene--summary" data-start="4.00" data-duration="4.00">
-    <h2 class="status-ok">{summary}</h2>
-    <ul>
-      <li>Steps OK: <strong>{steps_ok}/{steps_total}</strong></li>
-      <li>PRs opened: <strong>{pr_count}</strong></li>
-      <li>Scope: <strong>{scope_mode}</strong></li>
-    </ul>
-  </section>
-
-  <!-- Para cada StepReport: -->
-  <section class="scene scene--step" data-start="{cursor}" data-duration="4.00">
-    <span class="pill">{repo_or_global}</span>
-    <h2 class="status-{step.status}">Step {step.step}: {step.name}</h2>
-    <p>{step.message}</p>
-  </section>
-
-  <!-- Para cada TestEvidence(kind=screenshot, path=…): -->
-  <section class="scene scene--screenshot" data-start="{cursor}" data-duration="2.50">
-    <span class="pill">screenshot</span>
-    <h2>{evidence.title}</h2>
-    <img src="{evidence.path}" alt="{evidence.title}" />
-  </section>
-
-  <section class="scene scene--outro" data-start="{cursor}" data-duration="3.00">
-    <span class="pill">delivered</span>
-    <h1>Sprint {sprint_id}</h1>
-    <ul>
-      <!-- 1 <li> por PR.url -->
-    </ul>
-  </section>
-
-</div>
-</body>
+<html
+  data-composition-variables='[
+  {"id":"title","type":"string","label":"Title","default":"Hello"},
+  {"id":"theme","type":"enum","label":"Theme","default":"light","options":[
+    {"value":"light","label":"Light"},
+    {"value":"dark","label":"Dark"}
+  ]}
+]'
+>
+  <body>
+    <div data-composition-id="root" data-width="1920" data-height="1080">
+      <h1 id="hero" class="clip" data-start="0" data-duration="3"></h1>
+      <script>
+        const { title, theme } = window.__hyperframes.getVariables();
+        document.getElementById("hero").textContent = title;
+        document.body.dataset.theme = theme;
+      </script>
+    </div>
+  </body>
 </html>
 ```
 
----
+```bash
+# Dev preview uses declared defaults
+npx hyperframes preview
 
-## Comando de render
+# Render with overrides
+npx hyperframes render --variables '{"title":"Q4 Report","theme":"dark"}' --output q4.mp4
+
+# Or from a JSON file
+npx hyperframes render --variables-file ./vars.json
+```
+
+**Sub-composition per-instance values:**
+
+```html
+<div
+  data-composition-id="card-pro"
+  data-composition-src="compositions/card.html"
+  data-variable-values='{"title":"Pro","price":"$29"}'
+></div>
+<div
+  data-composition-id="card-enterprise"
+  data-composition-src="compositions/card.html"
+  data-variable-values='{"title":"Enterprise","price":"Custom"}'
+></div>
+```
+
+The runtime layers each host's `data-variable-values` over the sub-comp's declared defaults on a per-instance basis.
+
+**Rules of thumb:**
+
+- Always provide a sensible `default` for every declared variable. Dev preview uses defaults — without them, the composition won't render correctly until `--variables` is provided.
+- Read variables once at the top of the script (`const { title } = ...`), not inside frame loops or event handlers — `getVariables()` allocates a fresh object per call.
+- Use `--strict-variables` in CI to fail fast on undeclared keys or type mismatches.
+- Variable types are validated at render time. `string`, `number`, `boolean`, and `color` (hex string) check `typeof`; `enum` checks the value is in the declared `options`.
+
+## Video and Audio
+
+Video must be `muted playsinline`. Audio is always a separate `<audio>` element:
+
+```html
+<video
+  id="el-v"
+  data-start="0"
+  data-duration="30"
+  data-track-index="0"
+  src="video.mp4"
+  muted
+  playsinline
+></video>
+<audio
+  id="el-a"
+  data-start="0"
+  data-duration="30"
+  data-track-index="2"
+  src="video.mp4"
+  data-volume="1"
+></audio>
+```
+
+## Timeline Contract
+
+- All timelines start `{ paused: true }` — the player controls playback
+- Register every timeline: `window.__timelines["<composition-id>"] = tl`
+- Framework auto-nests sub-timelines — do NOT manually add them
+- Duration comes from `data-duration`, not from GSAP timeline length
+- Never create empty tweens to set duration
+
+## Rules (Non-Negotiable)
+
+**Deterministic:** No `Math.random()`, `Date.now()`, or time-based logic. Use a seeded PRNG if you need pseudo-random values (e.g. `mulberry32`).
+
+**GSAP:** Only animate visual properties (`opacity`, `x`, `y`, `scale`, `rotation`, `color`, `backgroundColor`, `borderRadius`, transforms). Do NOT animate `visibility`, `display`, or call `video.play()`/`audio.play()`.
+
+**Animation conflicts:** Never animate the same property on the same element from multiple timelines simultaneously.
+
+**No `repeat: -1`:** Infinite-repeat timelines break the capture engine. Calculate the exact repeat count from composition duration: `repeat: Math.ceil(duration / cycleDuration) - 1`.
+
+**Synchronous timeline construction:** Never build timelines inside `async`/`await`, `setTimeout`, or Promises. The capture engine reads `window.__timelines` synchronously after page load. Fonts are embedded by the compiler, so they're available immediately — no need to wait for font loading.
+
+**Never do:**
+
+1. Forget `window.__timelines` registration
+2. Use video for audio — always muted video + separate `<audio>`
+3. Nest video inside a timed div — use a non-timed wrapper
+4. Use `data-layer` (use `data-track-index`) or `data-end` (use `data-duration`)
+5. Animate video element dimensions — animate a wrapper div
+6. Call play/pause/seek on media — framework owns playback
+7. Create a top-level container without `data-composition-id`
+8. Use `repeat: -1` on any timeline or tween — always finite repeats
+9. Build timelines asynchronously (inside `async`, `setTimeout`, `Promise`)
+10. Use `gsap.set()` on clip elements from later scenes — they don't exist in the DOM at page load. Use `tl.set(selector, vars, timePosition)` inside the timeline at or after the clip's `data-start` time instead.
+11. Use `<br>` in content text — forced line breaks don't account for actual rendered font width. Text that wraps naturally + a `<br>` produces an extra unwanted break, causing overlap. Let text wrap via `max-width` instead. Exception: short display titles where each word is deliberately on its own line (e.g., "THE\nIMMORTAL\nGAME" at 130px).
+
+## Scene Transitions (Non-Negotiable)
+
+Every multi-scene composition MUST follow ALL of these rules. Violating any one of them is a broken composition.
+
+1. **ALWAYS use transitions between scenes.** No jump cuts. No exceptions.
+2. **ALWAYS use entrance animations on every scene.** Every element animates IN via `gsap.from()`. No element may appear fully-formed. If a scene has 5 elements, it needs 5 entrance tweens.
+3. **NEVER use exit animations** except on the final scene. This means: NO `gsap.to()` that animates opacity to 0, y offscreen, scale to 0, or any other "out" animation before a transition fires. The transition IS the exit. The outgoing scene's content MUST be fully visible at the moment the transition starts.
+4. **Final scene only:** The last scene may fade elements out (e.g., fade to black). This is the ONLY scene where `gsap.to(..., { opacity: 0 })` is allowed.
+
+**WRONG — exit animation before transition:**
+
+```js
+// BANNED — this empties the scene before the transition can use it
+tl.to("#s1-title", { opacity: 0, y: -40, duration: 0.4 }, 6.5);
+tl.to("#s1-subtitle", { opacity: 0, duration: 0.3 }, 6.7);
+// transition fires on empty frame
+```
+
+**RIGHT — entrance only, transition handles exit:**
+
+```js
+// Scene 1 entrance animations
+tl.from("#s1-title",    { y: 50, opacity: 0, duration: 0.7, ease: "power3.out" }, 0.3);
+tl.from("#s1-subtitle", { y: 30, opacity: 0, duration: 0.5, ease: "power2.out" }, 0.6);
+// NO exit tweens — transition at 7.2s handles the scene change
+// Scene 2 entrance animations
+tl.from("#s2-heading",  { x: -40, opacity: 0, duration: 0.6, ease: "expo.out" }, 8.0);
+```
+
+## Animation Guardrails
+
+- Offset first animation 0.1-0.3s (not t=0)
+- Vary eases across entrance tweens — use at least 3 different eases per scene
+- Don't repeat an entrance pattern within a scene
+- Avoid full-screen linear gradients on dark backgrounds (H.264 banding — use radial or solid + localized glow)
+- 60px+ headlines, 20px+ body, 16px+ data labels for rendered video
+- `font-variant-numeric: tabular-nums` on number columns
+
+If no `design.md` exists, follow `house-style.md` (this folder) for aesthetic defaults.
+
+## Typography and Assets
+
+- **Built-in fonts:** Write the `font-family` you want in CSS — the compiler embeds supported fonts automatically.
+- **Custom fonts:** If design.md names a font that isn't built-in, the user must provide `.woff2` files in a `fonts/` directory. If missing, warn before writing HTML. When files exist, add `@font-face` declarations pointing to the local files.
+- Add `crossorigin="anonymous"` to external media.
+- For dynamic text overflow, use `window.__hyperframes.fitTextFontSize(text, { maxWidth, fontFamily, fontWeight })`.
+- All files live at the project root alongside `index.html`; sub-compositions use `../`.
+
+## Editing Existing Compositions
+
+- **Read actual files, don't guess.** When editing, extending, or creating companion compositions, read the existing source. Don't reconstruct hex codes from memory. Don't guess GSAP easing patterns. The composition IS the spec — extract exact values from it.
+- Match existing fonts, colors, animation patterns from what you read.
+- Only change what was requested.
+- Preserve timing of unrelated clips.
+
+## Output Checklist
+
+**Fast (run immediately, block on results):**
+
+- [ ] `npx hyperframes lint` and `npx hyperframes validate` both pass
+- [ ] Design adherence verified if design.md exists
+
+**Slow (run in parallel while presenting the preview to the user):**
+
+- [ ] `npx hyperframes inspect` passes, or every reported overflow is intentionally marked
+- [ ] Contrast warnings addressed
+- [ ] Animation choreography verified
+
+## Quality Checks
+
+### Visual Inspect
+
+`hyperframes inspect` runs the composition in headless Chrome, seeks through the timeline, and maps visual layout issues with timestamps, selectors, bounding boxes, and fix hints. Run it after `lint` and `validate`:
 
 ```bash
-# Pré-requisitos: Node ≥ 22, FFmpeg. Sem instalação global necessária:
-npx hyperframes render hyperframes-out/composition.html \
-  --out hyperframes-out/evidence-<run_id>.mp4
-
-# Preview no browser (live reload) durante autoria:
-npx hyperframes preview hyperframes-out/composition.html
+npx hyperframes inspect
+npx hyperframes inspect --json
 ```
 
-Se preferir instalar globalmente: `npm install -g hyperframes`.
+Failures usually mean text is spilling out of a bubble/card, a fixed-size label is clipping dynamic copy, or text has moved off the canvas. Fix by increasing container size or padding, reducing font size or letter spacing, adding a real `max-width` so text wraps inside the container, or using `window.__hyperframes.fitTextFontSize(...)` for dynamic copy.
 
----
+Use `--samples 15` for dense videos and `--at 1.5,4,7.25` for specific hero frames. Repeated static issues are collapsed by default to avoid flooding agent context. If overflow is intentional for an entrance/exit animation, mark the element or ancestor with `data-layout-allow-overflow`. If a decorative element should never be audited, mark it with `data-layout-ignore`.
 
-## Definition of Done
+`hyperframes layout` is the compatibility alias for the same check.
 
-- [ ] `composition.html` existe no `output_dir` e abre num browser sem erro de console.
-- [ ] Todas as cenas têm `data-start` ≥ `data-start+data-duration` da cena anterior (sem sobreposição).
-- [ ] Toda string vinda do RunReport passou por `html.escape` (testar com `sprint_id="<script>"`).
-- [ ] Se toolchain ausente → `StepReport(status="skipped", message="npx/hyperframes not installed — render skipped")`. Nunca `status="ok"` sem MP4 real.
-- [ ] Se MP4 renderizado → arquivo `evidence-<run_id>.mp4` existe, `> 0 bytes`, ffprobe confirma `duration > 0`.
-- [ ] Se existe `EvidenceBundle` para o `run_id`, o MP4 foi anexado como `EvidenceItem` com `metadata.kind="video/mp4"`.
-- [ ] Console output usa cores Rich consistentes (green/yellow/red) com o resto do CLI.
+### Contrast
 
----
+`hyperframes validate` runs a WCAG contrast audit by default. It seeks to 5 timestamps, screenshots the page, samples background pixels behind every text element, and computes contrast ratios. Failures appear as warnings:
 
-## Exemplo (fluxo completo)
-
-```python
-# 1. Carregue o RunReport
-from pathlib import Path
-from sendsprint.models.reports import RunReport
-report = RunReport.model_validate_json(Path("report.json").read_text())
-
-# 2. Gere a composição HTML (template acima preenchido com os campos do report)
-out_dir = Path("hyperframes-out")
-out_dir.mkdir(exist_ok=True)
-(out_dir / "composition.html").write_text(build_composition_html(report))
-
-# 3. Renderize MP4 com fallback gracioso
-import shutil, subprocess
-if shutil.which("npx"):
-    proc = subprocess.run(
-        ["npx", "hyperframes", "render",
-         str(out_dir / "composition.html"),
-         "--out", str(out_dir / f"evidence-{report.sprint_id}.mp4")],
-        capture_output=True, text=True, timeout=600, check=False,
-    )
-    status = "ok" if proc.returncode == 0 else "failed"
-else:
-    status = "skipped"
-
-# 4. Anexe ao bundle (se existir)
-from sendsprint.evidence import BundleManager, EvidenceItemType
-mgr = BundleManager()
-bundle = mgr.load_bundle(report.sprint_id)
-if bundle and status == "ok":
-    mgr.add_item(bundle, EvidenceItemType.screenshot,
-                 str(out_dir / f"evidence-{report.sprint_id}.mp4"),
-                 metadata={"title": "delivery video", "kind": "video/mp4"})
-    mgr.finalize(bundle)
+```
+⚠ WCAG AA contrast warnings (3):
+  · .subtitle "secondary text" — 2.67:1 (need 4.5:1, t=5.3s)
 ```
 
+If warnings appear:
+
+- On dark backgrounds: brighten the failing color until it clears 4.5:1 (normal text) or 3:1 (large text, 24px+ or 19px+ bold)
+- On light backgrounds: darken it
+- Stay within the palette family — don't invent a new color, adjust the existing one
+- Re-run `hyperframes validate` until clean
+
+Use `--no-contrast` to skip if iterating rapidly and you'll check later.
+
+### Design Adherence
+
+If a `design.md` exists, verify the composition follows it after authoring. Read the HTML and check:
+
+1. **Colors** — every hex value in the composition appears in design.md's palette section (however the user labeled it: Colors, Palette, Theme, etc.). Flag any invented colors.
+2. **Typography** — font families and weights match design.md's type spec. No substitutions.
+3. **Corners** — border-radius values match the declared corner style, if specified.
+4. **Spacing** — padding and gap values fall within the declared density range, if specified.
+5. **Depth** — shadow usage matches the declared depth level, if specified (flat = none, subtle = light, layered = glows).
+6. **Avoidance rules** — if design.md has a section listing things to avoid (commonly "What NOT to Do", "Don'ts", "Anti-patterns", or "Do's and Don'ts"), verify none are present.
+
+Report violations as a checklist. Fix each one before serving.
+
+If no `design.md` exists (house-style-only path), verify:
+
+1. **Palette consistency** — the same bg, fg, and accent colors are used across all scenes. No per-scene color invention.
+2. **No lazy defaults** — check the composition against `house-style.md`'s "Lazy Defaults to Question" list. If any appear, they must be a deliberate choice for the content, not a default.
+
+### Animation Map
+
+After authoring animations, run the animation map to verify choreography:
+
+```bash
+node skills/hyperframes/scripts/animation-map.mjs <composition-dir> \
+  --out <composition-dir>/.hyperframes/anim-map
+```
+
+Outputs a single `animation-map.json` with per-tween summaries, ASCII timeline, stagger detection, dead zones, element lifecycles, scene snapshots, and flags (`offscreen`, `collision`, `invisible`, `paced-fast` < 0.2s, `paced-slow` > 2s). Read the JSON. Scan summaries for anything unexpected. Check every flag — fix or justify. Re-run after fixes. Skip on small edits.
+
 ---
 
-## Notas
+## Companion skills in this repo
 
-- HyperFrames upstream: https://github.com/heygen-com/hyperframes (Apache 2.0).
-- Fork de referência: https://github.com/wesleysimplicio/hyperframes.
-- Pipeline interno de marketing (não confundir): `video/` (Remotion + React).
-- ADR relacionado a evidências: `sendsprint/evidence.py` (`EvidenceBundle` v2.0).
-- Se o usuário pedir Spanish/inglês na composição, espelhe os strings — não há i18n built-in, mude direto as labels do template.
-- Para CI/headless: rode `npx hyperframes render` com `HEADLESS=1`. Sem display server o Puppeteer ainda funciona.
-- **Não invente** flags do CLI hyperframes — se o usuário pedir feature avançada (transitions, audio mixing, shader effects), leia primeiro a doc upstream e só então proponha.
+- **`.skills/hyperframes-cli/`** — CLI command reference (init, preview, render, lint, inspect, validate, browser, doctor, etc.).
+- **`.skills/hyperframes-media/`** — `tts`, `transcribe`, `remove-background` asset preprocessing.
+- **`.skills/hyperframes-registry/`** — `hyperframes add` blocks and components.
+- **`.skills/hyperframes-gsap/`** — GSAP usage rules and patterns.
+- **`sendsprint-evidence.md`** (this folder) — SendSprint-specific recipe mapping `RunReport`/`EvidenceBundle` to a delivery video.
+
+## Upstream references (read on demand)
+
+When a feature isn't covered here, read from upstream raw:
+
+- `references/captions.md`, `references/audio-reactive.md`, `references/css-patterns.md`, `references/video-composition.md`, `references/beat-direction.md`, `references/typography.md`, `references/motion-principles.md`, `references/techniques.md`, `references/html-in-canvas-patterns.md`, `references/narration.md`, `references/design-picker.md`, `references/transitions.md`, `references/transitions/catalog.md`, `references/transcript-guide.md`, `references/dynamic-techniques.md`
+- `visual-styles.md`, `house-style.md` (local mirror), `patterns.md`, `data-in-motion.md`
+- `palettes/<name>.md` (bold-energetic, warm-editorial, dark-premium, clean-corporate, nature-earth, neon-electric, pastel-soft, jewel-rich, monochrome)
+
+Upstream base URL: `https://raw.githubusercontent.com/wesleysimplicio/hyperframes/main/skills/hyperframes/`
