@@ -145,6 +145,8 @@ class SprintFlow:
         code_generation: CodeGenerationConfig | None = None,
         deploy: DeployWorkflowConfig | None = None,
         autonomy_policy: AutonomyPolicy | None = None,
+        default_base_branch: str | None = None,
+        branch_name_template: str | None = None,
     ) -> None:
         self.operator = operator
         self.workspace = workspace
@@ -152,6 +154,8 @@ class SprintFlow:
         self.code_generation = code_generation
         self.deploy = deploy
         self.autonomy_policy = autonomy_policy or AutonomyPolicy(level="pr")
+        self.default_base_branch = default_base_branch
+        self.branch_name_template = branch_name_template
         self.mapper = ArchitectureMapper()
 
     def run(
@@ -209,7 +213,11 @@ class SprintFlow:
         report.steps.append(link_validation)
 
         repos = self._resolve_repos(repo_path)
-        default_target = self.workspace.default_base_branch if self.workspace else "main"
+        default_target = (
+            self.workspace.default_base_branch
+            if self.workspace
+            else (self.default_base_branch or "main")
+        )
         plan_policy = AutonomyPolicy(level="plan") if dry_run else self.autonomy_policy
         plan = build_delivery_plan(
             sprint,
@@ -1131,13 +1139,14 @@ class SprintFlow:
         fp: TechFingerprint,
         repo_cfg: RepoConfig | None = None,
     ) -> str:
-        template = (
-            repo_cfg.branch_name_template
-            if repo_cfg and repo_cfg.branch_name_template
-            else self.workspace.branch_name_template
-            if self.workspace
-            else DEFAULT_BRANCH_NAME_TEMPLATE
-        )
+        if repo_cfg and repo_cfg.branch_name_template:
+            template = repo_cfg.branch_name_template
+        elif self.workspace is not None:
+            template = self.workspace.branch_name_template
+        elif self.branch_name_template:
+            template = self.branch_name_template
+        else:
+            template = DEFAULT_BRANCH_NAME_TEMPLATE
         key = _slugify(item.key or item.id or "task", 40)
         number = _task_number(item)
         raw_title = (item.title or "").strip()

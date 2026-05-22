@@ -281,3 +281,93 @@ def test_configure_defaults_sets_profile(monkeypatch, tmp_path: Path) -> None:
     assert updates[0]["default_repo_path"] == str(tmp_path.resolve())
     assert updates[0]["default_workspace"] == str(ws_file.resolve())
     assert updates[0]["runtime.auto_full_mode"] is True
+
+
+def test_configure_defaults_persists_branch_preferences(
+    monkeypatch, tmp_path: Path
+) -> None:
+    updates: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        "sendsprint.cli.profile_mod.update", lambda **kwargs: updates.append(kwargs)
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "configure-defaults",
+            "--repo",
+            str(tmp_path),
+            "--branch-template",
+            "feature/{key}-{title}",
+            "--base-branch",
+            "develop",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert updates[0]["branch.branch_name_template"] == "feature/{key}-{title}"
+    assert updates[0]["branch.default_base_branch"] == "develop"
+    assert updates[0]["branch.prompted"] is True
+
+
+def test_ensure_branch_preferences_skips_when_workspace_provides(
+    monkeypatch,
+) -> None:
+    from sendsprint.cli import _ensure_branch_preferences
+    from sendsprint.profile import BranchProfile, Profile
+
+    updates: list[dict[str, object]] = []
+
+    def fake_update(**kwargs):
+        updates.append(kwargs)
+        data = Profile().model_dump()
+        for key, value in kwargs.items():
+            if "." in key:
+                head, tail = key.split(".", 1)
+                data[head][tail] = value
+            else:
+                data[key] = value
+        return Profile.model_validate(data)
+
+    monkeypatch.setattr("sendsprint.cli.profile_mod.update", fake_update)
+    profile = Profile(branch=BranchProfile())
+    result = _ensure_branch_preferences(
+        profile, workspace_provides=True, interactive=True
+    )
+    assert updates == [{"branch.prompted": True}]
+    assert result.branch.prompted is True
+
+
+def test_ensure_branch_preferences_noop_when_already_prompted(monkeypatch) -> None:
+    from sendsprint.cli import _ensure_branch_preferences
+    from sendsprint.profile import BranchProfile, Profile
+
+    monkeypatch.setattr(
+        "sendsprint.cli.profile_mod.update",
+        lambda **kwargs: pytest_fail("should not be called"),
+    )
+    profile = Profile(branch=BranchProfile(prompted=True))
+    result = _ensure_branch_preferences(
+        profile, workspace_provides=False, interactive=True
+    )
+    assert result.branch.prompted is True
+
+
+def pytest_fail(message: str) -> None:
+    raise AssertionError(message)
+
+
+def test_ensure_branch_preferences_noop_when_non_interactive(monkeypatch) -> None:
+    from sendsprint.cli import _ensure_branch_preferences
+    from sendsprint.profile import BranchProfile, Profile
+
+    monkeypatch.setattr(
+        "sendsprint.cli.profile_mod.update",
+        lambda **kwargs: pytest_fail("should not be called"),
+    )
+    profile = Profile(branch=BranchProfile())
+    result = _ensure_branch_preferences(
+        profile, workspace_provides=False, interactive=False
+    )
+    assert result.branch.prompted is False
+    assert result.branch.branch_name_template is None

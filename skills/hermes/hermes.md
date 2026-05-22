@@ -54,6 +54,19 @@ sendsprint run jira 42 --workspace workspace.yaml --scope mine -o report.json
 sendsprint run azuredevops "Sprint 12" --repo ./repo
 ```
 
+## First-run prompts (one-time, persisted)
+
+On the very first `sendsprint sprint`/`sendsprint run` invocation without a
+workspace.yaml, the CLI asks once for the branch name template
+(default `feature/{number}-{title}`) and the base branch
+(default `main`). Both land in `branch:` inside
+`~/.config/sendsprint/profile.yaml` and the prompt is never shown again.
+Override non-interactively with:
+
+```bash
+sendsprint configure-defaults --branch-template "<template>" --base-branch <branch>
+```
+
 ---
 
 ## Padrão de código

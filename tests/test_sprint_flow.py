@@ -72,6 +72,29 @@ def test_branch_for_task_uses_repo_template_over_workspace_template() -> None:
     assert branch == "hotfix/42-add-login-flow"
 
 
+def test_branch_for_task_uses_profile_template_when_no_workspace() -> None:
+    flow = SprintFlow(
+        operator=MagicMock(),
+        workspace=None,
+        branch_name_template="release/{number}-{title}",
+        default_base_branch="develop",
+    )
+    branch = flow._branch_for_task(_item("PROJ-42", "Add Login Flow"), _fp())
+    assert branch == "release/42-add-login-flow"
+    assert flow.default_base_branch == "develop"
+
+
+def test_workspace_template_wins_over_profile_template() -> None:
+    ws = WorkspaceConfig(root_path="/tmp", branch_name_template="bugfix/{key}")
+    flow = SprintFlow(
+        operator=MagicMock(),
+        workspace=ws,
+        branch_name_template="release/{number}-{title}",
+    )
+    branch = flow._branch_for_task(_item("PROJ-42", "Add Login Flow"), _fp())
+    assert branch == "bugfix/proj-42"
+
+
 class FakeOperator(BaseOperator):
     source = "jira"
 
