@@ -1,9 +1,19 @@
-"""ProviderAdapter contract for the SendSprint v2 cloud-first dispatcher.
+"""ProviderAdapter contract for the SendSprint v2 dispatcher (cloud + local).
 
 A provider adapter ships a normalized :class:`~sendsprint.models.SprintItem`
-to a coding-agent vendor cloud, polls until the run is done, and collects the
+to an execution surface (a vendor cloud, a local worktree-driven loop, or a
+GitHub Actions runner), polls until the run is done, and collects the
 resulting PR. Adapters are independent of the router and the ingestion layer;
-the router fans tasks out across whichever adapters declare ``cloud=True``.
+the router fans tasks out across whichever adapters declare ``dispatchable=True``.
+
+Modes:
+    * ``cloud``         — work runs on a vendor-managed VM (Claude / Codex / Cursor / ...)
+    * ``local``         — work runs locally in a git worktree via ``/ralph`` or ``/goal``
+    * ``github-action`` — work runs on GitHub Actions (Copilot issue assignment)
+
+Air-gapped or non-GitHub projects rely on ``local`` adapters; cloud-friendly
+projects use ``cloud`` (or ``github-action``) ones. The router does not care:
+parallelism is uniform across modes.
 
 Spec: ``.specs/v2/cloud-dispatcher.md`` (IFACE sub-issue).
 """
@@ -19,18 +29,29 @@ from pydantic import BaseModel, Field
 from sendsprint.models import SprintItem
 
 RunStatus = Literal["queued", "running", "done", "failed", "cancelled"]
+DispatchMode = Literal["cloud", "local", "github-action"]
 
 
 class ProviderCapabilities(BaseModel):
     """Self-declared capabilities of a provider adapter.
 
     The router consults this to decide whether to dispatch to the provider
-    (``cloud`` must be True) and to understand the runtime environment
-    (network access, MCP availability).
+    (``dispatchable`` must be True) and to understand the runtime environment
+    (mode, network access, MCP availability).
     """
 
-    cloud: bool = Field(
-        description="True when the vendor exposes a real external trigger usable from CI."
+    mode: DispatchMode = Field(
+        description=(
+            "Execution surface the adapter targets: 'cloud' for vendor-managed VMs, "
+            "'local' for in-repo worktree loops (/ralph, /goal), or 'github-action' "
+            "for GitHub Actions runners."
+        ),
+    )
+    dispatchable: bool = Field(
+        description=(
+            "True when the adapter is wired to actually execute work right now. "
+            "Spike adapters declare False so the router falls back instead of dispatching."
+        ),
     )
     network: bool = Field(
         default=True,
@@ -38,11 +59,11 @@ class ProviderCapabilities(BaseModel):
     )
     mcp: bool = Field(
         default=False,
-        description="True when the container can reach the SendSprint MCP servers.",
+        description="True when the runtime can reach the SendSprint MCP servers.",
     )
     fallback: str | None = Field(
         default=None,
-        description="Name of the fallback provider when this one declares cloud=False.",
+        description="Name of the fallback provider when this one declares dispatchable=False.",
     )
 
 
@@ -55,7 +76,7 @@ class DispatchTicket(BaseModel):
     dispatched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     raw: dict[str, object] = Field(
         default_factory=dict,
-        description="Vendor-specific payload kept for debugging (request ids, urls).",
+        description="Vendor-specific payload kept for debugging (request ids, urls, pids).",
     )
 
 
@@ -84,36 +105,40 @@ class ProviderTimeoutError(ProviderError):
     """Polling exceeded the configured wall-clock budget."""
 
 
-class ProviderNoCloudError(ProviderError):
-    """Adapter has no external cloud trigger; the router should skip or fall back."""
+class ProviderNotDispatchableError(ProviderError):
+    """Adapter has no usable execution path; the router should skip or fall back."""
 
 
 class ProviderVendorBlockedError(ProviderError):
     """Vendor closed an API or removed a workflow that the adapter relied on."""
 
 
-class ProviderAdapter(ABC):
-    """Common contract every cloud provider adapter implements.
+# Backwards-compatible alias (kept until external consumers migrate).
+ProviderNoCloudError = ProviderNotDispatchableError
 
-    Concrete subclasses live next to this module (one per vendor). They are
-    instantiated by :class:`sendsprint.providers.router.ProviderRouter`
+
+class ProviderAdapter(ABC):
+    """Common contract every provider adapter implements (cloud, local, or actions).
+
+    Concrete subclasses live next to this module (one per vendor / local loop).
+    They are instantiated by :class:`sendsprint.providers.router.ProviderRouter`
     after :mod:`sendsprint.providers.registry` loads ``providers.yml``.
 
     The contract is deliberately small: dispatch a normalized task, poll a
     run, collect a PR. Anything more (multi-step prompting, retries,
-    container customization) is the adapter's private concern.
+    container or worktree customization) is the adapter's private concern.
     """
 
     name: str = "generic"
 
     @abstractmethod
     def dispatch(self, item: SprintItem) -> DispatchTicket:
-        """Ship the task to the vendor cloud and return an opaque run id.
+        """Ship the task to the execution surface and return an opaque run id.
 
         The adapter is responsible for converting the normalized task into
-        whatever the vendor accepts (issue body, routine payload, microVM
-        env). The returned :class:`DispatchTicket` is what the router holds
-        on to between calls to :meth:`poll` and :meth:`collect`.
+        whatever the surface accepts (issue body, routine payload, microVM
+        env, worktree task.md). The returned :class:`DispatchTicket` is what
+        the router holds on to between calls to :meth:`poll` and :meth:`collect`.
         """
 
     @abstractmethod

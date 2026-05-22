@@ -25,7 +25,9 @@ class CursorAdapter(ProviderAdapter):
     name = "cursor"
 
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(cloud=False, network=True, mcp=False, fallback="claude")
+        return ProviderCapabilities(
+            mode="cloud", dispatchable=False, network=True, mcp=False, fallback="claude"
+        )
 
     def dispatch(self, item: SprintItem) -> DispatchTicket:
         raise ProviderNoCloudError(

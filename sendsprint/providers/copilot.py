@@ -36,7 +36,9 @@ class CopilotAdapter(ProviderAdapter):
         self._repository = repository or os.getenv("COPILOT_TARGET_REPO")
 
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(cloud=True, network=True, mcp=False)
+        return ProviderCapabilities(
+            mode="github-action", dispatchable=True, network=True, mcp=False
+        )
 
     def dispatch(self, item: SprintItem) -> DispatchTicket:
         self._require_auth()

@@ -35,7 +35,7 @@ class CodexAdapter(ProviderAdapter):
         self._environment_id = environment_id or os.getenv("CODEX_ENVIRONMENT_ID")
 
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(cloud=True, network=False, mcp=False)
+        return ProviderCapabilities(mode="cloud", dispatchable=True, network=False, mcp=False)
 
     def dispatch(self, item: SprintItem) -> DispatchTicket:
         self._require_auth()

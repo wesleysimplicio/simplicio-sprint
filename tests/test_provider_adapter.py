@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from sendsprint.models import SprintItem
@@ -12,6 +14,8 @@ from sendsprint.providers import (
     CursorAdapter,
     DispatchTicket,
     KiroAdapter,
+    LocalGoalAdapter,
+    LocalRalphAdapter,
     ProviderAdapter,
     ProviderAuthError,
     ProviderCapabilities,
@@ -39,12 +43,12 @@ class _MockAdapter(ProviderAdapter):
 
     name = "mock"
 
-    def __init__(self, cloud: bool = True) -> None:
-        self._cloud = cloud
+    def __init__(self, dispatchable: bool = True) -> None:
+        self._dispatchable = dispatchable
         self._statuses: dict[str, RunStatus] = {}
 
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(cloud=self._cloud)
+        return ProviderCapabilities(mode="cloud", dispatchable=self._dispatchable)
 
     def dispatch(self, item: SprintItem) -> DispatchTicket:
         ticket = DispatchTicket(run_id=f"run-{item.key}", provider=self.name, item_key=item.key)
@@ -88,7 +92,9 @@ def test_mock_adapter_satisfies_contract() -> None:
 def test_claude_adapter_requires_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     adapter = ClaudeAdapter()
-    assert adapter.capabilities().cloud is True
+    caps = adapter.capabilities()
+    assert caps.mode == "cloud"
+    assert caps.dispatchable is True
     with pytest.raises(ProviderAuthError):
         adapter.dispatch(_make_item())
 
@@ -108,7 +114,10 @@ def test_claude_adapter_with_key_reaches_unwired_dispatch(
 def test_codex_adapter_requires_openai_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     adapter = CodexAdapter()
-    assert adapter.capabilities() == ProviderCapabilities(cloud=True, network=False, mcp=False)
+    caps = adapter.capabilities()
+    assert caps.mode == "cloud"
+    assert caps.dispatchable is True
+    assert caps.network is False
     with pytest.raises(ProviderAuthError):
         adapter.dispatch(_make_item())
 
@@ -117,6 +126,7 @@ def test_copilot_adapter_requires_token_and_repo(monkeypatch: pytest.MonkeyPatch
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
     monkeypatch.delenv("COPILOT_TARGET_REPO", raising=False)
     adapter = CopilotAdapter()
+    assert adapter.capabilities().mode == "github-action"
     with pytest.raises(ProviderAuthError):
         adapter.dispatch(_make_item())
 
@@ -135,15 +145,67 @@ def test_copilot_adapter_requires_token_and_repo(monkeypatch: pytest.MonkeyPatch
         (KiroAdapter, "codex"),
     ],
 )
-def test_spike_adapters_declare_no_cloud_with_fallback(
+def test_spike_adapters_declare_not_dispatchable_with_fallback(
     adapter_cls: type[ProviderAdapter], expected_fallback: str
 ) -> None:
     adapter = adapter_cls()
     caps = adapter.capabilities()
-    assert caps.cloud is False
+    assert caps.dispatchable is False
     assert caps.fallback == expected_fallback
     with pytest.raises(ProviderNoCloudError):
         adapter.dispatch(_make_item())
+
+
+def test_local_ralph_adapter_requires_ralph_cli_and_config(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    # Missing CLI -> ProviderAuthError.
+    monkeypatch.setattr("shutil.which", lambda _: None)
+    adapter = LocalRalphAdapter(repo_path=str(repo), ralph_binary="ralph")
+    caps = adapter.capabilities()
+    assert caps.mode == "local"
+    assert caps.dispatchable is True
+    with pytest.raises(ProviderAuthError) as excinfo:
+        adapter.dispatch(_make_item())
+    assert "ralph CLI" in str(excinfo.value)
+
+    # CLI present but missing .ralph/config.toml -> ProviderAuthError.
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/local/bin/ralph")
+    with pytest.raises(ProviderAuthError) as excinfo:
+        adapter.dispatch(_make_item())
+    assert "ralph config" in str(excinfo.value)
+
+    # CLI + config present -> reaches the explicit "not yet wired" guard.
+    config_dir = repo / ".ralph"
+    config_dir.mkdir()
+    (config_dir / "config.toml").write_text("adapter = 'claude'\n")
+    with pytest.raises(ProviderError) as excinfo:
+        adapter.dispatch(_make_item())
+    assert "not yet wired" in str(excinfo.value)
+
+
+def test_local_goal_adapter_requires_agent_cli(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    monkeypatch.setattr("shutil.which", lambda _: None)
+    adapter = LocalGoalAdapter(repo_path=str(repo), agent_binary="claude")
+    caps = adapter.capabilities()
+    assert caps.mode == "local"
+    assert caps.dispatchable is True
+    with pytest.raises(ProviderAuthError) as excinfo:
+        adapter.dispatch(_make_item())
+    assert "local agent CLI" in str(excinfo.value)
+
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/local/bin/claude")
+    with pytest.raises(ProviderError) as excinfo:
+        adapter.dispatch(_make_item())
+    assert "not yet wired" in str(excinfo.value)
 
 
 def test_claude_adapter_re_export_matches() -> None:

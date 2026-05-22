@@ -1,19 +1,30 @@
-# SendSprint v2 cloud-first dispatcher — copy to providers.yml and tune.
+# SendSprint v2 dispatcher — copy to providers.yml and tune.
+#
+# The router treats every dispatchable adapter the same — cloud, local, or
+# GitHub Actions. List only the modes your project can actually use:
+#   * cloud-friendly  -> claude / codex / copilot (and optional spikes)
+#   * GitHub-free     -> claude / codex + local-ralph / local-goal
+#   * air-gapped      -> local-ralph / local-goal ONLY
 #
 # Spec: .specs/v2/cloud-dispatcher.md (INFRA + ROUTER sub-issues).
-#
-# Adapters with cloud=false (cursor, windsurf, kiro spikes) are still listed
-# so the router can resolve their declared fallback. Drop them from the list
-# entirely if you want the router to forget about them.
 
 max_parallel: 3        # how many dispatches run concurrently
 poll_interval_s: 10    # seconds between poll() calls per ticket
 timeout_s: 1800        # wall-clock budget per ticket (30 min)
 
 providers:
-  - name: claude       # first-class: needs ANTHROPIC_API_KEY
-  - name: codex        # first-class: needs OPENAI_API_KEY + CODEX_ENVIRONMENT_ID
-  - name: copilot      # first-class: needs GITHUB_TOKEN + COPILOT_TARGET_REPO
-  - name: cursor       # spike: cloud=false, falls back to claude
-  - name: windsurf     # spike: cloud=false, falls back to claude
-  - name: kiro         # spike: cloud=false, falls back to codex
+  # --- Cloud (mode=cloud) ---
+  - name: claude       # needs ANTHROPIC_API_KEY
+  - name: codex        # needs OPENAI_API_KEY + CODEX_ENVIRONMENT_ID
+
+  # --- GitHub Actions (mode=github-action) ---
+  - name: copilot      # needs GITHUB_TOKEN + COPILOT_TARGET_REPO
+
+  # --- Local worktree loops (mode=local) — for air-gapped or non-GitHub repos ---
+  - name: local-ralph  # needs `ralph` CLI + .ralph/config.toml in the repo
+  - name: local-goal   # needs a local agent CLI (default: `claude`)
+
+  # --- Spike adapters (dispatchable=false; router falls back) ---
+  - name: cursor       # falls back to claude
+  - name: windsurf     # falls back to claude
+  - name: kiro         # falls back to codex

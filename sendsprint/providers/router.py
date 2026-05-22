@@ -2,10 +2,14 @@
 
 The router is the heart of the v2 dispatcher. For each
 :class:`~sendsprint.models.SprintItem` it picks a provider in round-robin
-order (skipping ``cloud=False`` providers or routing them through their
-declared fallback), dispatches in parallel via
+order (skipping ``dispatchable=False`` providers or routing them through
+their declared fallback), dispatches in parallel via
 :class:`concurrent.futures.ThreadPoolExecutor`, polls each ticket until it
 reaches a terminal status, and collects the resulting PRs.
+
+The router is mode-agnostic: cloud adapters, local Ralph/Goal worktree
+loops, and GitHub Actions runners all flow through the same fan-out. Mix-
+and-match per project by editing ``providers.yml``.
 
 Spec: ``.specs/v2/cloud-dispatcher.md`` (ROUTER sub-issue).
 """
@@ -61,29 +65,34 @@ class ProviderRouter:
     def assign(self, items: list[SprintItem]) -> list[_Assignment]:
         """Pick a provider per item in round-robin order, respecting capabilities.
 
-        Adapters with ``cloud=False`` are replaced by their declared fallback;
-        if no fallback resolves to a cloud-capable adapter the item is dropped
-        and a warning is logged.
+        Adapters with ``dispatchable=False`` are replaced by their declared
+        fallback; if no fallback resolves to a dispatchable adapter the item
+        is dropped and a warning is logged.
+
+        Mode (cloud / local / github-action) is intentionally NOT a filter
+        here — the router treats every dispatchable adapter the same. Set up
+        providers.yml to include only the modes your project can use (e.g.
+        ``local-ralph`` + ``local-goal`` for air-gapped repos).
         """
-        cloud_adapters = [a for a in self._adapters if a.capabilities().cloud]
-        if not cloud_adapters:
+        ready = [a for a in self._adapters if a.capabilities().dispatchable]
+        if not ready:
             raise ProviderError(
-                "no cloud-capable adapters available; check providers.yml and capabilities()"
+                "no dispatchable adapters available; check providers.yml and capabilities()"
             )
 
         assignments: list[_Assignment] = []
         for index, item in enumerate(items):
-            adapter = cloud_adapters[index % len(cloud_adapters)]
+            adapter = ready[index % len(ready)]
             assignments.append(_Assignment(item=item, adapter=adapter))
         return assignments
 
     def resolve_fallback(self, adapter: ProviderAdapter) -> ProviderAdapter | None:
-        """Walk the fallback chain until a cloud-capable adapter is found."""
+        """Walk the fallback chain until a dispatchable adapter is found."""
         seen: set[str] = set()
         current = adapter
         while True:
             caps = current.capabilities()
-            if caps.cloud:
+            if caps.dispatchable:
                 return current
             if not caps.fallback or caps.fallback in seen:
                 return None

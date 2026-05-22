@@ -24,7 +24,9 @@ class KiroAdapter(ProviderAdapter):
     name = "kiro"
 
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(cloud=False, network=True, mcp=False, fallback="codex")
+        return ProviderCapabilities(
+            mode="cloud", dispatchable=False, network=True, mcp=False, fallback="codex"
+        )
 
     def dispatch(self, item: SprintItem) -> DispatchTicket:
         raise ProviderNoCloudError(

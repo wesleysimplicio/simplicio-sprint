@@ -2,9 +2,11 @@
 
 The config file lives at the repo root by default. It selects which adapters
 the router should consider, in which priority order, and how aggressive the
-parallelism should be.
+parallelism should be. Cloud-friendly projects keep the vendor adapters;
+air-gapped or non-GitHub projects can run on ``local-ralph`` and ``local-goal``
+alone.
 
-Example ``providers.yml``::
+Example ``providers.yml`` (mixed)::
 
     max_parallel: 3
     poll_interval_s: 10
@@ -13,9 +15,8 @@ Example ``providers.yml``::
       - name: claude
       - name: codex
       - name: copilot
-      - name: cursor
-      - name: windsurf
-      - name: kiro
+      - name: local-ralph
+      - name: local-goal
 """
 
 from __future__ import annotations
@@ -32,6 +33,8 @@ from sendsprint.providers.codex import CodexAdapter
 from sendsprint.providers.copilot import CopilotAdapter
 from sendsprint.providers.cursor import CursorAdapter
 from sendsprint.providers.kiro import KiroAdapter
+from sendsprint.providers.local_goal import LocalGoalAdapter
+from sendsprint.providers.local_ralph import LocalRalphAdapter
 from sendsprint.providers.windsurf import WindsurfAdapter
 
 ADAPTER_CLASSES: dict[str, type[ProviderAdapter]] = {
@@ -41,6 +44,8 @@ ADAPTER_CLASSES: dict[str, type[ProviderAdapter]] = {
     "cursor": CursorAdapter,
     "windsurf": WindsurfAdapter,
     "kiro": KiroAdapter,
+    "local-ralph": LocalRalphAdapter,
+    "local-goal": LocalGoalAdapter,
 }
 
 

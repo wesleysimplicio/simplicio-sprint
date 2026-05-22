@@ -10,6 +10,7 @@ import yaml
 
 from sendsprint.models import SprintItem
 from sendsprint.providers import (
+    DispatchMode,
     DispatchTicket,
     ProviderAdapter,
     ProviderCapabilities,
@@ -29,16 +30,25 @@ def _make_item(key: str) -> SprintItem:
 class _ScriptedAdapter(ProviderAdapter):
     """Adapter that flips queued -> done on the second poll, recording dispatches."""
 
-    def __init__(self, name: str, cloud: bool = True, fallback: str | None = None) -> None:
+    def __init__(
+        self,
+        name: str,
+        dispatchable: bool = True,
+        mode: DispatchMode = "cloud",
+        fallback: str | None = None,
+    ) -> None:
         self.name = name
-        self._cloud = cloud
+        self._dispatchable = dispatchable
+        self._mode = mode
         self._fallback = fallback
         self.dispatched: list[str] = []
         self._lock = Lock()
         self._statuses: dict[str, RunStatus] = {}
 
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(cloud=self._cloud, fallback=self._fallback)
+        return ProviderCapabilities(
+            mode=self._mode, dispatchable=self._dispatchable, fallback=self._fallback
+        )
 
     def dispatch(self, item: SprintItem) -> DispatchTicket:
         with self._lock:
@@ -77,10 +87,10 @@ class _FailingDispatchAdapter(_ScriptedAdapter):
         raise ProviderError(f"{self.name} refuses to dispatch")
 
 
-def test_router_round_robins_across_cloud_capable_adapters() -> None:
+def test_router_round_robins_across_dispatchable_adapters() -> None:
     claude = _ScriptedAdapter("claude")
     codex = _ScriptedAdapter("codex")
-    cursor = _ScriptedAdapter("cursor", cloud=False, fallback="claude")
+    cursor = _ScriptedAdapter("cursor", dispatchable=False, fallback="claude")
 
     router = ProviderRouter(
         [claude, codex, cursor], max_parallel=2, poll_interval_s=0, sleep=lambda _: None
@@ -91,30 +101,62 @@ def test_router_round_robins_across_cloud_capable_adapters() -> None:
 
     assert len(results) == 4
     assert all(r.status == "done" for r in results)
-    # Cursor is cloud=false so the router never dispatches to it.
+    # Cursor is dispatchable=false so the router never dispatches to it.
     assert cursor.dispatched == []
-    # Round-robin across the two cloud-capable adapters in order.
+    # Round-robin across the two ready adapters in order.
     assert sorted(claude.dispatched) == ["T-0", "T-2"]
     assert sorted(codex.dispatched) == ["T-1", "T-3"]
 
 
+def test_router_mixes_cloud_and_local_modes_in_round_robin() -> None:
+    """Air-gapped projects can run with only local adapters; mixed setups also work."""
+    claude_cloud = _ScriptedAdapter("claude", mode="cloud")
+    ralph_local = _ScriptedAdapter("local-ralph", mode="local")
+    goal_local = _ScriptedAdapter("local-goal", mode="local")
+
+    router = ProviderRouter(
+        [claude_cloud, ralph_local, goal_local],
+        max_parallel=3,
+        poll_interval_s=0,
+        sleep=lambda _: None,
+    )
+    items = [_make_item(f"T-{i}") for i in range(6)]
+    results = router.dispatch_all(items)
+
+    assert all(r.status == "done" for r in results)
+    # Each of the three dispatchable adapters got exactly two items.
+    assert len(claude_cloud.dispatched) == 2
+    assert len(ralph_local.dispatched) == 2
+    assert len(goal_local.dispatched) == 2
+
+
+def test_router_runs_with_local_adapters_only() -> None:
+    """No cloud or GitHub access required when only local adapters are configured."""
+    ralph_local = _ScriptedAdapter("local-ralph", mode="local")
+    router = ProviderRouter([ralph_local], poll_interval_s=0, sleep=lambda _: None)
+    results = router.dispatch_all([_make_item("T-1"), _make_item("T-2")])
+
+    assert [r.status for r in results] == ["done", "done"]
+    assert sorted(ralph_local.dispatched) == ["T-1", "T-2"]
+
+
 def test_router_resolves_fallback_through_capabilities() -> None:
     claude = _ScriptedAdapter("claude")
-    cursor = _ScriptedAdapter("cursor", cloud=False, fallback="claude")
+    cursor = _ScriptedAdapter("cursor", dispatchable=False, fallback="claude")
     router = ProviderRouter([claude, cursor], poll_interval_s=0, sleep=lambda _: None)
 
     resolved = router.resolve_fallback(cursor)
     assert resolved is not None
     assert resolved.name == "claude"
 
-    # No-cloud adapter without a registered fallback yields None.
-    standalone = _ScriptedAdapter("standalone", cloud=False, fallback="ghost")
+    # Non-dispatchable adapter without a registered fallback yields None.
+    standalone = _ScriptedAdapter("standalone", dispatchable=False, fallback="ghost")
     router2 = ProviderRouter([standalone, claude], poll_interval_s=0, sleep=lambda _: None)
     assert router2.resolve_fallback(standalone) is None
 
 
-def test_router_rejects_when_no_cloud_capable_adapter() -> None:
-    cursor = _ScriptedAdapter("cursor", cloud=False, fallback="claude")
+def test_router_rejects_when_no_dispatchable_adapter() -> None:
+    cursor = _ScriptedAdapter("cursor", dispatchable=False, fallback="claude")
     router = ProviderRouter([cursor], poll_interval_s=0, sleep=lambda _: None)
     with pytest.raises(ProviderError):
         router.dispatch_all([_make_item("T-1")])
@@ -161,16 +203,26 @@ def test_registry_load_and_build(tmp_path: Path) -> None:
                 "max_parallel": 5,
                 "poll_interval_s": 1,
                 "timeout_s": 60,
-                "providers": [{"name": "claude"}, {"name": "cursor"}],
+                "providers": [
+                    {"name": "claude"},
+                    {"name": "cursor"},
+                    {"name": "local-ralph"},
+                    {"name": "local-goal"},
+                ],
             }
         )
     )
     config = load_config(config_path)
     assert config.max_parallel == 5
-    assert [p.name for p in config.providers] == ["claude", "cursor"]
+    assert [p.name for p in config.providers] == [
+        "claude",
+        "cursor",
+        "local-ralph",
+        "local-goal",
+    ]
 
     adapters = build_adapters(config)
-    assert [a.name for a in adapters] == ["claude", "cursor"]
+    assert [a.name for a in adapters] == ["claude", "cursor", "local-ralph", "local-goal"]
 
 
 def test_registry_rejects_unknown_provider(tmp_path: Path) -> None:

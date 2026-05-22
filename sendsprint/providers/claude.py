@@ -36,7 +36,7 @@ class ClaudeAdapter(ProviderAdapter):
         self._environment_id = environment_id or os.getenv("CLAUDE_ROUTINE_ENV_ID")
 
     def capabilities(self) -> ProviderCapabilities:
-        return ProviderCapabilities(cloud=True, network=True, mcp=False)
+        return ProviderCapabilities(mode="cloud", dispatchable=True, network=True, mcp=False)
 
     def dispatch(self, item: SprintItem) -> DispatchTicket:
         self._require_auth()

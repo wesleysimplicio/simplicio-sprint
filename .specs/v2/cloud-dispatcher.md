@@ -1,4 +1,4 @@
-# SendSprint v2 — Cloud-First Dispatcher
+# SendSprint v2 — Parallel Dispatcher (Cloud + Local)
 
 Source for the v2 epic + sub-issues. This file is the durable home of the spec
 because the issues failed to land via the GitHub MCP (token expired during the
@@ -9,9 +9,11 @@ issue with the labels documented at the end.
 ## Goal
 
 Move SendSprint from **local serial runtime** (Ralph loop on Mac/VPS) to a
-**cloud-first dispatcher**: read normalized tasks from Azure DevOps, fan them
-out in parallel to the coding-agent provider clouds, collect tested PRs, and
-close the loop with `git pull` locally + work-item status update.
+**parallel dispatcher** that fans tasks out across either vendor coding-agent
+clouds OR local git-worktree loops (`/ralph`, `/goal`), depending on what
+each project can use. Air-gapped or non-GitHub repos run on the local mode;
+cloud-friendly repos use vendor clouds. Either way, dispatch is parallel and
+the human reviewer pulls the resulting branch locally before merging.
 
 ## Before / After
 
@@ -21,16 +23,20 @@ Before (serial, ties up a machine):
 Azure DevOps -> sync -> .task.md -> Ralph loop (LOCAL/VPS) -> PR
 ```
 
-After (parallel, machine-free):
+After (parallel, mode-agnostic):
 
 ```
 Azure DevOps -> ingest -> normalized task -> Router (round-robin)
-  -> [Claude | Codex | Copilot | Cursor | Windsurf | Kiro] (vendor cloud)
+  -> [ Claude | Codex | Copilot         ]   (cloud mode)
+     [ Cursor | Windsurf | Kiro spikes  ]
+     [ local-ralph | local-goal         ]   (local mode, parallel worktrees)
   -> tested PR -> local git pull (review) -> merge -> work item "Done"
 ```
 
-The Ralph loop stops being the engine; parallelism across cloud containers
-replaces serial iteration.
+The serial Ralph loop stops being the engine. Parallelism comes either from
+cloud containers running side-by-side OR from multiple local worktrees
+driven by `/ralph` (Ralph autonomous loop) and `/goal` (PRD.md / PROGRESS.md
+/ GOAL_RESULT.md overlay) in parallel processes.
 
 ## What survives
 
@@ -48,18 +54,22 @@ replaces serial iteration.
 
 ## Per-provider reality
 
-| Provider | External cloud trigger                  | v2 status   |
-|----------|-----------------------------------------|-------------|
-| Claude   | OK (web routines / managed-agents API)  | first-class |
-| Codex    | OK (app/API fire-and-forget)            | first-class |
-| Copilot  | OK (assign issue -> @copilot)           | first-class |
-| Cursor   | Partial (background agents, limited API)| best-effort |
-| Windsurf | Weak (Cascade is IDE-first)             | spike       |
-| Kiro     | No clean external cloud trigger (AWS IDE)| spike      |
+| Provider     | Mode           | Trigger / runtime                          | v2 status   |
+|--------------|----------------|--------------------------------------------|-------------|
+| Claude       | cloud          | Anthropic routines / managed-agents API    | first-class |
+| Codex        | cloud          | OpenAI microVM (fire-and-forget)           | first-class |
+| Copilot      | github-action  | Assign issue -> @copilot                   | first-class |
+| Cursor       | cloud (spike)  | Background Agents, limited external API    | best-effort |
+| Windsurf     | cloud (spike)  | Cascade is IDE-first, weak external trigger| spike       |
+| Kiro         | cloud (spike)  | AWS IDE, no clean external trigger         | spike       |
+| local-ralph  | local          | `ralph` CLI in a per-task git worktree     | first-class |
+| local-goal   | local          | Local agent CLI driving PRD/PROGRESS/GOAL  | first-class |
 
-The adapter interface is first-class for all six. Real implementations only
-land where the vendor exposes a trigger. IDE-bound providers stay as spikes
-with a documented fallback (route to Claude/Codex).
+The adapter interface is first-class for all eight. Cloud + GitHub Actions
+adapters land where the vendor exposes a trigger; IDE-bound providers stay
+as spikes with a documented fallback (route to Claude/Codex). The two local
+adapters cover air-gapped or non-GitHub projects — they require only a git
+worktree and a local CLI, no vendor account.
 
 ## Sub-issues (planned)
 
@@ -73,7 +83,9 @@ with a documented fallback (route to Claude/Codex).
 | CURSOR    | Adapter: Cursor (best-effort)                                      | cloud-dispatch, adapter, spike      |
 | WIND      | Adapter: Windsurf (spike)                                          | cloud-dispatch, adapter, spike      |
 | KIRO      | Adapter: Kiro (spike)                                              | cloud-dispatch, adapter, spike      |
-| ROUTER    | Router round-robin parallel                                        | cloud-dispatch, router              |
+| LOCAL-RALPH | Adapter: local-ralph (worktree + /ralph loop)                    | cloud-dispatch, adapter             |
+| LOCAL-GOAL  | Adapter: local-goal (worktree + /goal overlay)                   | cloud-dispatch, adapter             |
+| ROUTER    | Router round-robin parallel (mode-agnostic)                        | cloud-dispatch, router              |
 | GATE      | PR validation gate (Playwright + DoD inside container)             | cloud-dispatch, feedback-loop       |
 | LOOP      | Feedback loop: merge -> work-item update + local git pull          | cloud-dispatch, feedback-loop       |
 | INFRA     | Config providers.yml + secrets/env                                 | cloud-dispatch, infra               |
@@ -230,6 +242,56 @@ nonexistent / weak.
 
 **DoD:** Report — viable? how? or blocked-on-vendor.
 
+### LOCAL-RALPH — Adapter: local-ralph (worktree + /ralph loop)
+
+**Labels:** `cloud-dispatch,adapter`
+
+**Context:** First-class for air-gapped, on-prem, or non-GitHub projects.
+Dispatch creates a git worktree per task and spawns the `ralph` CLI against
+the task file; the autonomous loop drives
+`read -> plan -> execute -> lint -> unit -> e2e -> fix -> repeat` until DoD
+exits. Parallelism comes from running multiple worktrees concurrently
+(`ThreadPoolExecutor` already in the router).
+
+**Acceptance Criteria:**
+
+- [ ] `dispatch` creates `.specs/sprints/<sprint>/<key>.task.md` in a fresh
+      worktree, then `subprocess.Popen(["ralph", "run", task_path])`
+- [ ] `poll` checks the process status + parses the `RALPH_STATUS` block
+- [ ] `collect` returns the PR / branch + Playwright evidence
+- [ ] Pre-checks: `ralph` CLI on `$PATH` + `.ralph/config.toml` present
+- [ ] capabilities: `mode=local`, `dispatchable=true`
+
+**Pegadinhas:** worktree GC after collect (success or failure); recurring
+`ralph_loop_end` hook from `.ralph/config.toml` runs format/check after each
+loop iteration.
+
+**DoD:** One sprint task runs end-to-end in a local worktree with no cloud or
+GitHub access; PR pushed to the configured remote (which may be GitLab,
+Bitbucket, or a local bare repo).
+
+### LOCAL-GOAL — Adapter: local-goal (worktree + /goal overlay)
+
+**Labels:** `cloud-dispatch,adapter`
+
+**Context:** First-class. Mirrors LOCAL-RALPH but drives the universal
+long-running agent overlay (`PRD.md` -> `PROGRESS.md` -> `GOAL_RESULT.md`)
+via a local agent CLI (defaults to `claude`). Same surface for projects that
+prefer the `/goal` flow over the Ralph loop.
+
+**Acceptance Criteria:**
+
+- [ ] `dispatch` writes the task into `PRD.md` inside a worktree, then
+      spawns the agent CLI with the overlay rules
+- [ ] `poll` watches for `GOAL_RESULT.md` to appear or the process to exit
+- [ ] `collect` reads `GOAL_RESULT.md` + the worktree branch
+- [ ] Pre-check: agent CLI on `$PATH` (override via
+      `SENDSPRINT_LOCAL_AGENT_BINARY`)
+- [ ] capabilities: `mode=local`, `dispatchable=true`
+
+**DoD:** One sprint task runs end-to-end inside a local worktree using
+`/goal` instead of `/ralph`; same PR target as LOCAL-RALPH.
+
 ### KIRO — Adapter: Kiro (spike)
 
 **Labels:** `cloud-dispatch,adapter,spike`
@@ -257,9 +319,11 @@ fallback).
 **Acceptance Criteria:**
 
 - [ ] Reads the queue of normalized tasks
-- [ ] Round-robin across providers with `cloud:true`
+- [ ] Round-robin across adapters with `dispatchable:true` (any mode)
 - [ ] Dispatches in parallel (N concurrent), not serial
-- [ ] Provider without real cloud -> skip or configurable fallback
+- [ ] Adapter that is not dispatchable -> skip or configurable fallback
+- [ ] Mode-agnostic: cloud, local, and github-action adapters share the
+      same fan-out
 - [ ] Collects run_ids, polls until done/failed, aggregates results
 - [ ] Config: max parallelism, per-task timeout, retry
 
