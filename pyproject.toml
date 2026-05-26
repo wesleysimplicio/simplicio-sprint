@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sendsprint"
-version = "0.22.0"
-description = "Sprint-to-PR delivery automation platform for Jira and Azure DevOps teams."
+version = "1.0.0"
+description = "Autonomous sprint-to-PR delivery agent. Reads Jira/Azure DevOps/GitHub tasks, delegates code edits to simplicio-cli, ships draft PRs with evidence."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Wesley Simplicio", email = "wesleybob4@gmail.com" }]
-keywords = ["sprint", "jira", "azure-devops", "playwright", "llm", "claude", "codex", "agent"]
+keywords = ["sprint", "jira", "azure-devops", "github", "simplicio-cli", "agent", "automation"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
@@ -20,49 +20,25 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
-    "playwright>=1.48.0",
     "httpx>=0.27.0",
     "pydantic>=2.7.0",
     "typer>=0.12.0",
     "rich>=13.7.0",
-    "python-dotenv>=1.0.1",
-    "anyio>=4.4.0",
     "pyyaml>=6.0.1",
-    "keyring>=25.0.0",
 ]
 
 [project.optional-dependencies]
-anthropic = ["anthropic>=0.39.0"]
-openai = ["openai>=1.50.0"]
-google = ["google-generativeai>=0.8.0"]
-groq = ["groq>=0.11.0"]
-ollama = ["ollama>=0.3.0"]
-api = [
-    "fastapi>=0.110.0",
-    "uvicorn[standard]>=0.27.0",
-]
-all = [
-    "anthropic>=0.39.0",
-    "openai>=1.50.0",
-    "google-generativeai>=0.8.0",
-    "groq>=0.11.0",
-    "ollama>=0.3.0",
-    "fastapi>=0.110.0",
-    "uvicorn[standard]>=0.27.0",
-]
+keyring = ["keyring>=25.0.0"]
+screenshot = ["playwright>=1.48.0"]
 dev = [
     "pytest>=8.3.0",
-    "pytest-asyncio>=0.24.0",
     "pytest-cov>=5.0.0",
     "ruff>=0.6.0",
     "mypy>=1.11.0",
-    "fastapi>=0.110.0",
-    "uvicorn[standard]>=0.27.0",
 ]
 
 [project.scripts]
 sendsprint = "sendsprint.cli:app"
-sendsprint-api = "sendsprint.api.server:main"
 
 [project.urls]
 Homepage = "https://github.com/wesleysimplicio/SendSprint"
@@ -72,33 +48,9 @@ Issues = "https://github.com/wesleysimplicio/SendSprint/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["sendsprint"]
 
-[tool.hatch.build.targets.wheel.force-include]
-"plugins" = "sendsprint/_plugin_packages"
-
-[tool.hatch.build.targets.sdist]
-exclude = [
-    "/.agents",
-    "/.claude",
-    "/.codex",
-    "/.github",
-    "/.plans",
-    "/.ralph",
-    "/.skills",
-    "/dist",
-    "/docs/assets/*.png",
-    "/docs/presentations",
-    "/GOAL_RESULT.md",
-    "/PRD.md",
-    "/PROGRESS.md",
-    "/sendsprint/api/assets/screenshots",
-    "/test-results",
-    "/video",
-    "/web",
-]
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "auto"
+filterwarnings = ["ignore::pytest.PytestCollectionWarning"]
 
 [tool.ruff]
 line-length = 100

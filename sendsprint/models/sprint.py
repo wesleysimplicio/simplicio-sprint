@@ -61,8 +61,8 @@ class Sprint(BaseModel):
     start_date: datetime | None = None
     end_date: datetime | None = None
     items: list[SprintItem] = Field(default_factory=list)
-    source: Literal["jira", "azuredevops"] = "jira"
-    transport: Literal["mcp", "api", "playwright"] = "api"
+    source: Literal["jira", "azuredevops", "github"] = "jira"
+    transport: Literal["mcp", "api"] = "api"
 
     @property
     def stories(self) -> list[SprintItem]:

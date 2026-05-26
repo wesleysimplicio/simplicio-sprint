@@ -1,4 +1,10 @@
-"""SendSprint - sprint-to-PR delivery automation platform."""
+"""SendSprint — autonomous sprint-to-PR delivery agent.
 
-__version__ = "0.22.0"
+The agent (Claude, driving this package) reads a sprint from Jira / Azure
+DevOps / GitHub Issues, hands each task to simplicio-cli for the code edit,
+captures evidence, and opens a draft PR for review. simplicio-cli is the
+executor; SendSprint owns the flow start to finish.
+"""
+
+__version__ = "1.0.0"
 __all__ = ["__version__"]
