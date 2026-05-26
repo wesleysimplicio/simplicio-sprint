@@ -7,15 +7,10 @@ import logging
 import os
 from datetime import datetime
 from importlib import import_module
-from pathlib import Path
 from typing import Any
 
 import httpx
 
-from sendsprint.browser_agents import (
-    BrowserAgentCaptureError,
-    capture_sprint_with_browser_agents,
-)
 from sendsprint.models import Sprint, SprintItem
 from sendsprint.operators.base import BaseOperator, Transport, TransportUnavailable
 
@@ -33,7 +28,7 @@ ADO_TYPE_MAP = {
 
 
 class AzureDevopsOperator(BaseOperator):
-    """Reads an Azure DevOps iteration (sprint) via MCP, REST API, or Playwright.
+    """Reads an Azure DevOps iteration (sprint) via MCP or REST API.
 
     Identifies the iteration by its ``IterationPath`` (e.g. ``MyTeam\\Sprint 12``).
     """
@@ -47,7 +42,6 @@ class AzureDevopsOperator(BaseOperator):
         team: str | None = None,
         pat: str | None = None,
         transport: Transport = "auto",
-        cdp_url: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(transport=transport, **kwargs)
@@ -75,9 +69,6 @@ class AzureDevopsOperator(BaseOperator):
         self.project: str = resolved_project or ""
         self.team: str = resolved_team or ""
         self.pat: str = resolved_pat or ""
-        self.cdp_url: str = cdp_url or os.getenv("PLAYWRIGHT_CDP_URL") or "http://127.0.0.1:9222"
-        self._work_dir = Path(self._kwargs.get("work_dir") or Path.cwd())
-        self._profile_sprint_url = self._load_profile_sprint_url()
 
     def _api_available(self) -> bool:
         return bool(self.organization and self.project and self.pat)
@@ -190,134 +181,6 @@ class AzureDevopsOperator(BaseOperator):
             items=items,
             source="azuredevops",
             transport="api",
-        )
-
-    def _read_via_playwright(self, **kwargs: Any) -> Sprint:
-        iteration_path = kwargs.get("iteration_path")
-        if iteration_path is None:
-            raise ValueError("iteration_path is required")
-        sprint_url = self._resolve_sprint_url(kwargs.get("sprint_url"))
-        last_error: Exception | None = None
-        try:
-            from playwright.sync_api import sync_playwright
-        except ImportError as exc:
-            last_error = exc
-            items = []
-        else:
-            try:
-                if not sprint_url:
-                    raise TransportUnavailable(
-                        "Azure DevOps sprint URL or organization/project context "
-                        "required for Playwright transport"
-                    )
-                items = self._scrape_items_via_playwright(sync_playwright, sprint_url)
-            except Exception as exc:  # pragma: no cover - fallback is validated below
-                last_error = exc
-                items = []
-        if not items:
-            if not sprint_url:
-                detail = str(last_error) if last_error else "no sprint URL available"
-                raise TransportUnavailable(detail)
-            try:
-                payload, _ = capture_sprint_with_browser_agents(
-                    source="azuredevops",
-                    sprint_url=sprint_url,
-                    identifier=iteration_path,
-                    working_dir=self._work_dir,
-                )
-            except BrowserAgentCaptureError as exc:
-                detail = str(last_error) if last_error else "playwright capture failed"
-                raise TransportUnavailable(
-                    f"{detail}; browser-agent fallback failed: {exc}"
-                ) from exc
-            items = [self._browser_item_to_sprint_item(item) for item in payload.items]
-            sprint_name = payload.sprint_name or iteration_path.split("\\")[-1]
-            return Sprint(
-                id=iteration_path,
-                name=sprint_name,
-                state="active",
-                goal=payload.sprint_goal,
-                items=items,
-                source="azuredevops",
-                transport="playwright",
-            )
-        return Sprint(
-            id=iteration_path,
-            name=iteration_path.split("\\")[-1],
-            state="active",
-            items=items,
-            source="azuredevops",
-            transport="playwright",
-        )
-
-    def _resolve_sprint_url(self, explicit: Any) -> str | None:
-        if explicit:
-            return str(explicit).strip()
-        if self._profile_sprint_url:
-            return self._profile_sprint_url
-        if self.organization and self.project:
-            return (
-                f"https://dev.azure.com/{self.organization}/{self.project}/_sprints/backlog/"
-                f"{self.team or self.project}"
-            )
-        return None
-
-    def _load_profile_sprint_url(self) -> str | None:
-        try:
-            from sendsprint import profile as _profile_mod
-
-            profile = _profile_mod.load()
-            return profile.azuredevops.last_sprint_url
-        except Exception:
-            return None
-
-    def _scrape_items_via_playwright(
-        self, sync_playwright: Any, sprint_url: str
-    ) -> list[SprintItem]:
-        items: list[SprintItem] = []
-        with sync_playwright() as pw:
-            browser = pw.chromium.connect_over_cdp(self.cdp_url)
-            context = browser.contexts[0] if browser.contexts else browser.new_context()
-            page = context.new_page()
-            page.goto(sprint_url)
-            page.wait_for_load_state("networkidle", timeout=20000)
-            rows = page.locator("[role='row']").all()
-            for row in rows:
-                title = row.locator("[class*='title']").first
-                if not title:
-                    continue
-                text = title.text_content() or ""
-                if not text.strip():
-                    continue
-                items.append(
-                    SprintItem(
-                        id=text.strip(),
-                        key=text.strip(),
-                        type="Story",
-                        title=text.strip(),
-                        status="unknown",
-                        source_url=sprint_url,
-                    )
-                )
-            page.close()
-        return items
-
-    def _browser_item_to_sprint_item(self, item: Any) -> SprintItem:
-        item_type = (
-            item.type
-            if item.type in {"Story", "Task", "Bug", "Feature", "Epic", "Issue"}
-            else "Issue"
-        )
-        return SprintItem(
-            id=item.key,
-            key=item.key,
-            type=item_type,
-            title=item.title,
-            description=item.description,
-            status=item.status or "unknown",
-            assignee=item.assignee,
-            story_points=item.story_points,
-            source_url=item.source_url,
         )
 
     def _workitem_to_item(self, wi: dict[str, Any], base: str) -> SprintItem:

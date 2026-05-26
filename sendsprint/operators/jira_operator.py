@@ -1,4 +1,4 @@
-"""JiraOperator - reads a sprint from Jira via MCP, REST API, or Playwright."""
+"""JiraOperator - reads a sprint from Jira via MCP or REST API."""
 
 from __future__ import annotations
 
@@ -6,15 +6,10 @@ import logging
 import os
 from datetime import datetime
 from importlib import import_module
-from pathlib import Path
 from typing import Any
 
 import httpx
 
-from sendsprint.browser_agents import (
-    BrowserAgentCaptureError,
-    capture_sprint_with_browser_agents,
-)
 from sendsprint.models import Comment, Link, Sprint, SprintItem
 from sendsprint.operators.base import BaseOperator, Transport, TransportUnavailable
 
@@ -38,7 +33,6 @@ class JiraOperator(BaseOperator):
     Transports:
       - mcp: uses the Atlassian MCP server (when MCP_JIRA_AVAILABLE=1).
       - api: Jira Cloud REST API v3 + Agile API (default for credentials in env).
-      - playwright: connects to an existing Chrome over CDP and scrapes the sprint board.
     """
 
     source = "jira"
@@ -49,7 +43,6 @@ class JiraOperator(BaseOperator):
         email: str | None = None,
         api_token: str | None = None,
         transport: Transport = "auto",
-        cdp_url: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(transport=transport, **kwargs)
@@ -75,9 +68,6 @@ class JiraOperator(BaseOperator):
         self.base_url: str = resolved_base or ""
         self.email: str = resolved_email or ""
         self.api_token: str = resolved_token or ""
-        self.cdp_url: str = cdp_url or os.getenv("PLAYWRIGHT_CDP_URL") or "http://127.0.0.1:9222"
-        self._work_dir = Path(self._kwargs.get("work_dir") or Path.cwd())
-        self._profile_sprint_url = self._load_profile_sprint_url()
 
     def _api_available(self) -> bool:
         return bool(self.base_url and self.email and self.api_token)
@@ -188,132 +178,6 @@ class JiraOperator(BaseOperator):
                     break
                 start_at += len(batch)
         return self._sprint_from_jira_issues(sprint_data, issues, transport="api")
-
-    def _read_via_playwright(self, **kwargs: Any) -> Sprint:
-        sprint_id = kwargs.get("sprint_id")
-        if sprint_id is None:
-            raise ValueError("sprint_id is required")
-        sprint_url = self._resolve_sprint_url(kwargs.get("sprint_url"), sprint_id)
-        last_error: Exception | None = None
-        try:
-            from playwright.sync_api import sync_playwright
-        except ImportError as exc:
-            last_error = exc
-            items = []
-        else:
-            try:
-                if not sprint_url:
-                    raise TransportUnavailable(
-                        "Jira sprint URL or base URL required for Playwright transport"
-                    )
-                items = self._scrape_items_via_playwright(sync_playwright, sprint_url)
-            except Exception as exc:  # pragma: no cover - fallback is validated below
-                last_error = exc
-                items = []
-        sprint_name = f"Sprint {sprint_id}"
-        if not items:
-            if not sprint_url:
-                detail = str(last_error) if last_error else "no sprint URL available"
-                raise TransportUnavailable(detail)
-            try:
-                payload, _ = capture_sprint_with_browser_agents(
-                    source="jira",
-                    sprint_url=sprint_url,
-                    identifier=str(sprint_id),
-                    working_dir=self._work_dir,
-                )
-            except BrowserAgentCaptureError as exc:
-                detail = str(last_error) if last_error else "playwright capture failed"
-                raise TransportUnavailable(
-                    f"{detail}; browser-agent fallback failed: {exc}"
-                ) from exc
-            items = [self._browser_item_to_sprint_item(item) for item in payload.items]
-            return Sprint(
-                id=str(sprint_id),
-                name=payload.sprint_name or sprint_name,
-                state="active",
-                goal=payload.sprint_goal,
-                items=items,
-                source="jira",
-                transport="playwright",
-            )
-        return Sprint(
-            id=str(sprint_id),
-            name=sprint_name,
-            state="active",
-            items=items,
-            source="jira",
-            transport="playwright",
-        )
-
-    def _resolve_sprint_url(self, explicit: Any, sprint_id: Any) -> str | None:
-        if explicit:
-            return str(explicit).strip()
-        if self._profile_sprint_url:
-            return self._profile_sprint_url
-        if self.base_url:
-            return f"{self.base_url}/jira/software/projects/_/boards/_?sprint={sprint_id}"
-        return None
-
-    def _load_profile_sprint_url(self) -> str | None:
-        try:
-            from sendsprint import profile as _profile_mod
-
-            profile = _profile_mod.load()
-            return profile.jira.last_sprint_url
-        except Exception:
-            return None
-
-    def _scrape_items_via_playwright(
-        self, sync_playwright: Any, sprint_url: str
-    ) -> list[SprintItem]:
-        items: list[SprintItem] = []
-        with sync_playwright() as pw:
-            browser = pw.chromium.connect_over_cdp(self.cdp_url)
-            context = browser.contexts[0] if browser.contexts else browser.new_context()
-            page = context.new_page()
-            page.goto(sprint_url)
-            page.wait_for_load_state("networkidle", timeout=20000)
-            cards = page.locator("[data-testid='platform-board-kit.ui.card.card']").all()
-            for card in cards:
-                key_el = card.locator("[data-testid='platform-card.common.ui.key.key']").first
-                title_el = card.locator(
-                    "[data-testid='platform-card.ui.card.focus-container']"
-                ).first
-                key = key_el.text_content() if key_el else ""
-                title = title_el.text_content() if title_el else ""
-                if not key:
-                    continue
-                items.append(
-                    SprintItem(
-                        id=key,
-                        key=key,
-                        type="Story",
-                        title=(title or key).strip(),
-                        status="unknown",
-                        source_url=f"{self.base_url}/browse/{key}" if self.base_url else sprint_url,
-                    )
-                )
-            page.close()
-        return items
-
-    def _browser_item_to_sprint_item(self, item: Any) -> SprintItem:
-        item_type = (
-            item.type
-            if item.type in {"Story", "Task", "Subtask", "Bug", "Epic", "Feature", "Issue"}
-            else "Issue"
-        )
-        return SprintItem(
-            id=item.key,
-            key=item.key,
-            type=item_type,
-            title=item.title,
-            description=item.description,
-            status=item.status or "unknown",
-            assignee=item.assignee,
-            story_points=item.story_points,
-            source_url=item.source_url,
-        )
 
     def _sprint_from_jira_issues(
         self,

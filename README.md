@@ -1,21 +1,45 @@
 # SendSprint
 
-![Coverage](./docs/assets/coverage-badge.svg)
-
 <p align="center">
   <img src="./docs/assets/sendsprint-hero.png" alt="SendSprint turns sprint work into validated pull requests" />
 </p>
 
 > 🇺🇸 English. Leia em português: [README.pt-BR.md](README.pt-BR.md).
 
+**SendSprint is an autonomous agent that finishes the cards assigned to you.**
+It reads your sprint from **Jira**, **Azure DevOps** or **GitHub Issues**, hands
+each task to **[simplicio-cli](https://github.com/wesleysimplicio/simplicio-cli)**
+for the actual code edit, captures test + screen evidence, commits on an
+isolated branch, and opens a **draft pull request** with the evidence attached.
+Then it watches the PR and feeds your review comments back to simplicio until
+you approve.
 
-SendSprint is a **personal autonomous sprint-to-pull-request delivery utility** you install into your own machine and authorize against the repos you already work on. It reads Jira or Azure DevOps sprint work, maps the target architecture, creates isolated branches/worktrees, builds, tests, checks security, captures evidence, commits, opens pull requests, reviews the diff, and reports delivery state in one controlled flow with opt-in LLM code generation and deploy callbacks.
+You don't sit at the keyboard invoking it. A scheduled trigger runs it; your
+only job is to **review the draft PR**.
 
-**There is no hosted service, no SaaS tenant, no billing, no subscription.** Everything runs locally under your control: credentials live in your OS keyring, work happens in worktrees on your disk, and any action against a company project is gated by the operator who launched the run. The package can be distributed independently of the repository visibility — the workflow is yours, not someone else's product.
+## The split that makes it work
 
-The proposal is simple: remove the manual coordination tax between backlog, code, tests, evidence, and PRs. SendSprint gives a single engineer a repeatable execution lane from sprint planning to `develop`, with preflight validation, dry-run planning, resumable runs, branch-per-task delivery, and auditable output.
+- **SendSprint = the agent (the brain).** It owns the flow start to finish:
+  read → organize → execute → evidence → commit → PR → update ticket → review loop.
+- **simplicio-cli = the executor (the hands).** Stateless. It runs *one task →
+  applied diff*. It knows nothing about sprints, branches or PRs.
 
-## Productivity Visuals
+```
+trigger (cron / GitHub Action / Claude web)   ← removes you from the loop
+  └─ SendSprint (agent)
+       1. read sprint        Jira / Azure DevOps / GitHub Issues   (--scope mine)
+       2. organize tasks
+       3. simplicio task ...  ← the only thing simplicio-cli does
+       3b. collect evidence   tests + Playwright screenshot
+       4. commit + push
+       5. open DRAFT PR       ← your only review surface
+       6. attach evidence     test results + embedded screenshots
+       7. update the ticket   "In Review" + PR link
+       8. watch the PR        review comment? → simplicio revises → re-evidence
+            ✓ you approve → merge → next card
+```
+
+## Productivity
 
 ### Without vs. with SendSprint
 
@@ -27,575 +51,100 @@ The proposal is simple: remove the manual coordination tax between backlog, code
 
 ## 🎬 Videos
 
-### Productivity before/after (47s)
-
 ![SendSprint before and after poster](./video/preview/sendsprint-before-after-poster-en.png)
 
 <p align="center">
-  <a href="./video/preview/sendsprint-before-after-en.mp4">▶️ English MP4 (1920×1080, 47s, 7.1 MB)</a>
+  <a href="./video/preview/sendsprint-before-after-en.mp4">▶️ English MP4</a>
   &nbsp;·&nbsp;
-  <a href="./video/preview/sendsprint-before-after-pt.mp4">🇧🇷 Portuguese MP4 (1920×1080, 47s, 7.1 MB)</a>
-</p>
-
-### Product explainer (56s)
-
-![SendSprint explainer preview](./video/preview/sendsprint-en-preview.gif)
-
-<p align="center">
-  <a href="./video/preview/sendsprint-explainer-en.mp4">▶️ Full MP4 (1920×1080, 56s, 20 MB)</a>
+  <a href="./video/preview/sendsprint-before-after-pt.mp4">🇧🇷 Portuguese MP4</a>
   &nbsp;·&nbsp;
-  <a href="./video/preview/poster.png">🖼️ Poster</a>
+  <a href="./video/preview/sendsprint-en-preview.gif">Product explainer</a>
 </p>
-
-### Run loop demo (22s) — what `web/RunScreen` shows
-
-![SendSprint run loop](./video/preview/runloop-en-preview.gif)
-
-<p align="center">
-  <a href="./video/preview/runloop-en.mp4">▶️ Full MP4 (1920×1080, 22s, 5.5 MB)</a>
-  &nbsp;·&nbsp;
-  <a href="./video/">🛠️ Source (Remotion)</a>
-</p>
-
-> 🇧🇷 Versão em português dos vídeos: ver [README.pt-BR.md](README.pt-BR.md).
-
-## Presentations
-
-Stakeholder-ready implementation decks are available in editable and PDF formats:
-
-- [English PPTX](./docs/presentations/sendsprint-implementation-en.pptx) · [English PDF](./docs/presentations/sendsprint-implementation-en.pdf)
-- [Portuguese PPTX](./docs/presentations/sendsprint-implementation-pt-BR.pptx) · [Portuguese PDF](./docs/presentations/sendsprint-implementation-pt-BR.pdf)
-- [Slide preview sheets](./docs/presentations/README.md)
-
-The MP4 videos are generated locally by Remotion and include a generated music bed plus workflow sound effects (`cd video && npm run build:preview`).
-The run-loop one shows exactly what happens in the browser when you open
-`http://localhost:8081` and start a sprint delivery: round 1 fails with a
-visual regression, fix-loop applies patches, round 2 turns green, PR opens.
-
-## 🌐 Run it in your browser (web)
-
-```bash
-# one command: ensure API + web UI and open the browser
-pip install -e ".[api]"
-cd web && npm install
-sendsprint web                    # UI http://localhost:8081, API http://127.0.0.1:8765
-```
-
-See [`web/README.md`](./web/README.md) for the full walkthrough and
-[`sendsprint/api/README.md`](./sendsprint/api/README.md) for the HTTP/SSE API.
-The first `sendsprint run`, `sendsprint watch`, or `sendsprint sprint` of the
-day now tries to ensure the localhost dashboard is up and opens
-`http://localhost:8081` automatically. Use `--no-dashboard` to skip it.
-`--full-mode` is a shortcut for maximum autonomy (`deploy-callback`), and
-`sendsprint full --workspace ...` starts the continuous watch loop in that mode.
-`sendsprint configure-defaults` persists repo/workspace defaults plus startup
-checks for package dependencies, `llm-project-mapper` refresh, dashboard
-bootstrap, and Python fallback when the web UI is blocked. The
-`simplicio-prompt` instruction block is also refreshed silently on every
-startup (default on; toggle via `--no-update-simplicio-prompt`).
-
-
-Works across **13 AI coding tools**: Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, Kiro, Zed, Cline, Continue, Aider, Sourcegraph Cody, Hermes, Openclaw.
-
-> **Status:** v0.22.0 — Console + Web is operational for the current free local-first slice: deterministic task understanding, portfolio/project routing metadata, read-only route previews, Web project setup and Azure auth feedback, frontend route inventory with generated Playwright smokes, robust dev-server readiness handling, version checks in Settings, and plugin profiles for Windsurf, Kiro, and Antigravity. Core delivery still includes local-first `sendsprint sprint`, Jira/Azure DevOps reads, dry-run/resume, evidence bundles, dashboard previews, PR creation, post-PR validation, OSS contribution mode, and yool/tuple runtime hardening.
-
----
-
-## Flow
-
-| Step | Name | What it does |
-|------|------|-------------|
-| 1 | **Read sprint** | Fetch stories/tasks/bugs from Jira or Azure DevOps |
-| 2 | **Architecture mapping** | Inspect repo docs; auto-generate baseline if score < 0.6 |
-| 3 | **Dev** | Detect tech stack, create worktree, install deps + build |
-| 4 | **Lint** | Static analysis per tech (eslint, ruff, clippy, etc.) |
-| 5 | **Tests** | Unit tests + Playwright E2E with screenshot evidence; front repos can opt into flow inventory and generated route smokes |
-| 6 | **Security review** | Flag-only scan (secrets, env files, npm audit) |
-| 7 | **Fix loop** | If lint/tests/security fail: re-build + re-run (max 3 rounds) |
-| 8 | **Commit** | `git add -A && git commit` on worktree branch |
-| 9 | **Create PR** | GitHub (gh CLI) or Azure DevOps REST API |
-| 10 | **PR review + Delivered** | Diff analysis + RunReport with JSON export |
-
-Optional hooks:
-
-- **Step 3.5 — LLM code generation** applies an opt-in unified diff between build and lint.
-- **Step 5.1 — Frontend flow inventory** can start a front repo dev server,
-  crawl declared base URLs, generate Playwright route smoke tests, capture
-  screenshots, and feed route failures back into the same fix loop as lint/tests.
-- **Step 11 — Deploy trigger** posts an opt-in webhook after PR creation and attempts a ticket status update.
-
-Before any mutable delivery step, SendSprint builds a read-only `DeliveryPlan`.
-That plan now carries deterministic task understanding (`sendsprint/task_understanding.py`),
-portfolio-aware routing (`sendsprint/routing.py`), selected repos, branch/target
-branches, validation templates, route confidence, and low-confidence warnings.
-Plan-only autonomy reports weak routes; side-effecting autonomy blocks low-confidence
-routes until the task or workspace supplies clearer repo, project, role, surface,
-or capability signals.
-
-Transport priority: `mcp` -> `api` -> `playwright`.
-
----
-
-## Requirements
-
-- Python `>=3.11`
-- Playwright (`playwright install chromium`)
-- Optional: Jira API token / Azure DevOps PAT, or Atlassian / Azure DevOps MCP server
 
 ---
 
 ## Install
 
 ```bash
-git clone https://github.com/wesleysimplicio/SendSprint.git
-cd SendSprint
 pip install -e .
-playwright install chromium
-cp .env.example .env  # fill in credentials
+pip install simplicio-cli            # the executor
+pip install -e ".[screenshot]"       # optional: Playwright screen evidence
+playwright install chromium          # optional
 ```
-
----
 
 ## Quick start
 
-### CLI
-
 ```bash
-# Full 10-step flow against a Jira sprint
-sendsprint run jira 42 --workspace workspace.yaml --scope mine -o report.json
+# one-time credential storage (OS keyring)
+sendsprint login jira
+sendsprint login azuredevops
+# GitHub uses the GITHUB_TOKEN env var
 
-# Same flow with opt-in LLM patch generation and deploy callback
-sendsprint run jira 42 --workspace workspace.yaml --scope mine --llm-codegen --deploy
+# deliver a sprint — each card → simplicio → evidence → draft PR
+sendsprint run jira 42 --repo . --repo-slug owner/repo --scope mine
+sendsprint run azuredevops "Team\\Sprint 12" --repo . --repo-slug repoId
+sendsprint run github 7 --repo . --repo-slug owner/repo   # milestone #7
 
-# Full flow against Azure DevOps
-sendsprint run azuredevops "Team\\Sprint 12" --repo ./repo
-
-# Validate environment/sprint safety before delivery
-sendsprint preflight azuredevops "Team\\Sprint 12" --workspace workspace.yaml
-
-# Plan branches/repos/PR targets without writing files or opening PRs
-sendsprint run azuredevops "Team\\Sprint 12" --workspace workspace.yaml --dry-run
-
-# Persist the same route plan as JSON for review or Web/API comparison
-sendsprint run azuredevops "Team\\Sprint 12" --workspace workspace.yaml --dry-run --plan-output route-plan.json
-
-# Build the localhost route preview used by Web preparation flows
-curl -X POST http://127.0.0.1:8765/runs/preview \
-  -H "content-type: application/json" \
-  -d '{"provider":"azuredevops","sprint_id":"Team\\\\Sprint 12","mode":"all","workspace_path":"workspace.yaml"}'
-
-# Resume a previous run idempotently
-sendsprint run azuredevops "Team\\Sprint 12" --workspace workspace.yaml --run-id sprint-12
-
-# Inspect tuple DAG + receipt cost rollup
-sendsprint sprint inspect tuple-20260519T120000-abcd1234 --cost
-
-# Emit one yool directly through the shared CLI/MCP dispatch path
-sendsprint sprint dispatch agent.codex.plan --payload '{"story":"APP-1"}'
-
-# Browse the spec-shaped HAMT catalog
-sendsprint sprint catalog list
-sendsprint sprint catalog find "/codex/"
-sendsprint sprint catalog show agent.codex.plan
-
-# Watch assigned tasks periodically in conservative planning mode
-sendsprint watch --workspace workspace.yaml --autonomy plan
-
-# Continuous full mode with maximum autonomy and dashboard bootstrap
-sendsprint full --workspace workspace.yaml
-
-# Persist your local operational defaults
-sendsprint configure-defaults --repo . --workspace workspace.yaml
-
-# Watch once without changing repos or watch-state
-sendsprint watch --workspace workspace.yaml --dry-run
-
-# Detect tech stack
-sendsprint detect-tech ./repo
-
-# Check architecture mapping (with auto-build if missing)
-sendsprint check-architecture ./repo --build
-
-# Sync latest agentic-starter scaffold files into a repo
-sendsprint sync-agentic-starter ./repo --ref latest
+# unattended: finish my cards without me at the keyboard
+sendsprint watch jira 42 --repo . --repo-slug owner/repo --once   # one pass (cron/CI)
+sendsprint watch jira 42 --repo . --repo-slug owner/repo          # loop forever
 ```
 
-### Python
+`simplicio-cli` reads its model/provider config from the environment
+(`SIMPLICIO_MODEL`, `SIMPLICIO_BASE_URL`, `SIMPLICIO_TEST_CMD`).
 
-```python
-from sendsprint.flow import SprintFlow
-from sendsprint.operators import JiraOperator
-from sendsprint.workspace import load_workspace
-from sendsprint.scope import build_scope
+## Unattended trigger
 
-ws = load_workspace("workspace.yaml")
-scope = build_scope(mode="mine", user_email="dev@example.com")
-flow = SprintFlow(operator=JiraOperator(), workspace=ws, scope=scope)
-result = flow.run(sprint_id=42)
-print(result.run_report.summary)
-```
+The point is to not invoke it manually. Run `sendsprint watch ... --once` from:
 
-### Read a sprint only
+- a **GitHub Action** on a schedule — see
+  [`.github/workflows/sendsprint.yml`](./.github/workflows/sendsprint.yml);
+- a **cron job**;
+- a **Claude Code on the web** scheduled trigger
+  ([docs](https://code.claude.com/docs/en/claude-code-on-the-web)).
 
-```python
-from sendsprint.operators import JiraOperator
+It scopes to your cards (`--scope mine`), delivers the ones it hasn't delivered
+yet (state in `.sendsprint/runs/watch-state.json`), and stops at the draft PR.
 
-op = JiraOperator(
-    base_url="https://your-org.atlassian.net",
-    transport="auto",
-)
-sprint = op.read_sprint(sprint_id=42)
-for item in sprint.items:
-    print(f"  [{item.type}] {item.key} - {item.title} ({item.status})")
-```
+## How Claude / Codex invoke it
 
-### Route preview surfaces
-
-CLI dry-runs and the Web/API route preview share the same planning path:
-`SprintFlow.bootstrap(..., dry_run=True)` -> `build_delivery_plan(...)`. Use
-`sendsprint run ... --dry-run` or `sendsprint sprint ... --dry-run` for terminal
-review, optionally with `--plan-output` on `sendsprint run`. Use `POST
-/runs/preview` or `POST /api/runs/preview` for the localhost API contract. Both
-surfaces expose selected repos, route confidence, low-confidence items, task
-scope source, and validation commands without writing files, branches, commits,
-PRs, receipts, or watch state.
-
-### Tuple runtime surfaces
-
-SendSprint now boots mutable delivery through the yool/tuple runtime. The main
-delivery path builds a DAG by seeding one worker-root tuple per item/repo route
-and letting lane subscribers (`dev -> lint -> test -> security -> pr`) append
-follow-up tuples. Receipts provide cross-run cache and resume, while `inspect`
-renders the tuple DAG and cost rollup.
-
-- `.catalog/agents.json` — spec-shaped HAMT catalog generated by `python scripts/build_agent_catalog.py`
-- `sendsprint sprint catalog ...` — list/find/show yools
-- `sendsprint sprint dispatch ...` — append one tuple into `.sendsprint/tuples/<run_id>.ndjson`
-- `sendsprint sprint inspect <run_id> --cost` — inspect tuple DAG + receipt rollup
-- `sendsprint sprint resume <run_id|tuple_id>` — replay pending tuples from the append-only log
-- `sendsprint run ... --no-cache` / `sendsprint sprint ... --no-cache` — bypass receipt reuse for a fresh execution pass
-- MCP: `sendsprint_snapshot`, `sendsprint_dispatch`, `sendsprint_inspect`
-
----
-
-## Multi-repo workspace
-
-Define repos in `workspace.yaml`:
-
-```yaml
-name: my-project
-root_path: /home/dev/repos
-new_projects_dir: Projetos/novos
-pr_provider: github
-default_base_branch: develop
-branch_name_template: feature/{number}-{title}
-pr_reviewers:
-  - reviewer@example.com
-required_pr_reviewers:
-  - lead@example.com
-code_generation:
-  enabled: false
-  provider: anthropic
-  model: claude-opus-4-7
-  max_usd: 1.0
-  max_tokens: 8000
-deploy:
-  enabled: false
-  provider: webhook
-  url: https://deploy.example.com/hooks/sendsprint
-  final_status: Deployed
-watch:
-  enabled: true
-  provider: azuredevops
-  interval_minutes: 15
-  scope: assigned_to_me
-  allowed_states:
-    - New
-  ignored_states:
-    - Removed
-    - Closed
-    - Done
-  work_item_types:
-    - Task
-  iteration_path: Team\\Sprint 12
-  max_tasks_per_cycle: 1
-  require_clean_worktree: true
-  evidence_required: true
-  playwright_required_for_front: true
-  create_pr: true
-  pr_target_branch: develop
-repos:
-  - name: backend-api
-    path: backend-api
-    role: api
-    tech: dotnet
-    default_branch: main
-    pr_target_branch: develop
-    # Optional per-repo reviewer rules:
-    # required_pr_reviewers:
-    #   - daniel.ribeiro_ext@interplayers.com.br
-    # Optional per-repo override:
-    # branch_name_template: hotfix/{number}-{title}
-  - name: frontend-web
-    path: frontend-web
-    role: front
-    tech: angular
-    frontend:
-      base_url: http://localhost:4200
-      dev_server_command: npm start -- --host 127.0.0.1 --port 4200
-      flow_inventory: auto
-      generate_route_smokes: true
-      screenshot_evidence: true
-  - name: mobile-app
-    path: mobile-app
-    role: mobile
-    tech: flutter
-```
-
-Portfolio/project mode can group repos before flattening them into the same
-`WorkspaceConfig.repos` list used by existing flow code. Project-owned repos
-inherit `project` from `key` or `name` unless the repo overrides it.
-
-```yaml
-name: commerce-workspace
-root_path: .
-portfolio:
-  name: Commerce
-  owners: [platform-office]
-  capabilities: [checkout, payments]
-projects:
-  - key: payments
-    name: Payments
-    owners: [team-payments]
-    capabilities: [payment-processing]
-    components: [checkout, ledger]
-    routing_hints:
-      labels: [payments]
-      areas: [Checkout]
-    repos:
-      - name: payments-api
-        path: apps/payments-api
-        role: api
-        tech: python
-        capabilities: [capture, refund]
-        components: [api, worker]
-        routing_hints:
-          labels: [scope:back]
-        validation_commands:
-          - ruff check sendsprint
-          - pytest tests -q
-      - name: checkout-web
-        path: apps/checkout-web
-        role: front
-        tech: react
-        frontend:
-          base_url: http://localhost:5173
-          dev_server_command: npm run dev -- --host 127.0.0.1 --port 5173
-          flow_inventory: auto
-          generate_route_smokes: true
-          screenshot_evidence: true
-        routing_hints:
-          labels: [scope:front]
-        validation_commands:
-          - npm test
-          - npx playwright test
-```
-
-Frontend repo options are intentionally local-first. When a repo declares
-`frontend.base_url` and `frontend.dev_server_command`, SendSprint can treat the
-running app as part of Step 5: inventory browser routes, generate concise
-Playwright smoke checks for reachable pages, attach screenshot evidence to the
-run report, and return failures to the capped fix loop before PR creation.
-
-Routing uses explicit labels first (`repo:payments-api`, `project:payments`,
-`scope:front`, `surface:api`, `capability:refund`), then structured task
-understanding, workspace/project metadata, tech fingerprints, operational
-memory, and finally backwards-compatible front/back inference.
-
-Azure DevOps MCP can be configured for Codex with:
-
-```bash
-sendsprint install-ado-mcp --organization my-org --project "Projetos Ágeis" --team "Squad Yankee"
-```
-
-SendSprint can also expose its own deterministic tooling as an MCP stdio
-server:
-
-```bash
-sendsprint mcp-serve
-```
-
-Current default MCP tools:
-
-- `sendsprint_detect_tech`
-- `sendsprint_check_architecture`
-- `sendsprint_version`
-
-The transport uses JSON-RPC 2.0 with `Content-Length` framing so Claude Code
-and similar hosts can launch it directly.
-
-When a User Story has no child tasks, SendSprint creates in-memory front/back
-tasks before delivery. Generated tasks keep `parent_key` pointing to the story
-and labels `scope:front` / `scope:back`, so each task runs only against matching
-workspace repos.
-
----
+The host assistant never reimplements the flow — it shells out to the
+`sendsprint` CLI. A trigger phrase (`/sendsprint`, "rode o sendsprint") makes
+Claude/Codex run `sendsprint run ... --scope mine`. Manifests live under
+[`skills/claude`](./skills/claude) and [`skills/codex`](./skills/codex).
 
 ## Architecture
 
 ```
 sendsprint/
-├── operators/         JiraOperator, AzureDevopsOperator (mcp|api|playwright)
-├── models/            Sprint, SprintItem, StepReport, RunReport (Pydantic v2)
-├── agents/
-│   ├── worktree.py    Git worktree isolation for parallel branches
-│   ├── dev.py         Install + build per tech stack (16 package managers)
-│   ├── lint_runner.py Static analysis per tech (19 linters)
-│   ├── test_runner.py Unit + E2E with screenshot evidence
-│   ├── security_reviewer.py  Secret scan, env audit, npm audit
-│   ├── pr_creator.py  GitHub (gh) / Azure DevOps (REST) PR creation
-│   └── pr_reviewer.py Diff static checks (TODO, debug, long lines)
-├── architecture/
-│   ├── mapper.py      Weighted architecture scoring
-│   └── builder.py     Auto-generate baseline docs
-├── tech/
-│   └── detector.py    Filesystem marker detection (25+ techs)
-├── workspace/
-│   └── loader.py      YAML/JSON multi-repo workspace config
-├── scope.py           --scope mine filtering (account_id, email, name)
-├── flow/
-│   └── sprint_flow.py orchestrator + opt-in codegen/deploy hooks
-├── llm/               Provider-agnostic LLM client
-└── cli.py             Typer CLI
+├── operators/      task readers: JiraOperator, AzureDevopsOperator, GitHubIssuesOperator (mcp|api)
+├── executor/       SimplicioExecutor — the boundary to simplicio-cli (task → applied diff)
+├── delivery/       worktree, git_ops (commit+push), evidence (tests+screens), pr (create+review)
+├── models/         Sprint, SprintItem, StepReport, RunReport, ScopeConfig (Pydantic v2)
+├── github_integration.py  ReviewReader (PR feedback) + evidence comment posting + CI
+├── scope.py        --scope mine filtering
+├── flow.py         the orchestrator (read → simplicio → evidence → PR → review loop)
+├── watch.py        the unattended trigger
+└── cli.py          Typer CLI: run, watch, login, logout, version
 ```
-
----
 
 ## Environment variables
 
-| Variable | Required for |
-|----------|-------------|
-| `JIRA_BASE_URL` | Jira API |
-| `JIRA_EMAIL` | Jira API |
-| `JIRA_API_TOKEN` | Jira API |
-| `AZURE_DEVOPS_ORG` | Azure DevOps API |
-| `AZURE_DEVOPS_PROJECT` | Azure DevOps API |
-| `AZURE_DEVOPS_PAT` | Azure DevOps API |
-| `PLAYWRIGHT_CDP_URL` | Playwright fallback (default `http://127.0.0.1:9222`) |
-| `LLM_PROVIDER` | LLM step (optional) |
-| `LLM_MODEL` | LLM step (optional) |
-
----
-
-## Assistant Integrations
-
-Per-platform reference manifests live under `skills/`. SendSprint can also
-install repo-local plugin adapters for the main assistant hosts:
-
-```bash
-sendsprint plugins list
-sendsprint plugins install --repo . --all                       # flat rule files (all hosts)
-sendsprint plugins install --repo . --packaged --all            # full plugin packages where supported
-sendsprint plugins install --repo . --packaged --platform claude  # one host at a time
-```
-
-### Full plugin packages
-
-Four hosts ship a **complete plugin package** (manifest + commands + agents +
-skills + hooks), not just a rule file. Source lives in
-[`plugins/`](./plugins/):
-
-| Host | Package | Manifest | Install target |
-|---|---|---|---|
-| Claude Code | `plugins/claude-code/` | `.claude-plugin/plugin.json` | `.claude/plugins/sendsprint/` |
-| Codex CLI | `plugins/codex/` | `plugin.toml` + `AGENTS.md` + `config.toml` | `.codex/plugins/sendsprint/` |
-| Hermes Agent | `plugins/hermes/` | `hermes-plugin.json` | `.hermes/plugins/sendsprint/` |
-| OpenClaw | `plugins/openclaw/` | `openclaw-plugin.json` | `.openclaw/plugins/sendsprint/` |
-
-`--packaged` runs the full-tree install for the four hosts above and falls back
-to the flat rule file for the rest (Cursor, Windsurf, Kiro, Antigravity,
-Copilot). See [plugins/README.md](./plugins/README.md) for per-host install
-notes.
-
-### Flat rule files (legacy mode)
-
-| File | Platform |
-|------|---------|
-| `skills/claude/SKILL.md` | Claude Code |
-| `skills/codex/AGENTS.md` | Codex / OpenAI |
-| `skills/hermes/hermes.md` | Hermes Agent |
-| `skills/openclaw/openclaw.md` | Openclaw |
-| `skills/copilot/copilot-instructions.md` | GitHub Copilot |
-| `skills/cursor/sendsprint.mdc` | Cursor |
-| `skills/windsurf/sendsprint.md` | Windsurf |
-| `skills/kiro/sendsprint.md` | Kiro |
-| `skills/zed/sendsprint.md` | Zed |
-| `skills/cline/.clinerules` | Cline |
-| `skills/continue/config.json` | Continue |
-| `skills/aider/CONVENTIONS.md` | Aider |
-| `skills/cody/sendsprint.md` | Sourcegraph Cody |
-
-Generated adapters target `.claude/skills/sendsprint/SKILL.md`,
-`AGENTS.md`, `.hermes/skills/sendsprint.md`,
-`.openclaw/skills/sendsprint.md`, `.cursor/rules/sendsprint.mdc`,
-`.windsurf/rules/sendsprint.md`, `.kiro/steering/sendsprint.md`,
-`.antigravity/rules/sendsprint.md`, and `.github/copilot-instructions.md`.
-Each adapter references the same Python core; the host assistant delegates to
-`sendsprint doctor`, `sendsprint web`, `sendsprint sprint`,
-`sendsprint watch`, and `sendsprint full` instead of reimplementing the
-pipeline. See `docs/PLUGIN_ADAPTERS.md`.
-
----
+| Variable | For |
+|---|---|
+| `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Jira |
+| `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_PAT` | Azure DevOps |
+| `GITHUB_TOKEN`, `GITHUB_REPO` | GitHub Issues + PRs |
+| `SIMPLICIO_MODEL`, `SIMPLICIO_BASE_URL`, `SIMPLICIO_TEST_CMD` | simplicio-cli |
 
 ## Tests
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ -v
+pytest tests/ -q
+ruff check sendsprint/
 ```
-
-The suite covers operators, architecture mapper/builder, tech detector, scope filtering, workspace loading, CLI overrides, and all delivery agents including codegen/deploy orchestration.
-
----
-
-## Roadmap
-
-- [x] Step 1 - Sprint reading (Jira + Azure DevOps, MCP / API / Playwright)
-- [x] Step 2 - Architecture mapping + auto-build baseline docs
-- [x] Step 3 - Dev agent (tech detection, worktree isolation, install + build)
-- [x] Step 4 - Test runner (unit + Playwright E2E with screenshot evidence)
-- [x] Step 5 - Security reviewer (flag-only: secrets, env, npm audit)
-- [x] Step 6 - Fix loop (re-build + re-test, max 3 rounds)
-- [x] Step 7 - PR creation (GitHub gh CLI + Azure DevOps REST)
-- [x] Step 8 - PR review (diff static checks)
-- [x] Step 9 - RunReport with full evidence
-- [x] Multi-repo workspace support (workspace.yaml)
-- [x] `--scope mine` current-user filtering
-- [x] LLM-powered code generation per sprint item
-- [x] Deploy trigger + status callback to ticket
-- [x] MCP server mode (expose SendSprint as an MCP tool)
-
----
-
-## Personal use and operator authorization
-
-SendSprint is a personal utility. Practical implications:
-
-- **No hosted service exists.** There is no SaaS dashboard, no managed tenant, no
-  billing portal. Everything runs from your terminal against `localhost`.
-- **You are the operator.** Every Jira/ADO read, every git operation, every PR
-  is initiated by a human launching `sendsprint sprint` (or starting the local
-  API). The tool never acts on its own schedule.
-- **Company repos are run under your authority.** When you point SendSprint at a
-  company repo, you are using your existing access — same credentials and same
-  branches you'd use by hand. No new permission boundary is introduced.
-- **Local utility.** The package can be installed and run on an engineer's own
-  machine against their own repos without any hosted SendSprint control plane.
-  There is still no commercial hosted offering in this release.
-
-If you ever want a hosted/multi-tenant version, fork the repo and build it
-yourself — the architecture is intentionally local-first.
 
 ## License
 
-MIT - see [LICENSE](./LICENSE).
+MIT — see [LICENSE](./LICENSE).

@@ -1,36 +1,51 @@
-name: SendSprint CI
+name: sendsprint-watch
+
+# Unattended trigger: finish the cards assigned to me, on a schedule.
+# This is how SendSprint runs without a human at the keyboard. It scopes to the
+# operator's cards, delivers the ones not yet delivered, and stops at draft PRs.
 
 on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main]
+  schedule:
+    - cron: "*/30 * * * *" # every 30 minutes
+  workflow_dispatch:
+    inputs:
+      source:
+        description: jira | azuredevops | github
+        required: true
+        default: github
+      sprint:
+        description: sprint id / iteration path / milestone
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  lint-and-test:
+  watch:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
-
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e . && pip install simplicio-cli
+      - name: Deliver assigned cards
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: ${{ github.repository }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          AZURE_DEVOPS_ORG: ${{ secrets.AZURE_DEVOPS_ORG }}
+          AZURE_DEVOPS_PROJECT: ${{ secrets.AZURE_DEVOPS_PROJECT }}
+          AZURE_DEVOPS_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          SIMPLICIO_MODEL: ${{ secrets.SIMPLICIO_MODEL }}
+          SIMPLICIO_BASE_URL: ${{ secrets.SIMPLICIO_BASE_URL }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
-
-      - name: Lint (ruff)
-        run: ruff check sendsprint/ tests/
-
-      - name: Type check (mypy)
-        run: mypy sendsprint/ --ignore-missing-imports
-
-      - name: Tests
-        run: pytest tests/ -v --tb=short
+          sendsprint watch "${{ github.event.inputs.source || 'github' }}" \
+            "${{ github.event.inputs.sprint || '*' }}" \
+            --repo . --repo-slug "${{ github.repository }}" --once

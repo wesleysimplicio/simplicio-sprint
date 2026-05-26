@@ -1,6 +1,0 @@
-node_modules/
-.expo/
-.expo-shared/
-dist/
-*.log
-.DS_Store
