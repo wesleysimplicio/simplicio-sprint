@@ -77,7 +77,7 @@ _CLAUDE_FM = (
     "name: sendsprint\n"
     f"description: {SKILL_DESCRIPTION}\n"
     "command: sendsprint\n"
-    "version: 3.0.0\n"
+    "version: 1.0.0\n"
     "platform: claude-code\n"
     "---"
 )
