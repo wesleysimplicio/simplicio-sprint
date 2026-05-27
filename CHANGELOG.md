@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.0
+
+simplicio-mapper + MCP integration, plus the simplicio-prompt subagent fan-out.
+
+- **MCP transport now works.** A host-injected seam
+  (`operators/_mcp_bridge.py`) lets the agent feed MCP tool results to the Jira /
+  Azure DevOps / GitHub operators, which reuse their REST→`Sprint` mappers. With
+  no provider registered, `auto` transport falls back to REST as before.
+- **simplicio-mapper adapter** (`mapper/`): renders a `Sprint` into the
+  `.specs/sprints/sprint-XX/` format (`SPRINT.md`, `BACKLOG.md`, and one
+  `NN-slug.task.md` per card with frontmatter + Acceptance Criteria, Test plan,
+  Definition of Done). The flow writes each card's spec into the worktree so
+  simplicio-cli has structured context.
+- **simplicio-prompt fan-out** (`prompt/`): `PromptFanout` shells out to the
+  Tuple-Space + Yool kernel (`--subagents 600`) to brainstorm edge cases and a
+  plan per card, folding the result into the simplicio task. Opt-in via
+  `sendsprint run --fanout`; degrades gracefully when the kernel is absent.
+
 ## 1.0.0
 
 Full rewrite around the simplicio-cli executor model.

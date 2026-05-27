@@ -64,7 +64,13 @@ class BaseOperator(ABC):
         return self._read_via_api(**kwargs)
 
     def _mcp_available(self) -> bool:
-        return os.getenv(f"MCP_{self.source.upper()}_AVAILABLE") == "1"
+        if os.getenv(f"MCP_{self.source.upper()}_AVAILABLE") == "1":
+            return True
+        try:
+            from sendsprint.operators import _mcp_bridge
+        except ImportError:  # pragma: no cover — bridge ships with the package
+            return False
+        return _mcp_bridge.has_provider(self.source)
 
     def update_status(self, item_key: str, status: str, comment: str | None = None) -> None:
         """Update the remote ticket status and optionally attach a comment."""

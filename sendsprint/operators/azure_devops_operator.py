@@ -129,11 +129,10 @@ class AzureDevopsOperator(BaseOperator):
         iteration_path = kwargs.get("iteration_path")
         if iteration_path is None:
             raise ValueError("iteration_path is required")
-        try:
-            bridge = import_module("sendsprint.operators._mcp_bridge")
-        except ImportError as exc:
-            raise TransportUnavailable("MCP bridge module missing") from exc
-        return bridge.call_ado_mcp(iteration_path=iteration_path)
+        bridge = import_module("sendsprint.operators._mcp_bridge")
+        payload = bridge.fetch("azuredevops", iteration_path=iteration_path)
+        work_items = payload.get("work_items") or payload.get("workItems") or payload.get("value")
+        return self._sprint_from_workitems(iteration_path, work_items or [], transport="mcp")
 
     def _read_via_api(self, **kwargs: Any) -> Sprint:
         iteration_path = kwargs.get("iteration_path")
@@ -158,7 +157,7 @@ class AzureDevopsOperator(BaseOperator):
             )
             wiql_resp.raise_for_status()
             ids = [w["id"] for w in wiql_resp.json().get("workItems", [])]
-            items: list[SprintItem] = []
+            raw_items: list[dict[str, Any]] = []
             for chunk in _chunked(ids, 200):
                 if not chunk:
                     continue
@@ -172,15 +171,21 @@ class AzureDevopsOperator(BaseOperator):
                     },
                 )
                 detail.raise_for_status()
-                for wi in detail.json().get("value", []):
-                    items.append(self._workitem_to_item(wi, base))
+                raw_items.extend(detail.json().get("value", []))
+        return self._sprint_from_workitems(iteration_path, raw_items, transport="api")
+
+    def _sprint_from_workitems(
+        self, iteration_path: str, work_items: list[dict[str, Any]], *, transport: str
+    ) -> Sprint:
+        base = f"https://dev.azure.com/{self.organization}/{self.project}"
+        items = [self._workitem_to_item(wi, base) for wi in work_items]
         return Sprint(
             id=iteration_path,
             name=iteration_path.split("\\")[-1],
             state="active",
             items=items,
             source="azuredevops",
-            transport="api",
+            transport=transport,  # type: ignore[arg-type]
         )
 
     def _workitem_to_item(self, wi: dict[str, Any], base: str) -> SprintItem:

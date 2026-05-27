@@ -22,8 +22,10 @@ from sendsprint.delivery.git_ops import GitError, GitOps
 from sendsprint.delivery.pr import PullRequestManager
 from sendsprint.delivery.worktree import WorktreeError, WorktreeManager
 from sendsprint.executor import SimplicioExecutor
+from sendsprint.mapper import MapperAdapter
 from sendsprint.models import RunReport, ScopeConfig, Sprint, SprintItem, StepReport
 from sendsprint.operators.base import BaseOperator, TransportUnavailable
+from sendsprint.prompt import PromptFanout
 from sendsprint.scope import apply_scope
 from sendsprint.tech import detect_tech
 
@@ -72,6 +74,8 @@ class SprintFlow:
         simplicio_binary: str = "simplicio",
         draft_prs: bool = True,
         update_tickets: bool = True,
+        write_specs: bool = True,
+        fanout: PromptFanout | None = None,
     ) -> None:
         self.operator = operator
         self.target = target
@@ -79,6 +83,8 @@ class SprintFlow:
         self.simplicio_binary = simplicio_binary
         self.draft_prs = draft_prs
         self.update_tickets = update_tickets
+        self.write_specs = write_specs
+        self.fanout = fanout
 
     def run(self, **read_kwargs: object) -> RunReport:
         """Read the sprint, scope it, and deliver each item."""
@@ -92,8 +98,8 @@ class SprintFlow:
             scope_mode=(self.scope.mode if self.scope else "all"),
             user=(self.scope.user_email if self.scope else None),
         )
-        for item in sprint.items:
-            outcome = self.deliver_item(item)
+        for index, item in enumerate(sprint.items, start=1):
+            outcome = self.deliver_item(item, sprint=sprint, index=index)
             report.steps.extend(outcome.steps)
             if outcome.pr is not None:
                 report.prs.append(outcome.pr)  # type: ignore[arg-type]
@@ -101,7 +107,9 @@ class SprintFlow:
         report.summary = self._summarize(sprint, report)
         return report
 
-    def deliver_item(self, item: SprintItem) -> ItemOutcome:
+    def deliver_item(
+        self, item: SprintItem, *, sprint: Sprint | None = None, index: int = 1
+    ) -> ItemOutcome:
         """Deliver one item end to end. Never raises — failures become reports."""
         outcome = ItemOutcome(item_key=item.key)
         branch = self._branch_name(item)
@@ -117,9 +125,30 @@ class SprintFlow:
 
         tech = self.target.tech or detect_tech(str(work_dir)).primary_tech
 
+        context_parts: list[str] = []
+
+        # Step 2b — adapt the card into the simplicio-mapper spec format.
+        if self.write_specs:
+            spec_step, spec_note = self._write_spec(work_dir, item, sprint, index)
+            outcome.steps.append(spec_step)
+            if spec_note:
+                context_parts.append(spec_note)
+
+        # Step 2c — optional simplicio-prompt subagent fan-out (brainstorm/plan).
+        if self.fanout is not None:
+            fan_step, fan_note = self._fan_out(item)
+            outcome.steps.append(fan_step)
+            if fan_note:
+                context_parts.append(fan_note)
+
         # Step 3 — simplicio executes the task.
         executor = SimplicioExecutor(work_dir, binary=self.simplicio_binary)
-        exec_step = executor.run_item(item, stack=tech, repo=self.target.name)
+        exec_step = executor.run_item(
+            item,
+            stack=tech,
+            repo=self.target.name,
+            extra_context="\n\n".join(context_parts) or None,
+        )
         outcome.steps.append(exec_step)
         if exec_step.status != "ok":
             wt_manager.remove(branch)
@@ -216,6 +245,47 @@ class SprintFlow:
         return steps
 
     # -- internals ----------------------------------------------------------
+
+    def _write_spec(
+        self, work_dir: Path, item: SprintItem, sprint: Sprint | None, index: int
+    ) -> tuple[StepReport, str | None]:
+        """Materialize the card into ``.specs/`` and return a note for simplicio."""
+        try:
+            path = MapperAdapter(work_dir).write_item(item, sprint=sprint, index=index)
+        except OSError as exc:  # best-effort; never abort the item
+            return (
+                StepReport(step=2, name=f"mapper:{item.key}", status="skipped", message=str(exc)),
+                None,
+            )
+        rel = path.relative_to(work_dir)
+        note = (
+            f"A task spec was written to {rel} in the mapper format. Follow its "
+            "Acceptance Criteria, Test plan, and Definition of Done."
+        )
+        return (
+            StepReport(step=2, name=f"mapper:{item.key}", status="ok", message=f"spec at {rel}"),
+            note,
+        )
+
+    def _fan_out(self, item: SprintItem) -> tuple[StepReport, str | None]:
+        """Run the simplicio-prompt subagent fan-out for one card."""
+        assert self.fanout is not None
+        result = self.fanout.brainstorm(item)
+        status = result.status if result.status in {"ok", "skipped", "failed"} else "skipped"
+        note: str | None = None
+        if result.status == "ok" and result.samples:
+            joined = "\n".join(f"- {s.strip()}" for s in result.samples if s.strip())
+            note = f"Subagent brainstorm ({result.completed} agents):\n{joined}"
+        return (
+            StepReport(
+                step=3,
+                name=f"fanout:{item.key}",
+                tech=self.target.tech,
+                status=status,  # type: ignore[arg-type]
+                message=result.summary(),
+            ),
+            note,
+        )
 
     def _collect_evidence(
         self, work_dir: Path, item: SprintItem, tech: str | None

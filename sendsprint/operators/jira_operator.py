@@ -138,11 +138,11 @@ class JiraOperator(BaseOperator):
         sprint_id = kwargs.get("sprint_id")
         if sprint_id is None:
             raise ValueError("sprint_id is required")
-        try:
-            bridge = import_module("sendsprint.operators._mcp_bridge")
-        except ImportError as exc:
-            raise TransportUnavailable("MCP bridge module missing") from exc
-        return bridge.call_jira_mcp(sprint_id=sprint_id)
+        bridge = import_module("sendsprint.operators._mcp_bridge")
+        payload = bridge.fetch("jira", sprint_id=sprint_id)
+        sprint_data = payload.get("sprint") or {"id": sprint_id, "name": f"sprint {sprint_id}"}
+        issues = payload.get("issues", [])
+        return self._sprint_from_jira_issues(sprint_data, issues, transport="mcp")
 
     def _read_via_api(self, **kwargs: Any) -> Sprint:
         sprint_id = kwargs.get("sprint_id")

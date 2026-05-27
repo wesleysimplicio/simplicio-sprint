@@ -30,6 +30,7 @@ from sendsprint.operators import (
     GitHubIssuesOperator,
     JiraOperator,
 )
+from sendsprint.prompt import PromptFanout
 from sendsprint.scope import build_scope
 from sendsprint.watch import Watcher
 
@@ -82,6 +83,11 @@ def run(
     test_command: str | None = typer.Option(None, help="Command to run for test evidence"),
     frontend_url: str | None = typer.Option(None, help="URL to screenshot for screen evidence"),
     draft: bool = typer.Option(True, help="Open PRs as drafts pending your review"),
+    specs: bool = typer.Option(True, help="Write simplicio-mapper .specs/ task files per card"),
+    fanout: bool = typer.Option(False, help="Run a simplicio-prompt subagent fan-out per card"),
+    fanout_subagents: int = typer.Option(600, help="Subagents per fan-out"),
+    fanout_provider: str = typer.Option("deepseek", help="simplicio-prompt provider"),
+    fanout_dry_run: bool = typer.Option(False, help="Run the fan-out offline (no key/network)"),
     output: Path | None = typer.Option(None, "-o", "--output", help="Write RunReport JSON"),
 ) -> None:
     """Deliver a sprint: each card → simplicio task → evidence → draft PR."""
@@ -98,6 +104,11 @@ def run(
         test_command=test_command,
         frontend_url=frontend_url,
         draft=draft,
+        write_specs=specs,
+        fanout=fanout,
+        fanout_subagents=fanout_subagents,
+        fanout_provider=fanout_provider,
+        fanout_dry_run=fanout_dry_run,
     )
     report = flow.run(**_read_kwargs(source, sprint, flow.scope))
     console.print(f"[bold]{report.summary}[/bold]")
@@ -175,6 +186,11 @@ def _build_flow(
     test_command: str | None,
     frontend_url: str | None,
     draft: bool,
+    write_specs: bool = True,
+    fanout: bool = False,
+    fanout_subagents: int = 600,
+    fanout_provider: str = "deepseek",
+    fanout_dry_run: bool = False,
 ) -> SprintFlow:
     target = RepoTarget(
         path=repo,
@@ -187,7 +203,14 @@ def _build_flow(
         frontend_url=frontend_url,
     )
     scope = _build_scope(operator, scope_mode)
-    return SprintFlow(operator, target, scope=scope, draft_prs=draft)
+    fan = (
+        PromptFanout(provider=fanout_provider, subagents=fanout_subagents, dry_run=fanout_dry_run)
+        if fanout
+        else None
+    )
+    return SprintFlow(
+        operator, target, scope=scope, draft_prs=draft, write_specs=write_specs, fanout=fan
+    )
 
 
 def _build_scope(operator: BaseOperator, mode: str) -> ScopeConfig:

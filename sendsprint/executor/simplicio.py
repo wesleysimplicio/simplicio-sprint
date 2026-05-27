@@ -122,15 +122,19 @@ class SimplicioExecutor:
         stack: str | None = None,
         target: str | None = None,
         constraints: str | None = None,
+        extra_context: str | None = None,
     ) -> SimplicioTask:
         """Map a :class:`SprintItem` to a :class:`SimplicioTask`.
 
         Title + description become the instruction; acceptance criteria flow
-        into ``--criteria`` so simplicio can self-check its work.
+        into ``--criteria`` so simplicio can self-check its work. ``extra_context``
+        (e.g. the mapper spec path or a fan-out brainstorm) is appended verbatim.
         """
         description = item.title.strip()
         if item.description:
             description = f"{description}\n\n{item.description.strip()}"
+        if extra_context:
+            description = f"{description}\n\n{extra_context.strip()}"
         return SimplicioTask(
             description=description,
             stack=stack,
@@ -194,9 +198,10 @@ class SimplicioExecutor:
         stack: str | None = None,
         target: str | None = None,
         repo: str | None = None,
+        extra_context: str | None = None,
     ) -> StepReport:
         """Execute one sprint item and return a :class:`StepReport`."""
-        task = self.task_from_item(item, stack=stack, target=target)
+        task = self.task_from_item(item, stack=stack, target=target, extra_context=extra_context)
         result = self.run(task)
         return StepReport(
             step=EXECUTE_STEP,
