@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sendsprint"
-version = "1.1.0"
+version = "3.0.0"
 description = "Autonomous sprint-to-PR delivery agent. Reads Jira/Azure DevOps/GitHub tasks, delegates code edits to simplicio-cli, ships draft PRs with evidence."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -47,6 +47,18 @@ Issues = "https://github.com/wesleysimplicio/SendSprint/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["sendsprint"]
+
+[tool.hatch.build.targets.sdist]
+# Keep the published source distribution lean — no videos / slide decks.
+include = [
+    "sendsprint",
+    "skills",
+    "README.md",
+    "README.pt-BR.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

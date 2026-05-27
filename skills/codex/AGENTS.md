@@ -2,7 +2,7 @@
 name: sendsprint
 description: Autonomous sprint delivery via the sendsprint CLI + simplicio-cli executor.
 command: sendsprint
-version: 1.1.0
+version: 3.0.0
 platform: codex
 ---
 

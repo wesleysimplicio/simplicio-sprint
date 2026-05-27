@@ -2,7 +2,7 @@
 name: sendsprint
 description: Autonomous sprint delivery. Reads a Jira / Azure DevOps / GitHub sprint, delegates each task's code edit to simplicio-cli, captures evidence, and opens a draft PR. Triggers on "rode o sendsprint", "executar sprint", "entregar sprint", "run sendsprint", "ship my sprint", "deliver my sprint", "ejecutar sprint".
 command: sendsprint
-version: 1.1.0
+version: 3.0.0
 platform: claude-code
 ---
 
