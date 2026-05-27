@@ -23,6 +23,7 @@ Você não fica no teclado invocando. Um trigger agendado roda; seu único traba
 
 - [A divisão que faz funcionar](#a-divisão-que-faz-funcionar)
 - [O fluxo completo](#o-fluxo-completo)
+- [Demonstração: um card de front, ponta a ponta](#demonstração-um-card-de-front-ponta-a-ponta)
 - [Instalação](#instalação)
 - [Configurar credenciais](#configurar-credenciais)
 - [Como invocar](#como-invocar)
@@ -68,6 +69,54 @@ trigger (cron / GitHub Action / Claude web)   ← tira você do loop
 
    …e cada etapa acima é gravada num arquivo de log (veja Logging).
 ```
+
+## Demonstração: um card de front, ponta a ponta
+
+Uma simulação versionada prova o fluxo inteiro para um **card de front**, sem
+precisar de credenciais reais nem navegador no CI:
+[`tests/test_e2e_frontend_sim.py`](./tests/test_e2e_frontend_sim.py).
+
+```bash
+pytest tests/test_e2e_frontend_sim.py -q
+```
+
+O card "**WEB-7 — Add a Login button to the homepage header**" chega do Jira
+**via MCP**, e o teste percorre cada estágio:
+
+1. **Coleta** a task do Jira (transporte MCP) → um `Sprint` com o card.
+2. **Mapeia** para `.specs/sprints/sprint-42/01-add-a-login-button…task.md`
+   (os critérios de aceite viram `AC-1`, `AC-2`).
+3. **Executa** — a edição simulada adiciona o botão no `index.html`
+   (`<a href="/login"><button>Login</button></a>`), exatamente como o simplicio aplica um diff.
+4. **Evidência** — roda os testes e captura um **screenshot** commitado em
+   `.sendsprint/evidence/WEB-7/screen.png`.
+5. **PR** — abre um pull request em **draft** com a evidência embutida.
+
+O "print" capturado da tela entregue:
+
+![Evidência de entrega de front do SendSprint](./docs/assets/sendsprint-frontend-demo.png)
+
+…e o comentário de evidência que o SendSprint posta no PR:
+
+```markdown
+## SendSprint evidence
+
+### Steps
+- [x] execute
+- [x] evidence
+- [x] commit
+
+### Tests & screens
+- ✅ **unit**: pytest — exit 0
+- ✅ **screenshot**: homepage
+
+  ![homepage](https://raw.githubusercontent.com/acme/web/feature/web-7/.sendsprint/evidence/WEB-7/screen.png)
+```
+
+> O teste versionado usa um PNG mínimo injetado para rodar em qualquer lugar; com
+> o Playwright instalado (`pip install -e ".[screenshot]" && playwright install chromium`)
+> o fluxo real captura um screenshot verdadeiro da tela — foi assim que a imagem
+> acima foi gerada.
 
 ## Instalação
 

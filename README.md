@@ -22,6 +22,7 @@ only job is to **review the draft PR**.
 
 - [The split that makes it work](#the-split-that-makes-it-work)
 - [The full pipeline](#the-full-pipeline)
+- [Demonstration: a frontend card, end to end](#demonstration-a-frontend-card-end-to-end)
 - [Install](#install)
 - [Configure credentials](#configure-credentials)
 - [How to invoke it](#how-to-invoke-it)
@@ -67,6 +68,54 @@ trigger (cron / GitHub Action / Claude web)   ← removes you from the loop
 
    …and every step above is written to a log file (see Logging).
 ```
+
+## Demonstration: a frontend card, end to end
+
+A committed simulation proves the whole pipeline for a **frontend card**, without
+needing live credentials or a browser in CI:
+[`tests/test_e2e_frontend_sim.py`](./tests/test_e2e_frontend_sim.py).
+
+```bash
+pytest tests/test_e2e_frontend_sim.py -q
+```
+
+The card "**WEB-7 — Add a Login button to the homepage header**" arrives from
+Jira **over MCP**, and the test walks every stage:
+
+1. **Collect** the task from Jira (MCP transport) → a `Sprint` with the card.
+2. **Map** it into `.specs/sprints/sprint-42/01-add-a-login-button…task.md`
+   (acceptance criteria become `AC-1`, `AC-2`).
+3. **Execute** — the simulated edit adds the button to `index.html`
+   (`<a href="/login"><button>Login</button></a>`), exactly as simplicio applies a diff.
+4. **Evidence** — run tests and capture a **screenshot** committed under
+   `.sendsprint/evidence/WEB-7/screen.png`.
+5. **PR** — open a **draft** pull request with the evidence embedded.
+
+The captured "print" of the delivered screen:
+
+![SendSprint frontend delivery evidence](./docs/assets/sendsprint-frontend-demo.png)
+
+…and the evidence comment SendSprint posts on the PR:
+
+```markdown
+## SendSprint evidence
+
+### Steps
+- [x] execute
+- [x] evidence
+- [x] commit
+
+### Tests & screens
+- ✅ **unit**: pytest — exit 0
+- ✅ **screenshot**: homepage
+
+  ![homepage](https://raw.githubusercontent.com/acme/web/feature/web-7/.sendsprint/evidence/WEB-7/screen.png)
+```
+
+> The committed test uses a tiny injected PNG so it runs anywhere; with Playwright
+> installed (`pip install -e ".[screenshot]" && playwright install chromium`) the
+> real flow captures a true screenshot of the running screen — that's how the image
+> above was produced.
 
 ## Install
 
