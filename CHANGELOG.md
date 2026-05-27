@@ -17,6 +17,11 @@ simplicio-mapper + MCP integration, plus the simplicio-prompt subagent fan-out.
   Tuple-Space + Yool kernel (`--subagents 600`) to brainstorm edge cases and a
   plan per card, folding the result into the simplicio task. Opt-in via
   `sendsprint run --fanout`; degrades gracefully when the kernel is absent.
+- **`sendsprint update`** (`bootstrap.py`): pulls the latest simplicio-cli (pip),
+  simplicio-prompt kernel (git) and simplicio-mapper (git), and wires the
+  previously-inert `verify_dependencies_on_start` / `update_*_on_start` profile
+  flags so `run`/`watch` refresh tools at start (`--no-update` /
+  `SENDSPRINT_NO_UPDATE=1` to skip). The fan-out auto-discovers the cached kernel.
 
 ## 1.0.0
 

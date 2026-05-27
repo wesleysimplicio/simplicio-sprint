@@ -71,6 +71,12 @@ class PromptFanout:
         env: dict[str, str] | None = None,
     ) -> None:
         resolved = kernel_path or os.getenv(KERNEL_ENV)
+        if not resolved:
+            from sendsprint.bootstrap import default_prompt_kernel
+
+            candidate = default_prompt_kernel()
+            if candidate.exists():
+                resolved = str(candidate)
         self.kernel_path = Path(resolved) if resolved else None
         self.python = python
         self.provider = provider

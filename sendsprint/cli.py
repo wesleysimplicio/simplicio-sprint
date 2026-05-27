@@ -15,6 +15,7 @@ calls per task. Commands:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import typer
@@ -37,6 +38,7 @@ from sendsprint.watch import Watcher
 app = typer.Typer(add_completion=False, help="Autonomous sprint-to-PR delivery.")
 console = Console()
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger(__name__)
 
 SOURCES = ("jira", "azuredevops", "github")
 
@@ -71,6 +73,21 @@ def logout(provider: str, account: str) -> None:
 
 
 @app.command()
+def update(
+    cli: bool = typer.Option(True, help="Upgrade simplicio-cli via pip"),
+    prompt: bool = typer.Option(True, help="Sync the simplicio-prompt kernel via git"),
+    mapper: bool = typer.Option(True, help="Sync simplicio-mapper via git"),
+) -> None:
+    """Pull the latest of simplicio-cli / simplicio-prompt / simplicio-mapper."""
+    from sendsprint.bootstrap import Updater
+
+    report = Updater().update_all(cli=cli, prompt=prompt, mapper=mapper)
+    for result in report.results:
+        console.print(f"  {result.line()}")
+    raise typer.Exit(code=0 if report.ok else 1)
+
+
+@app.command()
 def run(
     source: str = typer.Argument(..., help="jira | azuredevops | github"),
     sprint: str = typer.Argument(..., help="Jira sprint id, ADO iteration path, or GH milestone"),
@@ -88,9 +105,11 @@ def run(
     fanout_subagents: int = typer.Option(600, help="Subagents per fan-out"),
     fanout_provider: str = typer.Option("deepseek", help="simplicio-prompt provider"),
     fanout_dry_run: bool = typer.Option(False, help="Run the fan-out offline (no key/network)"),
+    no_update: bool = typer.Option(False, help="Skip the start-up tool update (profile-driven)"),
     output: Path | None = typer.Option(None, "-o", "--output", help="Write RunReport JSON"),
 ) -> None:
     """Deliver a sprint: each card → simplicio task → evidence → draft PR."""
+    _startup(no_update)
     operator = _build_operator(source)
     flow = _build_flow(
         operator,
@@ -133,8 +152,10 @@ def watch(
     interval: int = typer.Option(15, help="Minutes between cycles in loop mode"),
     once: bool = typer.Option(False, help="Run a single cycle and exit (for cron/CI triggers)"),
     max_per_cycle: int = typer.Option(1, help="Max cards delivered per cycle"),
+    no_update: bool = typer.Option(False, help="Skip the start-up tool update (profile-driven)"),
 ) -> None:
     """Unattended trigger: finish cards assigned to me, scoped with --scope mine."""
+    _startup(no_update)
     operator = _build_operator(source)
     flow = _build_flow(
         operator,
@@ -160,6 +181,21 @@ def watch(
 
 
 # -- builders ---------------------------------------------------------------
+
+
+def _startup(skip: bool) -> None:
+    """Run the profile-driven tool update before a delivery. Never fatal."""
+    if skip or os.getenv("SENDSPRINT_NO_UPDATE") == "1":
+        return
+    try:
+        from sendsprint import profile as profile_mod
+        from sendsprint.bootstrap import Updater
+
+        report = Updater().run_startup(profile_mod.load())
+        for result in report.results:
+            console.print(f"  [dim]{result.line()}[/dim]")
+    except Exception as exc:  # noqa: BLE001 — startup updates are best-effort
+        logger.warning("startup update skipped: %s", exc)
 
 
 def _build_operator(source: str) -> BaseOperator:
