@@ -98,13 +98,25 @@ class SprintFlow:
             scope_mode=(self.scope.mode if self.scope else "all"),
             user=(self.scope.user_email if self.scope else None),
         )
+        logger.info(
+            "run start: %s (%d item(s), scope=%s, transport=%s)",
+            sprint.name,
+            len(sprint.items),
+            report.scope_mode,
+            sprint.transport,
+        )
         for index, item in enumerate(sprint.items, start=1):
             outcome = self.deliver_item(item, sprint=sprint, index=index)
+            for step in outcome.steps:
+                logger.info(
+                    "step %s %s [%s] %s", step.step, step.name, step.status, step.message or ""
+                )
             report.steps.extend(outcome.steps)
             if outcome.pr is not None:
                 report.prs.append(outcome.pr)  # type: ignore[arg-type]
         report.failed = any(s.status == "failed" for s in report.steps)
         report.summary = self._summarize(sprint, report)
+        logger.info("run done: %s", report.summary)
         return report
 
     def deliver_item(
@@ -114,6 +126,7 @@ class SprintFlow:
         outcome = ItemOutcome(item_key=item.key)
         branch = self._branch_name(item)
         outcome.branch = branch
+        logger.info("deliver %s: %s -> branch %s", item.key, item.title, branch)
         wt_manager = WorktreeManager(self.target.path)
         try:
             work_dir = wt_manager.create(branch, base=self.target.base_branch)

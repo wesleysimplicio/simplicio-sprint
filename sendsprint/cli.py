@@ -37,10 +37,22 @@ from sendsprint.watch import Watcher
 
 app = typer.Typer(add_completion=False, help="Autonomous sprint-to-PR delivery.")
 console = Console()
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("sendsprint.cli")
 
 SOURCES = ("jira", "azuredevops", "github")
+
+
+@app.callback()
+def _main(
+    log_level: str = typer.Option("INFO", "--log-level", help="DEBUG | INFO | WARNING | ERROR"),
+    log_file: Path | None = typer.Option(None, "--log-file", help="Override the log file path"),
+    log_json: bool = typer.Option(False, "--log-json", help="Write logs as JSON lines"),
+) -> None:
+    """Configure logging for every command (logs capture every step to a file)."""
+    from sendsprint.logging_setup import configure
+
+    path = configure(level=log_level, log_file=log_file, json_lines=log_json)
+    logger.debug("sendsprint %s — logging to %s", __version__, path)
 
 
 @app.command()
@@ -85,6 +97,27 @@ def update(
     for result in report.results:
         console.print(f"  {result.line()}")
     raise typer.Exit(code=0 if report.ok else 1)
+
+
+@app.command()
+def install(
+    target: list[str] = typer.Option(
+        [], "--target", "-t", help="Agent(s) to install for; repeatable"
+    ),
+    all_: bool = typer.Option(False, "--all", help="Install for every supported agent"),
+    repo: Path = typer.Option(Path("."), help="Target project directory"),
+) -> None:
+    """Install the SendSprint skill into each agent's convention (Cursor, Claude, ...)."""
+    from sendsprint.installer import TARGETS
+    from sendsprint.installer import install as do_install
+
+    names = sorted(TARGETS) if all_ or not target else target
+    try:
+        results = do_install(repo, names)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    for result in results:
+        console.print(f"  {result.line()}")
 
 
 @app.command()
@@ -133,6 +166,7 @@ def run(
     console.print(f"[bold]{report.summary}[/bold]")
     for pr in report.prs:
         console.print(f"  PR: {pr.url or pr.number} ({pr.state})")
+    _archive_report(report)
     if output:
         output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         console.print(f"report written to {output}")
@@ -196,6 +230,22 @@ def _startup(skip: bool) -> None:
             console.print(f"  [dim]{result.line()}[/dim]")
     except Exception as exc:  # noqa: BLE001 — startup updates are best-effort
         logger.warning("startup update skipped: %s", exc)
+
+
+def _archive_report(report: object) -> None:
+    """Persist the run report JSON next to the logs. Best-effort."""
+    try:
+        from datetime import UTC, datetime
+
+        from sendsprint.logging_setup import log_dir
+
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        path = log_dir() / f"run-{stamp}.report.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(report.model_dump_json(indent=2), encoding="utf-8")  # type: ignore[attr-defined]
+        console.print(f"[dim]run report archived to {path}[/dim]")
+    except Exception as exc:  # noqa: BLE001 — archiving is best-effort
+        logger.warning("could not archive run report: %s", exc)
 
 
 def _build_operator(source: str) -> BaseOperator:

@@ -153,6 +153,8 @@ class SimplicioExecutor:
                 message=f"{self.binary} not installed (pip install simplicio-cli)",
                 argv=argv,
             )
+        logger.info("simplicio task in %s (stack=%s)", self.repo_path, task.stack or "auto")
+        logger.debug("simplicio argv: %s", argv)
         try:
             proc = self._runner(
                 argv,
@@ -182,6 +184,7 @@ class SimplicioExecutor:
             if status == "ok"
             else f"simplicio task failed (exit {proc.returncode})"
         )
+        logger.info("simplicio result: %s (exit %s)", status, proc.returncode)
         return SimplicioResult(
             status=status,
             returncode=proc.returncode,

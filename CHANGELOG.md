@@ -22,6 +22,15 @@ simplicio-mapper + MCP integration, plus the simplicio-prompt subagent fan-out.
   previously-inert `verify_dependencies_on_start` / `update_*_on_start` profile
   flags so `run`/`watch` refresh tools at start (`--no-update` /
   `SENDSPRINT_NO_UPDATE=1` to skip). The fan-out auto-discovers the cached kernel.
+- **`sendsprint install`** (`installer.py`): writes the SendSprint skill into each
+  agent's convention — Cursor, Claude, Kiro (dedicated files) and Codex /
+  OpenCode / Antigravity / Gemini / Hermes / openclaw (idempotent managed block in
+  `AGENTS.md` / `GEMINI.md`, never clobbering existing content). `--target` or
+  `--all`.
+- **Central logging** (`logging_setup.py`): every command configures the
+  `sendsprint` logger to a rotating file (DEBUG) plus console; `--log-level`,
+  `--log-file`, `--log-json` are global options. The flow logs each delivery step,
+  and `run` archives the `RunReport` JSON next to the logs.
 
 ## 1.0.0
 

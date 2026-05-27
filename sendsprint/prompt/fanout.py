@@ -122,6 +122,9 @@ class PromptFanout:
                 ),
             )
         argv = self.argv(task, subagents=n, dry_run=offline)
+        logger.info(
+            "fan-out: %d subagents on %s%s", n, self.provider, " (dry-run)" if offline else ""
+        )
         try:
             proc = self._runner(
                 argv, capture_output=True, text=True, timeout=self.timeout_s, env=self._env
