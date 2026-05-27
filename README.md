@@ -4,6 +4,12 @@
   <img src="./docs/assets/sendsprint-hero.png" alt="SendSprint turns sprint work into validated pull requests" />
 </p>
 
+<p align="center">
+  <a href="https://pypi.org/project/simplicio-sprint/"><img alt="PyPI" src="https://img.shields.io/pypi/v/simplicio-sprint.svg?label=pypi%20package"></a>
+  <a href="https://pypi.org/project/simplicio-sprint/"><img alt="Python versions" src="https://img.shields.io/pypi/pyversions/simplicio-sprint.svg"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/pypi/l/simplicio-sprint.svg"></a>
+</p>
+
 > 🇺🇸 English. Leia em português: [README.pt-BR.md](README.pt-BR.md).
 
 **SendSprint is an autonomous agent that finishes the cards assigned to you.**
@@ -120,19 +126,21 @@ The captured "print" of the delivered screen:
 ## Install
 
 ```bash
-# 1) SendSprint itself
-pip install -e .
+# 1) SendSprint itself (published on PyPI as `simplicio-sprint`)
+pip install simplicio-sprint
 
 # 2) the executor (required for real code edits)
 pip install simplicio-cli
 
 # 3) optional: Playwright screen evidence
-pip install -e ".[screenshot]" && playwright install chromium
+pip install "simplicio-sprint[screenshot]" && playwright install chromium
 
 # 4) optional but recommended: pull the latest of every external tool
 #    (also installs the simplicio-prompt kernel used by --fanout)
 sendsprint update
 ```
+
+Working on the agent itself? Clone the repo and `pip install -e ".[dev]"` instead.
 
 Requirements: **Python ≥ 3.11** and **git**. `sendsprint update` additionally
 needs `git` on PATH to clone the simplicio-prompt / simplicio-mapper helpers.
