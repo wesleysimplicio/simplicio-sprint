@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.0.0
+
+First public release on PyPI. Bundles the simplicio-mapper + MCP integration, the
+simplicio-prompt subagent fan-out, `sendsprint update`, the multi-agent
+`sendsprint install`, central logging, the didactic EN/PT README and the
+end-to-end frontend demonstration. Published via GitHub Actions Trusted
+Publishing (`.github/workflows/publish.yml`); the source distribution ships only
+the package (no videos / slide decks).
+
 ## 1.1.0
 
 simplicio-mapper + MCP integration, plus the simplicio-prompt subagent fan-out.
