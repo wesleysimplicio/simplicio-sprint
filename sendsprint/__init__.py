@@ -6,5 +6,5 @@ captures evidence, and opens a draft PR for review. simplicio-cli is the
 executor; SendSprint owns the flow start to finish.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __all__ = ["__version__"]

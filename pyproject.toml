@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sendsprint"
-version = "1.0.0"
+version = "1.1.0"
 description = "Autonomous sprint-to-PR delivery agent. Reads Jira/Azure DevOps/GitHub tasks, delegates code edits to simplicio-cli, ships draft PRs with evidence."
 readme = "README.md"
 requires-python = ">=3.11"

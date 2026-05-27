@@ -122,15 +122,19 @@ class SimplicioExecutor:
         stack: str | None = None,
         target: str | None = None,
         constraints: str | None = None,
+        extra_context: str | None = None,
     ) -> SimplicioTask:
         """Map a :class:`SprintItem` to a :class:`SimplicioTask`.
 
         Title + description become the instruction; acceptance criteria flow
-        into ``--criteria`` so simplicio can self-check its work.
+        into ``--criteria`` so simplicio can self-check its work. ``extra_context``
+        (e.g. the mapper spec path or a fan-out brainstorm) is appended verbatim.
         """
         description = item.title.strip()
         if item.description:
             description = f"{description}\n\n{item.description.strip()}"
+        if extra_context:
+            description = f"{description}\n\n{extra_context.strip()}"
         return SimplicioTask(
             description=description,
             stack=stack,
@@ -149,6 +153,8 @@ class SimplicioExecutor:
                 message=f"{self.binary} not installed (pip install simplicio-cli)",
                 argv=argv,
             )
+        logger.info("simplicio task in %s (stack=%s)", self.repo_path, task.stack or "auto")
+        logger.debug("simplicio argv: %s", argv)
         try:
             proc = self._runner(
                 argv,
@@ -178,6 +184,7 @@ class SimplicioExecutor:
             if status == "ok"
             else f"simplicio task failed (exit {proc.returncode})"
         )
+        logger.info("simplicio result: %s (exit %s)", status, proc.returncode)
         return SimplicioResult(
             status=status,
             returncode=proc.returncode,
@@ -194,9 +201,10 @@ class SimplicioExecutor:
         stack: str | None = None,
         target: str | None = None,
         repo: str | None = None,
+        extra_context: str | None = None,
     ) -> StepReport:
         """Execute one sprint item and return a :class:`StepReport`."""
-        task = self.task_from_item(item, stack=stack, target=target)
+        task = self.task_from_item(item, stack=stack, target=target, extra_context=extra_context)
         result = self.run(task)
         return StepReport(
             step=EXECUTE_STEP,

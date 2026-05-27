@@ -46,7 +46,7 @@ class FakeExecutor:
     def __init__(self, work_dir, **kw):  # noqa: ANN001
         self.work_dir = work_dir
 
-    def run_item(self, item, *, stack=None, target=None, repo=None):  # noqa: ANN001
+    def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
         return StepReport(step=3, name=f"execute:{item.key}", status="ok", message="ok")
 
     def revise(self, feedback, *, stack=None, target=None, repo=None):  # noqa: ANN001
@@ -110,7 +110,9 @@ def patched(monkeypatch):
     monkeypatch.setattr(flow_mod, "EvidenceCollector", FakeEvidence)
     monkeypatch.setattr(flow_mod, "GitOps", FakeGit)
     monkeypatch.setattr(flow_mod, "PullRequestManager", FakePR)
-    monkeypatch.setattr(flow_mod, "detect_tech", lambda p: type("T", (), {"primary_tech": "python"})())
+    monkeypatch.setattr(
+        flow_mod, "detect_tech", lambda p: type("T", (), {"primary_tech": "python"})()
+    )
 
 
 def _flow(operator, tmp_path):
@@ -140,6 +142,41 @@ def test_deliver_item_happy_path(patched, tmp_path):
     assert FakePR.last.evidence_posts == [11]
 
 
+def test_deliver_item_records_mapper_and_fanout_steps(patched, tmp_path):
+    import json
+    import subprocess
+
+    from sendsprint.prompt import PromptFanout
+
+    kernel = tmp_path / "subagent_runtime.py"
+    kernel.write_text("# stub")
+    report = json.dumps(
+        {
+            "requested": 3,
+            "completed": 3,
+            "failed": 0,
+            "elapsed_s": 0.1,
+            "provider": "deepseek",
+            "model": "m",
+            "usage": {"cost_usd": 0.0},
+            "results": [{"agent_id": 0, "ok": True, "text": "idea"}],
+        }
+    )
+
+    def run(argv, **kwargs):  # noqa: ANN001
+        return subprocess.CompletedProcess(argv, 0, report, "")
+
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="do x", status="open")
+    flow = _flow(FakeOperator([item]), tmp_path)
+    flow.fanout = PromptFanout(kernel_path=kernel, runner=run, subagents=3)
+    outcome = flow.deliver_item(item)
+    names = [s.name for s in outcome.steps]
+    assert any(n.startswith("mapper:") for n in names)
+    assert any(n.startswith("fanout:") for n in names)
+    # The mapper spec file lands in the worktree under .specs/.
+    assert list(tmp_path.glob(".specs/sprints/*/*.task.md"))
+
+
 def test_run_aggregates_report(patched, tmp_path):
     items = [
         SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open"),
@@ -153,7 +190,7 @@ def test_run_aggregates_report(patched, tmp_path):
 
 def test_deliver_item_skips_when_executor_fails(patched, tmp_path, monkeypatch):
     class FailingExec(FakeExecutor):
-        def run_item(self, item, *, stack=None, target=None, repo=None):  # noqa: ANN001
+        def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
             return StepReport(step=3, name=f"execute:{item.key}", status="failed", message="boom")
 
     monkeypatch.setattr(flow_mod, "SimplicioExecutor", FailingExec)
@@ -173,5 +210,7 @@ def test_revise_pr_runs_simplicio_on_feedback(patched, tmp_path, monkeypatch):
     monkeypatch.setattr(flow_mod, "PullRequestManager", FeedbackPR)
     # worktree_dir must "exist" — point at tmp_path which exists
     item = SprintItem(id="1", key="ABC-1", type="Task", title="x", status="open")
-    steps = _flow(FakeOperator([item]), tmp_path).revise_pr(11, branch="feature/x", item_key="ABC-1")
+    steps = _flow(FakeOperator([item]), tmp_path).revise_pr(
+        11, branch="feature/x", item_key="ABC-1"
+    )
     assert any(s.name == "revise:pr-feedback" for s in steps)

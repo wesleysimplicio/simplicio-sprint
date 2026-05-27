@@ -25,7 +25,10 @@ loop → you approve.
 ```
 sendsprint/
 ├── operators/   JiraOperator, AzureDevopsOperator, GitHubIssuesOperator (transport mcp|api)
+│   └── _mcp_bridge.py  host-injected MCP seam (register_provider → fetch)
 ├── executor/    SimplicioExecutor — the ONLY boundary to simplicio-cli
+├── mapper/      MapperAdapter — render a Sprint into simplicio-mapper .specs/ tasks
+├── prompt/      PromptFanout — simplicio-prompt subagent fan-out (--subagents 600)
 ├── delivery/    worktree, git_ops, evidence, pr
 ├── models/      Sprint, SprintItem, StepReport, RunReport, ScopeConfig
 ├── github_integration.py  ReviewReader + evidence comment + CI monitor
@@ -34,6 +37,12 @@ sendsprint/
 ├── watch.py     unattended trigger (Watcher)
 └── cli.py       run | watch | login | logout | version
 ```
+
+**MCP transport.** The Python operators can't call MCP servers directly, so the
+host (Claude) registers a provider per source via `_mcp_bridge.register_provider`
+that returns the raw payload shape the REST path already maps. No provider → the
+operator falls back to REST. **mapper** writes `.specs/` task files per card before
+simplicio runs; **prompt** is an opt-in pre-execution brainstorm (`run --fanout`).
 
 ## 4. Commands
 

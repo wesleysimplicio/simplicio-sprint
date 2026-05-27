@@ -15,6 +15,7 @@ calls per task. Commands:
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 import typer
@@ -30,14 +31,28 @@ from sendsprint.operators import (
     GitHubIssuesOperator,
     JiraOperator,
 )
+from sendsprint.prompt import PromptFanout
 from sendsprint.scope import build_scope
 from sendsprint.watch import Watcher
 
 app = typer.Typer(add_completion=False, help="Autonomous sprint-to-PR delivery.")
 console = Console()
-logging.basicConfig(level=logging.INFO, format="%(message)s")
+logger = logging.getLogger("sendsprint.cli")
 
 SOURCES = ("jira", "azuredevops", "github")
+
+
+@app.callback()
+def _main(
+    log_level: str = typer.Option("INFO", "--log-level", help="DEBUG | INFO | WARNING | ERROR"),
+    log_file: Path | None = typer.Option(None, "--log-file", help="Override the log file path"),
+    log_json: bool = typer.Option(False, "--log-json", help="Write logs as JSON lines"),
+) -> None:
+    """Configure logging for every command (logs capture every step to a file)."""
+    from sendsprint.logging_setup import configure
+
+    path = configure(level=log_level, log_file=log_file, json_lines=log_json)
+    logger.debug("sendsprint %s — logging to %s", __version__, path)
 
 
 @app.command()
@@ -70,6 +85,42 @@ def logout(provider: str, account: str) -> None:
 
 
 @app.command()
+def update(
+    cli: bool = typer.Option(True, help="Upgrade simplicio-cli via pip"),
+    prompt: bool = typer.Option(True, help="Sync the simplicio-prompt kernel via git"),
+    mapper: bool = typer.Option(True, help="Sync simplicio-mapper via git"),
+) -> None:
+    """Pull the latest of simplicio-cli / simplicio-prompt / simplicio-mapper."""
+    from sendsprint.bootstrap import Updater
+
+    report = Updater().update_all(cli=cli, prompt=prompt, mapper=mapper)
+    for result in report.results:
+        console.print(f"  {result.line()}")
+    raise typer.Exit(code=0 if report.ok else 1)
+
+
+@app.command()
+def install(
+    target: list[str] = typer.Option(
+        [], "--target", "-t", help="Agent(s) to install for; repeatable"
+    ),
+    all_: bool = typer.Option(False, "--all", help="Install for every supported agent"),
+    repo: Path = typer.Option(Path("."), help="Target project directory"),
+) -> None:
+    """Install the SendSprint skill into each agent's convention (Cursor, Claude, ...)."""
+    from sendsprint.installer import TARGETS
+    from sendsprint.installer import install as do_install
+
+    names = sorted(TARGETS) if all_ or not target else target
+    try:
+        results = do_install(repo, names)
+    except ValueError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    for result in results:
+        console.print(f"  {result.line()}")
+
+
+@app.command()
 def run(
     source: str = typer.Argument(..., help="jira | azuredevops | github"),
     sprint: str = typer.Argument(..., help="Jira sprint id, ADO iteration path, or GH milestone"),
@@ -82,9 +133,16 @@ def run(
     test_command: str | None = typer.Option(None, help="Command to run for test evidence"),
     frontend_url: str | None = typer.Option(None, help="URL to screenshot for screen evidence"),
     draft: bool = typer.Option(True, help="Open PRs as drafts pending your review"),
+    specs: bool = typer.Option(True, help="Write simplicio-mapper .specs/ task files per card"),
+    fanout: bool = typer.Option(False, help="Run a simplicio-prompt subagent fan-out per card"),
+    fanout_subagents: int = typer.Option(600, help="Subagents per fan-out"),
+    fanout_provider: str = typer.Option("deepseek", help="simplicio-prompt provider"),
+    fanout_dry_run: bool = typer.Option(False, help="Run the fan-out offline (no key/network)"),
+    no_update: bool = typer.Option(False, help="Skip the start-up tool update (profile-driven)"),
     output: Path | None = typer.Option(None, "-o", "--output", help="Write RunReport JSON"),
 ) -> None:
     """Deliver a sprint: each card → simplicio task → evidence → draft PR."""
+    _startup(no_update)
     operator = _build_operator(source)
     flow = _build_flow(
         operator,
@@ -98,11 +156,17 @@ def run(
         test_command=test_command,
         frontend_url=frontend_url,
         draft=draft,
+        write_specs=specs,
+        fanout=fanout,
+        fanout_subagents=fanout_subagents,
+        fanout_provider=fanout_provider,
+        fanout_dry_run=fanout_dry_run,
     )
     report = flow.run(**_read_kwargs(source, sprint, flow.scope))
     console.print(f"[bold]{report.summary}[/bold]")
     for pr in report.prs:
         console.print(f"  PR: {pr.url or pr.number} ({pr.state})")
+    _archive_report(report)
     if output:
         output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         console.print(f"report written to {output}")
@@ -122,8 +186,10 @@ def watch(
     interval: int = typer.Option(15, help="Minutes between cycles in loop mode"),
     once: bool = typer.Option(False, help="Run a single cycle and exit (for cron/CI triggers)"),
     max_per_cycle: int = typer.Option(1, help="Max cards delivered per cycle"),
+    no_update: bool = typer.Option(False, help="Skip the start-up tool update (profile-driven)"),
 ) -> None:
     """Unattended trigger: finish cards assigned to me, scoped with --scope mine."""
+    _startup(no_update)
     operator = _build_operator(source)
     flow = _build_flow(
         operator,
@@ -151,6 +217,37 @@ def watch(
 # -- builders ---------------------------------------------------------------
 
 
+def _startup(skip: bool) -> None:
+    """Run the profile-driven tool update before a delivery. Never fatal."""
+    if skip or os.getenv("SENDSPRINT_NO_UPDATE") == "1":
+        return
+    try:
+        from sendsprint import profile as profile_mod
+        from sendsprint.bootstrap import Updater
+
+        report = Updater().run_startup(profile_mod.load())
+        for result in report.results:
+            console.print(f"  [dim]{result.line()}[/dim]")
+    except Exception as exc:  # noqa: BLE001 — startup updates are best-effort
+        logger.warning("startup update skipped: %s", exc)
+
+
+def _archive_report(report: object) -> None:
+    """Persist the run report JSON next to the logs. Best-effort."""
+    try:
+        from datetime import UTC, datetime
+
+        from sendsprint.logging_setup import log_dir
+
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        path = log_dir() / f"run-{stamp}.report.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(report.model_dump_json(indent=2), encoding="utf-8")  # type: ignore[attr-defined]
+        console.print(f"[dim]run report archived to {path}[/dim]")
+    except Exception as exc:  # noqa: BLE001 — archiving is best-effort
+        logger.warning("could not archive run report: %s", exc)
+
+
 def _build_operator(source: str) -> BaseOperator:
     source = source.lower()
     if source == "jira":
@@ -175,6 +272,11 @@ def _build_flow(
     test_command: str | None,
     frontend_url: str | None,
     draft: bool,
+    write_specs: bool = True,
+    fanout: bool = False,
+    fanout_subagents: int = 600,
+    fanout_provider: str = "deepseek",
+    fanout_dry_run: bool = False,
 ) -> SprintFlow:
     target = RepoTarget(
         path=repo,
@@ -187,7 +289,14 @@ def _build_flow(
         frontend_url=frontend_url,
     )
     scope = _build_scope(operator, scope_mode)
-    return SprintFlow(operator, target, scope=scope, draft_prs=draft)
+    fan = (
+        PromptFanout(provider=fanout_provider, subagents=fanout_subagents, dry_run=fanout_dry_run)
+        if fanout
+        else None
+    )
+    return SprintFlow(
+        operator, target, scope=scope, draft_prs=draft, write_specs=write_specs, fanout=fan
+    )
 
 
 def _build_scope(operator: BaseOperator, mode: str) -> ScopeConfig:

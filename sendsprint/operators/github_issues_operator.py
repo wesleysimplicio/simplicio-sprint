@@ -35,7 +35,7 @@ class GitHubIssuesOperator(BaseOperator):
         self,
         repo: str | None = None,
         token: str | None = None,
-        transport: Transport = "api",
+        transport: Transport = "auto",
         **kwargs: Any,
     ) -> None:
         super().__init__(transport=transport, **kwargs)
@@ -70,7 +70,13 @@ class GitHubIssuesOperator(BaseOperator):
         }
 
     def _read_via_mcp(self, **kwargs: Any) -> Sprint:
-        raise TransportUnavailable("github issues MCP is host-driven, not operator-driven")
+        from importlib import import_module
+
+        bridge = import_module("sendsprint.operators._mcp_bridge")
+        sprint_id = kwargs.get("sprint_id")
+        payload = bridge.fetch("github", sprint_id=sprint_id, assignee=kwargs.get("assignee"))
+        issues = [i for i in payload.get("issues", []) if "pull_request" not in i]
+        return self._sprint_from_issues(sprint_id, issues, transport="mcp")
 
     def _read_via_api(self, **kwargs: Any) -> Sprint:
         if not self._api_available():
@@ -95,6 +101,11 @@ class GitHubIssuesOperator(BaseOperator):
                 url = _next_link(resp.headers.get("link"))
                 params = {}
 
+        return self._sprint_from_issues(sprint_id, issues, transport="api")
+
+    def _sprint_from_issues(
+        self, sprint_id: Any, issues: list[dict[str, Any]], *, transport: str
+    ) -> Sprint:
         items = [self._issue_to_item(i) for i in issues]
         name = f"milestone {sprint_id}" if sprint_id not in (None, "", "*") else "open issues"
         return Sprint(
@@ -103,7 +114,7 @@ class GitHubIssuesOperator(BaseOperator):
             state="active",
             items=items,
             source="github",  # type: ignore[arg-type]
-            transport="api",
+            transport=transport,  # type: ignore[arg-type]
         )
 
     def update_status(self, item_key: str, status: str, comment: str | None = None) -> None:
