@@ -10,7 +10,13 @@ from sendsprint.models.sprint import SprintItem
 
 
 def _item(**kw) -> SprintItem:
-    base = {"id": "1", "key": "ABC-1", "type": "Task", "title": "Hide delete button", "status": "open"}
+    base = {
+        "id": "1",
+        "key": "ABC-1",
+        "type": "Task",
+        "title": "Hide delete button",
+        "status": "open",
+    }
     base.update(kw)
     return SprintItem(**base)
 

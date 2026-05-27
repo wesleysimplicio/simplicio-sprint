@@ -327,6 +327,7 @@ class ReviewReader:
         Actionable = review with CHANGES_REQUESTED or any inline comment body.
         """
         feedback: list[ReviewFeedback] = []
+        seen: set[tuple[str, str, str, int | None, str]] = set()
 
         # Top-level reviews requesting changes
         reviews = self.read_reviews(pr_number)
@@ -334,12 +335,14 @@ class ReviewReader:
             state = review.get("state", "")
             body = (review.get("body") or "").strip()
             if state == "CHANGES_REQUESTED" and body:
-                feedback.append(
+                _append_feedback(
+                    feedback,
+                    seen,
                     ReviewFeedback(
                         reviewer=review.get("user", {}).get("login", "unknown"),
                         body=body,
                         state=state,
-                    )
+                    ),
                 )
 
         # Inline comments
@@ -347,14 +350,28 @@ class ReviewReader:
         for comment in comments:
             body = (comment.get("body") or "").strip()
             if body:
-                feedback.append(
+                _append_feedback(
+                    feedback,
+                    seen,
                     ReviewFeedback(
                         reviewer=comment.get("user", {}).get("login", "unknown"),
                         body=body,
                         path=comment.get("path"),
                         line=comment.get("line") or comment.get("original_line"),
                         state="COMMENTED",
-                    )
+                    ),
                 )
 
         return feedback
+
+
+def _append_feedback(
+    feedback: list[ReviewFeedback],
+    seen: set[tuple[str, str, str, int | None, str]],
+    item: ReviewFeedback,
+) -> None:
+    key = (item.reviewer, item.body.strip(), item.path or "", item.line, item.state)
+    if key in seen:
+        return
+    seen.add(key)
+    feedback.append(item)

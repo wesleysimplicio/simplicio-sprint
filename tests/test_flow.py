@@ -55,13 +55,20 @@ class FakeExecutor:
 
 class FakeEvidence:
     def __init__(self, work_dir, *, item_key, **kw):  # noqa: ANN001
-        pass
+        self.work_dir = work_dir
+        self.item_key = item_key
 
     def collect_tests(self, cmd):  # noqa: ANN001
         return TestEvidence(kind="unit", title=cmd or "tests", passed=True, message="exit 0")
 
     def capture_screenshot(self, url, *, name="screen", screenshot_fn=None):  # noqa: ANN001
         return None
+
+    def write_manifest(self, evidence, *, steps_completed=None, review_feedback=None):  # noqa: ANN001
+        path = self.work_dir / ".sendsprint/evidence" / self.item_key / "manifest.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}")
+        return path
 
 
 class FakeGit:
@@ -96,7 +103,9 @@ class FakePR:
             state="draft" if draft else "open",
         )
 
-    def post_evidence(self, pr_number, *, branch, evidence, steps_completed=None):  # noqa: ANN001
+    def post_evidence(  # noqa: ANN001
+        self, pr_number, *, branch, evidence, steps_completed=None, review_feedback=None
+    ):
         self.evidence_posts.append(pr_number)
 
     def read_feedback(self, pr_number):  # noqa: ANN001

@@ -129,11 +129,14 @@ class PullRequestManager:
         branch: str,
         evidence: list[TestEvidence],
         steps_completed: list[str] | None = None,
+        review_feedback: list[ReviewFeedback] | None = None,
     ) -> None:
         """Comment on the PR with test results + embedded screenshots."""
         if self.provider != "github":
             return
-        body = self._render_evidence(branch, evidence, steps_completed)
+        body = self._render_evidence(
+            branch, evidence, steps_completed, review_feedback=review_feedback
+        )
         reporter = ProgressReporter(self.repo, token=self.token)
         reporter.post_progress_comment(pr_number, body)
 
@@ -149,23 +152,33 @@ class PullRequestManager:
         branch: str,
         evidence: list[TestEvidence],
         steps_completed: list[str] | None,
+        *,
+        review_feedback: list[ReviewFeedback] | None = None,
     ) -> str:
         lines = ["## SendSprint evidence", ""]
         if steps_completed:
             lines.append("### Steps")
             lines += [f"- [x] {s}" for s in steps_completed]
             lines.append("")
+        if review_feedback:
+            lines.append("### Review feedback addressed")
+            for feedback in _dedupe_feedback(review_feedback):
+                loc = f" ({feedback.path}:{feedback.line})" if feedback.path else ""
+                lines.append(f"- @{feedback.reviewer}{loc}: {feedback.body}")
+            lines.append("")
         lines.append("### Tests & screens")
-        for ev in evidence:
+        for ev in _dedupe_evidence(evidence):
             mark = "✅" if ev.passed else "❌"
             detail = f" — {ev.message}" if ev.message else ""
             lines.append(f"- {mark} **{ev.kind}**: {ev.title}{detail}")
-            if ev.kind == "screenshot" and ev.passed and ev.path:
+            if ev.passed and ev.path:
                 raw = self._raw_url(branch, ev.path)
-                if raw:
+                if raw and ev.kind == "screenshot":
                     lines.append("")
                     lines.append(f"  ![{ev.title}]({raw})")
                     lines.append("")
+                elif raw:
+                    lines.append(f"  Artifact: [{ev.title}]({raw})")
         return "\n".join(lines)
 
     def _raw_url(self, branch: str, path: str) -> str | None:
@@ -185,3 +198,41 @@ class PullRequestManager:
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         return httpx.Client(timeout=30.0, headers=headers)
+
+
+def _evidence_key(ev: TestEvidence) -> tuple[str, str, str, str, bool]:
+    return (ev.kind, ev.title, ev.path or "", ev.message or "", ev.passed)
+
+
+def _dedupe_evidence(evidence: list[TestEvidence]) -> list[TestEvidence]:
+    seen: set[tuple[str, str, str, str, bool]] = set()
+    result: list[TestEvidence] = []
+    for ev in evidence:
+        key = _evidence_key(ev)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(ev)
+    return result
+
+
+def _feedback_key(feedback: ReviewFeedback) -> tuple[str, str, str, int | None, str]:
+    return (
+        feedback.reviewer,
+        feedback.body.strip(),
+        feedback.path or "",
+        feedback.line,
+        feedback.state,
+    )
+
+
+def _dedupe_feedback(feedback: list[ReviewFeedback]) -> list[ReviewFeedback]:
+    seen: set[tuple[str, str, str, int | None, str]] = set()
+    result: list[ReviewFeedback] = []
+    for item in feedback:
+        key = _feedback_key(item)
+        if not key[1] or key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result

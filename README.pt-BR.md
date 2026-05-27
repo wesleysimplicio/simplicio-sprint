@@ -62,13 +62,13 @@ trigger (cron / GitHub Action / Claude web)   ← tira você do loop
   └─ SendSprint (agente)
        0. atualiza ferramentas  último simplicio-cli / -prompt / -mapper (conforme o profile)
        1. lê a sprint           Jira / Azure DevOps / GitHub   (mcp → api, --scope mine)
-       2. mapeia cada card      → .specs/sprints/sprint-XX/NN-slug.task.md  (formato simplicio-mapper)
-       2b. (opcional) fan-out   brainstorm de edge cases com 600 subagentes do simplicio-prompt
+       2. mapeia cada card      → .specs/... mais contexto project-map + precedentes
+       2b. (opcional) fan-out   brainstorm via subagentes YOOL/TUPLE/HAMT lazy
        3. simplicio task ...    ← a única coisa que o simplicio faz (uma task → diff)
        3b. coleta evidência     testes + screenshot Playwright
        4. commit + push         git worktree isolado, backoff limitado
        5. abre PR em DRAFT      ← sua única superfície de revisão
-       6. anexa evidência       resultado dos testes + imagens embutidas
+       6. anexa evidência       testes + screenshots + manifesto
        7. atualiza o ticket     "In Review" + link do PR
        8. acompanha o PR        comentário? → simplicio ajusta → nova evidência
             ✓ você aprova → merge → próximo card
@@ -267,12 +267,22 @@ do worktree, para o executor ter contexto rico e estruturado:
 Cada arquivo de task carrega título, descrição, critérios de aceite (convertidos
 em `AC-1`, `AC-2`, …), labels e link do ticket. Desligue com `--no-specs`.
 
+Quando o repo alvo já tem artefatos do mapper, o SendSprint também lê
+`.simplicio/project-map.json` e `.simplicio/precedent-index.json`. Ele ranqueia
+arquivos relevantes, mudanças recentes, sinais de arquitetura e precedentes para
+o card atual, embute tudo em `## Structured mapper context` e passa o mesmo
+contexto compacto para o simplicio-cli.
+
 ## O fan-out de 600 subagentes
 
 Opcionalmente, antes de implementar um card, o SendSprint pode espalhar a task
 por **centenas de subagentes reais** via
 [simplicio-prompt](https://github.com/wesleysimplicio/simplicio-prompt) para
 levantar edge cases e um plano, e então funde o resultado na task do simplicio.
+Quando `SIMPLICIO_PROMPT_REPO` aponta para um checkout atual do
+simplicio-prompt, o SendSprint usa o adapter YOOL/TUPLE/HAMT `PromptFanout` e
+recibos lazy de `batch_spawn`, sem enumerar workers. O caminho antigo por
+subprocesso `SIMPLICIO_PROMPT_KERNEL` continua como fallback.
 
 ```bash
 # 600 subagentes por card (precisa do kernel + chave de provider)
@@ -282,9 +292,10 @@ sendsprint run jira 42 --repo . --repo-slug owner/repo --fanout
 sendsprint run jira 42 --repo . --repo-slug owner/repo --fanout --fanout-dry-run
 ```
 
-É **opt-in** e **degrada com elegância**: sem kernel ou chave, registra uma etapa
-`skipped` e segue. O `sendsprint update` instala o kernel e aponta o
-`SIMPLICIO_PROMPT_KERNEL` para ele automaticamente.
+É **opt-in** e **degrada com elegância**: sem adapter tuple, kernel ou chave,
+registra uma etapa `skipped` e segue. O `sendsprint update` instala o checkout
+do prompt e aponta o `SIMPLICIO_PROMPT_KERNEL` para o kernel legado
+automaticamente.
 
 ## Manter as ferramentas atualizadas
 
@@ -353,9 +364,9 @@ sendsprint/
 ├── operators/      leitores de tasks: JiraOperator, AzureDevopsOperator, GitHubIssuesOperator (mcp|api)
 │   └── _mcp_bridge.py  seam MCP injetado pelo host (register_provider → fetch)
 ├── executor/       SimplicioExecutor — a fronteira com o simplicio-cli (task → diff aplicado)
-├── mapper/         MapperAdapter — renderiza um Sprint nos specs .specs/ do simplicio-mapper
-├── prompt/         PromptFanout — fan-out de subagentes do simplicio-prompt (--subagents 600)
-├── delivery/       worktree, git_ops (commit+push), evidence (testes+telas), pr (cria+review)
+├── mapper/         MapperAdapter — tasks .specs/ + contexto project-map/precedentes
+├── prompt/         PromptFanout — fan-out YOOL/TUPLE/HAMT do simplicio-prompt
+├── delivery/       worktree, git_ops, manifesto de evidência, PR cria/review
 ├── models/         Sprint, SprintItem, StepReport, RunReport, ScopeConfig (Pydantic v2)
 ├── github_integration.py  ReviewReader (feedback do PR) + comentário de evidência + CI
 ├── scope.py        filtragem --scope mine
@@ -375,6 +386,7 @@ sendsprint/
 | `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_PAT` | Azure DevOps |
 | `GITHUB_TOKEN`, `GITHUB_REPO` | GitHub Issues + PRs |
 | `SIMPLICIO_MODEL`, `SIMPLICIO_BASE_URL`, `SIMPLICIO_TEST_CMD` | simplicio-cli |
+| `SIMPLICIO_PROMPT_REPO` | checkout do simplicio-prompt com `examples/python/prompt_fanout.py` |
 | `SIMPLICIO_PROMPT_KERNEL` | caminho do kernel do fan-out (definido pelo `sendsprint update`) |
 | `SENDSPRINT_CACHE_DIR` | onde ficam as ferramentas clonadas (padrão `~/.cache/sendsprint`) |
 | `SENDSPRINT_LOG_DIR` | onde ficam os logs (padrão `~/.local/state/sendsprint/logs`) |
@@ -420,8 +432,9 @@ Não — é opt-in (`--fanout`) e pula com elegância sem kernel/chave. Use
 `--fanout-dry-run` para prever o custo offline.
 
 **Um revisor deixou um comentário — o que acontece?**
-O loop de review lê o feedback acionável, roda o simplicio de novo para resolver,
-recoleta evidência fresca, e dá push — repetindo até você aprovar. Um agente
+O loop de review deduplica o feedback acionável, inclui contexto de arquivo/linha,
+roda o simplicio de novo para resolver, recoleta evidência fresca, escreve um
+manifesto de evidência e dá push — repetindo até você aprovar. Um agente
 inscrito na atividade do PR pode conduzir isso automaticamente.
 
 **Onde vejo o que aconteceu?**

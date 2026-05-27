@@ -61,13 +61,13 @@ trigger (cron / GitHub Action / Claude web)   ← removes you from the loop
   └─ SendSprint (agent)
        0. update tools       latest simplicio-cli / -prompt / -mapper (per profile)
        1. read sprint        Jira / Azure DevOps / GitHub Issues   (mcp → api, --scope mine)
-       2. map each card      → .specs/sprints/sprint-XX/NN-slug.task.md  (simplicio-mapper format)
-       2b. (optional) fan-out brainstorm edge cases with 600 simplicio-prompt subagents
+       2. map each card      → .specs/... plus project-map + precedent context
+       2b. (optional) fan-out brainstorm via YOOL/TUPLE/HAMT lazy subagents
        3. simplicio task ... ← the only thing simplicio-cli does (one task → diff)
        3b. collect evidence  tests + Playwright screenshot
        4. commit + push      isolated git worktree, bounded backoff
        5. open DRAFT PR      ← your only review surface
-       6. attach evidence    test results + embedded screenshots
+       6. attach evidence    test results + screenshots + manifest
        7. update the ticket  "In Review" + PR link
        8. watch the PR       review comment? → simplicio revises → re-evidence
             ✓ you approve → merge → next card
@@ -266,12 +266,22 @@ Each task file carries the card's title, description, acceptance criteria
 (parsed into `AC-1`, `AC-2`, …), labels and ticket link. Turn it off with
 `--no-specs`.
 
+When the target repo already has mapper artifacts, SendSprint also reads
+`.simplicio/project-map.json` and `.simplicio/precedent-index.json`. It ranks
+relevant files, recent changes, architecture signals and precedent snippets for
+the current card, embeds them under `## Structured mapper context`, and passes
+that same compact context to simplicio-cli.
+
 ## The 600-subagent fan-out
 
 Optionally, before implementing a card, SendSprint can fan the task out across
 **hundreds of real subagents** via
 [simplicio-prompt](https://github.com/wesleysimplicio/simplicio-prompt) to
 brainstorm edge cases and a plan, then folds the result into the simplicio task.
+When `SIMPLICIO_PROMPT_REPO` points at a current simplicio-prompt checkout,
+SendSprint uses the YOOL/TUPLE/HAMT `PromptFanout` adapter and lazy
+`batch_spawn` receipts instead of enumerating workers. The older
+`SIMPLICIO_PROMPT_KERNEL` subprocess path remains as a fallback.
 
 ```bash
 # 600 subagents per card (needs the kernel + a provider key)
@@ -281,9 +291,10 @@ sendsprint run jira 42 --repo . --repo-slug owner/repo --fanout
 sendsprint run jira 42 --repo . --repo-slug owner/repo --fanout --fanout-dry-run
 ```
 
-It is **opt-in** and **degrades gracefully**: with no kernel or key it logs a
-`skipped` step and continues. `sendsprint update` installs the kernel and points
-`SIMPLICIO_PROMPT_KERNEL` at it automatically.
+It is **opt-in** and **degrades gracefully**: with no tuple adapter, kernel or
+key it logs a `skipped` step and continues. `sendsprint update` installs the
+prompt checkout and points `SIMPLICIO_PROMPT_KERNEL` at the legacy kernel
+automatically.
 
 ## Keeping the tools current
 
@@ -352,9 +363,9 @@ sendsprint/
 ├── operators/      task readers: JiraOperator, AzureDevopsOperator, GitHubIssuesOperator (mcp|api)
 │   └── _mcp_bridge.py  host-injected MCP seam (register_provider → fetch)
 ├── executor/       SimplicioExecutor — the boundary to simplicio-cli (task → applied diff)
-├── mapper/         MapperAdapter — render a Sprint into simplicio-mapper .specs/ tasks
-├── prompt/         PromptFanout — simplicio-prompt subagent fan-out (--subagents 600)
-├── delivery/       worktree, git_ops (commit+push), evidence (tests+screens), pr (create+review)
+├── mapper/         MapperAdapter — .specs/ tasks + project-map/precedent context
+├── prompt/         PromptFanout — simplicio-prompt YOOL/TUPLE/HAMT fan-out
+├── delivery/       worktree, git_ops, evidence manifest, PR create/review
 ├── models/         Sprint, SprintItem, StepReport, RunReport, ScopeConfig (Pydantic v2)
 ├── github_integration.py  ReviewReader (PR feedback) + evidence comment posting + CI
 ├── scope.py        --scope mine filtering
@@ -374,6 +385,7 @@ sendsprint/
 | `AZURE_DEVOPS_ORG`, `AZURE_DEVOPS_PROJECT`, `AZURE_DEVOPS_PAT` | Azure DevOps |
 | `GITHUB_TOKEN`, `GITHUB_REPO` | GitHub Issues + PRs |
 | `SIMPLICIO_MODEL`, `SIMPLICIO_BASE_URL`, `SIMPLICIO_TEST_CMD` | simplicio-cli |
+| `SIMPLICIO_PROMPT_REPO` | path to a simplicio-prompt checkout with `examples/python/prompt_fanout.py` |
 | `SIMPLICIO_PROMPT_KERNEL` | path to the fan-out kernel (auto-set by `sendsprint update`) |
 | `SENDSPRINT_CACHE_DIR` | where git-cloned tools live (default `~/.cache/sendsprint`) |
 | `SENDSPRINT_LOG_DIR` | where logs live (default `~/.local/state/sendsprint/logs`) |
@@ -420,9 +432,10 @@ No — it's opt-in (`--fanout`) and skips gracefully without a kernel/key. Use
 `--fanout-dry-run` to preview cost offline.
 
 **A reviewer left a comment — what happens?**
-The review loop reads the actionable feedback, re-runs simplicio to address it,
-re-collects fresh evidence, and pushes — repeating until you approve. An agent
-subscribed to PR activity can drive this automatically.
+The review loop deduplicates actionable feedback, includes file/line context,
+re-runs simplicio to address it, re-collects fresh evidence, writes an evidence
+manifest, and pushes — repeating until you approve. An agent subscribed to PR
+activity can drive this automatically.
 
 **Where do I see what happened?**
 In the log file (`~/.local/state/sendsprint/logs/sendsprint.log`) and the

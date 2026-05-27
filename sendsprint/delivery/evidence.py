@@ -9,10 +9,13 @@ branch and can be embedded in the PR comment as markdown images.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from sendsprint.models.reports import TestEvidence
 
@@ -116,6 +119,30 @@ class EvidenceCollector:
             )
         return TestEvidence(kind="screenshot", title=url, passed=True, path=str(out))
 
+    def write_manifest(
+        self,
+        evidence: list[TestEvidence],
+        *,
+        steps_completed: list[str] | None = None,
+        review_feedback: list[Any] | None = None,
+    ) -> Path:
+        """Write a stable manifest for PR comments and review-loop revisions."""
+        artifacts = [_evidence_record(ev) for ev in _dedupe_evidence(evidence)]
+        feedback = [_feedback_record(fb) for fb in _dedupe_feedback(review_feedback or [])]
+        manifest = {
+            "schema": "sendsprint.evidence/v1",
+            "item_key": self.item_key,
+            "status": "passed" if all(ev.passed for ev in evidence) else "failed",
+            "steps_completed": steps_completed or [],
+            "artifacts": artifacts,
+            "review_feedback": feedback,
+            "summary": {
+                "passed": sum(1 for ev in evidence if ev.passed),
+                "failed": sum(1 for ev in evidence if not ev.passed),
+            },
+        }
+        return self._write("manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+
     def _write(self, name: str, content: str) -> Path:
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
         path = self.evidence_dir / name
@@ -136,3 +163,68 @@ def _playwright_screenshot(url: str, out_path: str) -> bool:
         page.screenshot(path=out_path, full_page=True)
         browser.close()
     return True
+
+
+def _evidence_key(ev: TestEvidence) -> tuple[str, str, str, str, bool]:
+    return (ev.kind, ev.title, ev.path or "", ev.message or "", ev.passed)
+
+
+def _dedupe_evidence(evidence: list[TestEvidence]) -> list[TestEvidence]:
+    seen: set[tuple[str, str, str, str, bool]] = set()
+    result: list[TestEvidence] = []
+    for ev in evidence:
+        key = _evidence_key(ev)
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(ev)
+    return result
+
+
+def _feedback_key(feedback: Any) -> tuple[str, str, str, int | None, str]:
+    return (
+        str(getattr(feedback, "reviewer", "") or ""),
+        str(getattr(feedback, "body", "") or "").strip(),
+        str(getattr(feedback, "path", "") or ""),
+        getattr(feedback, "line", None),
+        str(getattr(feedback, "state", "") or ""),
+    )
+
+
+def _dedupe_feedback(feedback: list[Any]) -> list[Any]:
+    seen: set[tuple[str, str, str, int | None, str]] = set()
+    result: list[Any] = []
+    for item in feedback:
+        key = _feedback_key(item)
+        if not key[1] or key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result
+
+
+def _evidence_record(ev: TestEvidence) -> dict[str, Any]:
+    payload = {
+        "kind": ev.kind,
+        "title": ev.title,
+        "passed": ev.passed,
+        "path": ev.path,
+        "message": ev.message,
+        "duration_ms": ev.duration_ms,
+    }
+    compact = json.dumps(payload, sort_keys=True, default=str)
+    payload["id"] = hashlib.blake2b(compact.encode("utf-8"), digest_size=8).hexdigest()
+    return {key: value for key, value in payload.items() if value is not None}
+
+
+def _feedback_record(feedback: Any) -> dict[str, Any]:
+    payload = {
+        "reviewer": getattr(feedback, "reviewer", "unknown"),
+        "body": str(getattr(feedback, "body", "") or "").strip(),
+        "path": getattr(feedback, "path", None),
+        "line": getattr(feedback, "line", None),
+        "state": getattr(feedback, "state", "COMMENTED"),
+    }
+    compact = json.dumps(payload, sort_keys=True, default=str)
+    payload["id"] = hashlib.blake2b(compact.encode("utf-8"), digest_size=8).hexdigest()
+    return {key: value for key, value in payload.items() if value is not None}

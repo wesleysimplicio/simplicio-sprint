@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import subprocess
 
-import httpx
 import pytest
 
 from sendsprint.delivery.evidence import EvidenceCollector
@@ -13,7 +12,6 @@ from sendsprint.delivery.git_ops import GitError, GitOps
 from sendsprint.delivery.pr import PullRequestManager
 from sendsprint.github_integration import ReviewFeedback, ReviewReader
 from sendsprint.models.reports import TestEvidence
-
 
 # -- git_ops ----------------------------------------------------------------
 
@@ -184,7 +182,10 @@ def test_render_evidence_embeds_screenshot():
     ]
     body = pr._render_evidence("feature/x", evidence, ["execute"])
     assert "![http://x](" in body
-    assert "raw.githubusercontent.com/owner/repo/feature/x/.sendsprint/evidence/ABC-1/screen.png" in body
+    assert (
+        "raw.githubusercontent.com/owner/repo/feature/x/.sendsprint/evidence/ABC-1/screen.png"
+        in body
+    )
 
 
 def test_render_evidence_deduplicates_and_links_manifest():

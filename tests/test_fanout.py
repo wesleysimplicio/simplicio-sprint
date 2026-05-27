@@ -138,12 +138,29 @@ class PromptFanout:
         self.receipt = None
         self.recorded = []
 
-    def spawn_task(self, goal, *, mapper_context=None, lane="analysis", depth=2, branching=8, compression_threshold=None):
+    def spawn_task(
+        self,
+        goal,
+        *,
+        mapper_context=None,
+        lane="analysis",
+        depth=2,
+        branching=8,
+        compression_threshold=None,
+    ):
         self.mapper_context = mapper_context
         self.receipt = Receipt(depth, branching)
         return {"goal": goal}, self.receipt
 
-    def record_tokens(self, lane, *, prompt_tokens=0, completion_tokens=0, cost_usd=0.0, reason="fanout"):
+    def record_tokens(
+        self,
+        lane,
+        *,
+        prompt_tokens=0,
+        completion_tokens=0,
+        cost_usd=0.0,
+        reason="fanout",
+    ):
         self.recorded.append((lane, prompt_tokens, completion_tokens, cost_usd, reason))
 
     def snapshot(self):

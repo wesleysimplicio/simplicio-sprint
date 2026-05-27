@@ -113,7 +113,9 @@ class RecordingPR:
             state="draft" if draft else "open",
         )
 
-    def post_evidence(self, pr_number, *, branch, evidence, steps_completed=None):  # noqa: ANN001
+    def post_evidence(  # noqa: ANN001
+        self, pr_number, *, branch, evidence, steps_completed=None, review_feedback=None
+    ):
         self.evidence = evidence
 
 

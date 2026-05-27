@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.2.0
+
+Reliability and ecosystem-integration release for the richer mapper/prompt flow.
+
+- **Mapper artifacts are consumed directly.** `MapperAdapter` now reads
+  `.simplicio/project-map.json` and `.simplicio/precedent-index.json`, ranks
+  relevant files and precedent candidates per sprint item, embeds them in the
+  task spec, and passes the same compact context to `simplicio-cli`.
+- **YOOL/TUPLE/HAMT fan-out adapter.** `PromptFanout` can load the
+  `simplicio-prompt` `examples/python/prompt_fanout.py` adapter via
+  `SIMPLICIO_PROMPT_REPO`, use lazy `batch_spawn` semantics, track token/cost
+  usage, and keep the legacy `SIMPLICIO_PROMPT_KERNEL` subprocess path as a
+  graceful fallback.
+- **Review and evidence loop hardening.** Evidence collection now writes a
+  stable `.sendsprint/evidence/<key>/manifest.json`, PR comments deduplicate
+  repeated artifacts, review feedback is deduplicated before revise, and
+  revision comments are posted together with fresh evidence and feedback context.
+
 ## 1.0.0
 
 First public release on PyPI as `simplicio-sprint` (clean reboot from the

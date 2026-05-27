@@ -9,7 +9,10 @@ from sendsprint.scope import apply_scope, build_scope
 
 
 def test_next_link_parsing():
-    header = '<https://api.github.com/x?page=2>; rel="next", <https://api.github.com/x?page=5>; rel="last"'
+    header = (
+        '<https://api.github.com/x?page=2>; rel="next", '
+        '<https://api.github.com/x?page=5>; rel="last"'
+    )
     assert _next_link(header) == "https://api.github.com/x?page=2"
     assert _next_link(None) is None
     assert _next_link('<https://x>; rel="last"') is None

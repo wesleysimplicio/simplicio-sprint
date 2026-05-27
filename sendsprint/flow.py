@@ -23,7 +23,7 @@ from sendsprint.delivery.pr import PullRequestManager
 from sendsprint.delivery.worktree import WorktreeError, WorktreeManager
 from sendsprint.executor import SimplicioExecutor
 from sendsprint.mapper import MapperAdapter
-from sendsprint.models import RunReport, ScopeConfig, Sprint, SprintItem, StepReport
+from sendsprint.models import RunReport, ScopeConfig, Sprint, SprintItem, StepReport, TestEvidence
 from sendsprint.operators.base import BaseOperator, TransportUnavailable
 from sendsprint.prompt import PromptFanout
 from sendsprint.scope import apply_scope
@@ -139,17 +139,18 @@ class SprintFlow:
         tech = self.target.tech or detect_tech(str(work_dir)).primary_tech
 
         context_parts: list[str] = []
+        mapper_context: dict | None = None
 
         # Step 2b — adapt the card into the simplicio-mapper spec format.
         if self.write_specs:
-            spec_step, spec_note = self._write_spec(work_dir, item, sprint, index)
+            spec_step, spec_note, mapper_context = self._write_spec(work_dir, item, sprint, index)
             outcome.steps.append(spec_step)
             if spec_note:
                 context_parts.append(spec_note)
 
         # Step 2c — optional simplicio-prompt subagent fan-out (brainstorm/plan).
         if self.fanout is not None:
-            fan_step, fan_note = self._fan_out(item)
+            fan_step, fan_note = self._fan_out(item, mapper_context=mapper_context)
             outcome.steps.append(fan_step)
             if fan_note:
                 context_parts.append(fan_note)
@@ -232,7 +233,7 @@ class SprintFlow:
             )
             return steps
 
-        feedback_text = "\n".join(f"- @{f.reviewer}: {f.body}" for f in feedback)
+        feedback_text = self._review_feedback_text(feedback)
         executor = SimplicioExecutor(work_dir, binary=self.simplicio_binary)
         revise_step = executor.revise(feedback_text, stack=self.target.tech, repo=self.target.name)
         steps.append(revise_step)
@@ -247,7 +248,11 @@ class SprintFlow:
             if git.commit_all(f"fix: address review feedback on {branch}"):
                 git.push(branch)
             pr_manager.post_evidence(
-                pr_number, branch=branch, evidence=evidence, steps_completed=["revise", "evidence"]
+                pr_number,
+                branch=branch,
+                evidence=evidence,
+                steps_completed=["revise", "evidence"],
+                review_feedback=feedback,
             )
         except GitError as exc:
             steps.append(StepReport(step=7, name="review:push", status="failed", message=str(exc)))
@@ -261,13 +266,16 @@ class SprintFlow:
 
     def _write_spec(
         self, work_dir: Path, item: SprintItem, sprint: Sprint | None, index: int
-    ) -> tuple[StepReport, str | None]:
+    ) -> tuple[StepReport, str | None, dict | None]:
         """Materialize the card into ``.specs/`` and return a note for simplicio."""
         try:
-            path = MapperAdapter(work_dir).write_item(item, sprint=sprint, index=index)
+            adapter = MapperAdapter(work_dir)
+            path = adapter.write_item(item, sprint=sprint, index=index)
+            mapper_context = adapter.mapper_context_for_item(item)
         except OSError as exc:  # best-effort; never abort the item
             return (
                 StepReport(step=2, name=f"mapper:{item.key}", status="skipped", message=str(exc)),
+                None,
                 None,
             )
         rel = path.relative_to(work_dir)
@@ -275,15 +283,21 @@ class SprintFlow:
             f"A task spec was written to {rel} in the mapper format. Follow its "
             "Acceptance Criteria, Test plan, and Definition of Done."
         )
+        structured = adapter.structured_context_for_item(item)
+        if structured:
+            note = f"{note}\n\nStructured mapper context:\n{structured}"
         return (
             StepReport(step=2, name=f"mapper:{item.key}", status="ok", message=f"spec at {rel}"),
             note,
+            mapper_context or None,
         )
 
-    def _fan_out(self, item: SprintItem) -> tuple[StepReport, str | None]:
+    def _fan_out(
+        self, item: SprintItem, *, mapper_context: dict | None = None
+    ) -> tuple[StepReport, str | None]:
         """Run the simplicio-prompt subagent fan-out for one card."""
         assert self.fanout is not None
-        result = self.fanout.brainstorm(item)
+        result = self.fanout.brainstorm(item, mapper_context=mapper_context)
         status = result.status if result.status in {"ok", "skipped", "failed"} else "skipped"
         note: str | None = None
         if result.status == "ok" and result.samples:
@@ -310,6 +324,16 @@ class SprintFlow:
             if shot is not None:
                 evidence.append(shot)
         passed = all(e.passed for e in evidence)
+        manifest = collector.write_manifest(evidence, steps_completed=["evidence"])
+        evidence.append(
+            TestEvidence(
+                kind="log",
+                title="evidence manifest",
+                passed=True,
+                path=str(manifest),
+                message="manifest.json",
+            )
+        )
         step = StepReport(
             step=5,
             name=f"evidence:{item.key}",
@@ -320,6 +344,24 @@ class SprintFlow:
             evidence=evidence,
         )
         return step, evidence
+
+    def _review_feedback_text(self, feedback: list) -> str:
+        lines: list[str] = []
+        seen: set[tuple[str, str, str, int | None, str]] = set()
+        for item in feedback:
+            key = (
+                getattr(item, "reviewer", "unknown"),
+                str(getattr(item, "body", "") or "").strip(),
+                getattr(item, "path", None) or "",
+                getattr(item, "line", None),
+                getattr(item, "state", ""),
+            )
+            if not key[1] or key in seen:
+                continue
+            seen.add(key)
+            location = f" ({key[2]}:{key[3]})" if key[2] else ""
+            lines.append(f"- @{key[0]}{location} [{key[4]}]: {key[1]}")
+        return "\n".join(lines)
 
     def _open_pr(
         self, item: SprintItem, branch: str, evidence: list
