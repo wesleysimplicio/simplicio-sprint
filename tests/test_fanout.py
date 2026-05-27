@@ -116,3 +116,68 @@ def test_brainstorm_builds_task_from_item(tmp_path):
     task_arg = captured["argv"][captured["argv"].index("--task") + 1]
     assert "Add login" in task_arg
     assert "works under load" in task_arg
+
+
+def test_tuple_runtime_uses_prompt_fanout_adapter(tmp_path):
+    prompt_repo = tmp_path / "simplicio-prompt"
+    examples = prompt_repo / "examples/python"
+    examples.mkdir(parents=True)
+    (examples / "prompt_fanout.py").write_text(
+        """
+class Receipt:
+    def __init__(self, depth, branching):
+        self.depth = depth
+        self.branching = branching
+        self.virtual_agents = branching ** depth
+        self.receipt_id = "receipt-123"
+
+
+class PromptFanout:
+    def __init__(self, repo, authority="simplicio", policy=None, space=None):
+        self.repo = repo
+        self.receipt = None
+        self.recorded = []
+
+    def spawn_task(self, goal, *, mapper_context=None, lane="analysis", depth=2, branching=8, compression_threshold=None):
+        self.mapper_context = mapper_context
+        self.receipt = Receipt(depth, branching)
+        return {"goal": goal}, self.receipt
+
+    def record_tokens(self, lane, *, prompt_tokens=0, completion_tokens=0, cost_usd=0.0, reason="fanout"):
+        self.recorded.append((lane, prompt_tokens, completion_tokens, cost_usd, reason))
+
+    def snapshot(self):
+        return {
+            "active_agents": 1,
+            "virtual_agents": self.receipt.virtual_agents,
+            "total_agents": self.receipt.virtual_agents + 1,
+            "token_usage": {
+                "total_cost_usd": 0.0123,
+                "lanes": {
+                    "analysis": {
+                        "prompt_tokens": 12,
+                        "completion_tokens": 3,
+                        "cost_usd": 0.0123,
+                    }
+                },
+            },
+        }
+""",
+        encoding="utf-8",
+    )
+
+    fan = PromptFanout(
+        prompt_repo=prompt_repo,
+        repo="owner/repo",
+        mapper_context={"relevant_files": ["src/auth/login.py"]},
+        subagents=64,
+        dry_run=True,
+    )
+    res = fan.run("Implement login")
+    assert res.status == "ok"
+    assert res.runtime == "tuple"
+    assert res.requested == 64
+    assert res.completed == 64
+    assert res.cost_usd == 0.0123
+    assert res.token_usage["lanes"]["analysis"]["prompt_tokens"] == 12
+    assert any("batch_spawn" in sample for sample in res.samples)

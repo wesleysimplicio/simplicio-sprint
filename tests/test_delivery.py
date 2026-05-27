@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 
 import httpx
@@ -10,6 +11,7 @@ import pytest
 from sendsprint.delivery.evidence import EvidenceCollector
 from sendsprint.delivery.git_ops import GitError, GitOps
 from sendsprint.delivery.pr import PullRequestManager
+from sendsprint.github_integration import ReviewFeedback, ReviewReader
 from sendsprint.models.reports import TestEvidence
 
 
@@ -108,6 +110,28 @@ def test_capture_screenshot_unavailable(tmp_path):
     assert ev is not None and ev.passed is False
 
 
+def test_write_manifest_deduplicates_evidence_and_review_feedback(tmp_path):
+    collector = EvidenceCollector(tmp_path, item_key="ABC-1")
+    evidence = [
+        TestEvidence(kind="unit", title="pytest", passed=True, path="/tmp/tests.log"),
+        TestEvidence(kind="unit", title="pytest", passed=True, path="/tmp/tests.log"),
+        TestEvidence(kind="screenshot", title="home", passed=True, path="/tmp/screen.png"),
+    ]
+    feedback = [
+        ReviewFeedback(reviewer="ana", body="add a regression test", path="app.py", line=12),
+        ReviewFeedback(reviewer="ana", body="add a regression test", path="app.py", line=12),
+    ]
+    manifest = collector.write_manifest(
+        evidence, steps_completed=["revise", "evidence"], review_feedback=feedback
+    )
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    assert data["item_key"] == "ABC-1"
+    assert data["status"] == "passed"
+    assert len(data["artifacts"]) == 2
+    assert len(data["review_feedback"]) == 1
+    assert data["steps_completed"] == ["revise", "evidence"]
+
+
 # -- pr ---------------------------------------------------------------------
 
 
@@ -161,3 +185,75 @@ def test_render_evidence_embeds_screenshot():
     body = pr._render_evidence("feature/x", evidence, ["execute"])
     assert "![http://x](" in body
     assert "raw.githubusercontent.com/owner/repo/feature/x/.sendsprint/evidence/ABC-1/screen.png" in body
+
+
+def test_render_evidence_deduplicates_and_links_manifest():
+    pr = PullRequestManager("github", "owner/repo", token="t")
+    evidence = [
+        TestEvidence(kind="unit", title="pytest", passed=True, message="exit 0"),
+        TestEvidence(kind="unit", title="pytest", passed=True, message="exit 0"),
+        TestEvidence(
+            kind="log",
+            title="evidence manifest",
+            passed=True,
+            path="/wt/.sendsprint/evidence/ABC-1/manifest.json",
+        ),
+    ]
+    body = pr._render_evidence(
+        "feature/x",
+        evidence,
+        ["execute"],
+        review_feedback=[
+            ReviewFeedback(reviewer="ana", body="add a regression test", path="app.py", line=12)
+        ],
+    )
+    assert body.count("**unit**: pytest") == 1
+    assert "Review feedback addressed" in body
+    assert "[evidence manifest]" in body
+
+
+class _ReviewClient:
+    def get(self, url, params=None):  # noqa: ANN001
+        if url.endswith("/reviews"):
+            return _FakeResponse(
+                [
+                    {
+                        "state": "CHANGES_REQUESTED",
+                        "body": "Add a regression test",
+                        "user": {"login": "ana"},
+                    },
+                    {
+                        "state": "CHANGES_REQUESTED",
+                        "body": "Add a regression test",
+                        "user": {"login": "ana"},
+                    },
+                    {"state": "APPROVED", "body": "looks good", "user": {"login": "bob"}},
+                ]
+            )
+        if url.endswith("/comments"):
+            return _FakeResponse(
+                [
+                    {
+                        "body": "rename the helper",
+                        "path": "app.py",
+                        "line": 12,
+                        "user": {"login": "ana"},
+                    },
+                    {
+                        "body": "rename the helper",
+                        "path": "app.py",
+                        "line": 12,
+                        "user": {"login": "ana"},
+                    },
+                    {"body": "", "path": "app.py", "line": 13, "user": {"login": "ana"}},
+                ]
+            )
+        raise AssertionError(url)
+
+
+def test_review_reader_deduplicates_actionable_feedback():
+    feedback = ReviewReader("owner/repo", client=_ReviewClient()).extract_actionable_feedback(7)
+    assert [(f.reviewer, f.body, f.path, f.line, f.state) for f in feedback] == [
+        ("ana", "Add a regression test", None, None, "CHANGES_REQUESTED"),
+        ("ana", "rename the helper", "app.py", 12, "COMMENTED"),
+    ]
