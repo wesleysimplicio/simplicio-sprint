@@ -1,14 +1,14 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling<1.27"]
 build-backend = "hatchling.build"
 
 [project]
 name = "simplicio-sprint"
-version = "1.2.0"
+version = "1.2.1"
 description = "Autonomous sprint-to-PR delivery agent. Reads Jira/Azure DevOps/GitHub tasks, delegates code edits to simplicio-cli, ships draft PRs with evidence."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
+license = { text = "MIT" }
 authors = [{ name = "Wesley Simplicio", email = "wesleybob4@gmail.com" }]
 keywords = ["sprint", "jira", "azure-devops", "github", "simplicio-cli", "agent", "automation"]
 classifiers = [

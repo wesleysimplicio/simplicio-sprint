@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.2.1
+
+Performance release that bundles the work from issues #265 and #267.
+
+- **LLM client pooling + completion cache** (`sendsprint/llm/client.py`).
+  `LlmClient` now owns an `httpx.Client` with configurable connection
+  limits and reuses it across calls; identical completions are memoized
+  via an LRU+TTL cache controlled by `SENDSPRINT_LLM_CACHE`,
+  `SENDSPRINT_LLM_CACHE_SIZE`, and `SENDSPRINT_LLM_CACHE_TTL_S`.
+- **Shared utility modules** (`sendsprint/utils/`). `LruTtlCache`,
+  `TemplateRenderer`, and `orjson`-backed JSON helpers (`dumps_json`,
+  `loads_json`) with a stdlib `json` fallback.
+- **Cached sprint/backlog/retrospective templates** rendered once per
+  identical input; `RETROSPECTIVE.md` is now materialized alongside
+  sprint specs.
+- **Optional Rust kernel** at `crates/sendsprint-core/` (PyO3 0.22,
+  abi3-py311, maturin). `sendsprint.core.validate_sprint_plan` runs a
+  full sprint-plan validator (cycle detection, duplicate keys, orphan
+  parents, story-points, status, links, labels, acceptance criteria)
+  and dispatches between the Rust extension and a pure-Python fallback
+  via `SENDSPRINT_USE_RUST_CORE`. Empirical benchmark in
+  `bench/results/` shows the Rust path is on par with Python at the
+  current scale; see `docs/perf/rust-pyo3-evaluation.md` for the
+  measured table and recommendation to keep Python as the default.
+
 ## 1.2.0
 
 Reliability and ecosystem-integration release for the richer mapper/prompt flow.
