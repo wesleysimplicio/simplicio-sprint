@@ -35,6 +35,7 @@ sendsprint/
 ├── scope.py     --scope mine
 ├── flow.py      orchestrator (SprintFlow)
 ├── watch.py     unattended trigger (Watcher)
+├── core.py      sprint-plan validator (Rust kernel + Python fallback)
 └── cli.py       run | watch | login | logout | version
 ```
 
@@ -53,6 +54,21 @@ ruff check sendsprint/ && ruff format sendsprint/
 
 sendsprint run   <jira|azuredevops|github> <sprint> --repo . --repo-slug owner/repo --scope mine
 sendsprint watch <jira|azuredevops|github> <sprint> --repo . --repo-slug owner/repo --once
+```
+
+Optional Rust kernel (sprint-plan validator) — see `crates/sendsprint-core/`
+and [`docs/perf/rust-pyo3-evaluation.md`](./docs/perf/rust-pyo3-evaluation.md):
+
+```bash
+# build the wheel (release profile)
+(cd crates/sendsprint-core && maturin build --release)
+pip install crates/sendsprint-core/target/wheels/sendsprint_core-*.whl
+
+# opt in (default off; falls back to Python automatically)
+export SENDSPRINT_USE_RUST_CORE=1
+
+# run the benchmark against both backends
+python bench/validate_sprint_plan.py
 ```
 
 ## 5. Hard rules

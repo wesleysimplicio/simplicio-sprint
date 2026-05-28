@@ -1,0 +1,17 @@
+sendsprint-core benchmark — RUST_AVAILABLE=True
+python: Python 3.11.15
+
+       N  backend                                   metric  ratio (python/rust)
+--------------------------------------------------------------------------------
+      10   python  median=      28.6 µs  p95=      39.8 µs
+      10     rust  median=      28.2 µs  p95=      48.9 µs     1.0x
+
+     100   python  median=     240.9 µs  p95=     285.1 µs
+     100     rust  median=     248.9 µs  p95=     299.1 µs     1.0x
+
+    1000   python  median=    2667.4 µs  p95=    2829.2 µs
+    1000     rust  median=    2613.5 µs  p95=    2661.6 µs     1.0x
+
+   10000   python  median=   41993.0 µs  p95=   43870.6 µs
+   10000     rust  median=   41251.3 µs  p95=   44757.1 µs     1.0x
+

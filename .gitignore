@@ -58,3 +58,7 @@ evidence/
 # Local Codex/browser run artifacts
 .codex-layout-shots/
 .codex-web-expo.*.log
+
+# Rust build artifacts
+crates/**/target/
+crates/**/Cargo.lock
