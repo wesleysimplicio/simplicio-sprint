@@ -175,9 +175,49 @@ Before merging any Rust code:
 - Would a NumPy-style C-extension (e.g. `cython`) be enough for the same
   validators? It's a faster on-ramp than PyO3 for pure-CPU kernels.
 
+## Pilot results (measured)
+
+The pilot crate described above was actually built and benchmarked. See
+`crates/sendsprint-core/`, `sendsprint/core.py`, `tests/test_core_validator.py`,
+and `bench/validate_sprint_plan.py`.
+
+Wheel built with `maturin build --release` (PyO3 0.22, abi3-py311) and
+exercised by `bench/validate_sprint_plan.py` on Python 3.11.15:
+
+| N       | Python (median) | Rust (median) | Ratio (py/rust) |
+| ------- | --------------- | ------------- | --------------- |
+| 10      | ~29 µs          | ~28 µs        | 1.0×            |
+| 100     | ~241 µs         | ~249 µs       | 1.0×            |
+| 1 000   | ~2.67 ms        | ~2.61 ms      | 1.0×            |
+| 10 000  | ~42 ms          | ~41 ms        | 1.0×            |
+
+Full output: [`bench/results/2026-05-28.txt`](../../bench/results/2026-05-28.txt).
+
+The Rust kernel does not win at any size. The validator's actual CPU work
+is dwarfed by:
+
+- JSON parsing on both sides (`json.loads` vs `serde_json::from_slice` —
+  similar throughput at these sizes).
+- PyDict construction in the Rust path: one dict per finding crosses the
+  FFI boundary and goes through PyO3's allocator, which costs about the
+  same as building those dicts directly in Python.
+
+**Conclusion confirmed by measurement:** for this workload the Rust path
+is not justified. The pilot stands as proof-of-concept and as a template
+for future kernels that *don't* return Python-side collections, but the
+validator itself should stay in Python (`sendsprint.core._python_validate`).
+
 ## Recommendation
 
-Defer the Rust port. Land the #265 optimizations first, instrument
-`flow.py` with timing, and revisit this evaluation once we have real
-profiling numbers for a sprint with ≥100 items. If those numbers show CPU
-on the sprint-plan validator, run the pilot in this doc.
+- Keep the `sendsprint.core.validate_sprint_plan` Python fallback as the
+  default. It already runs cycle/duplicate/orphan/status/AC checks in
+  ~3 ms for 1 000 items.
+- Treat `SENDSPRINT_USE_RUST_CORE=1` as an opt-in experiment, not a
+  default. The wheel ships separately (`crates/sendsprint-core/`); it is
+  not a hard dependency of `simplicio-sprint`.
+- Revisit Rust only when a kernel appears that (a) does meaningfully
+  more CPU work than the validator and (b) returns a small, fixed-size
+  payload (so FFI overhead doesn't eat the win). Candidates: repo tree
+  walks at 10⁵+ files, or a precedent-index BK-tree.
+- Land the #265 optimizations first — they target the real bottleneck
+  (HTTP + cache).

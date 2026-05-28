@@ -1,0 +1,20 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "sendsprint-core"
+version = "0.1.0"
+description = "Rust kernels for SendSprint, exposed to Python via PyO3."
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[tool.maturin]
+module-name = "sendsprint_core"
+features = ["pyo3/extension-module"]
+manifest-path = "Cargo.toml"
