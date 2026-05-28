@@ -82,7 +82,10 @@ class TemplateRenderer:
         """Render a named template and memoize identical renders."""
         values = values or {}
         key = self._render_key(name, values)
-        return self._rendered.get_or_set(key, lambda: self._template(name).safe_substitute(_text(values)))
+        return self._rendered.get_or_set(
+            key,
+            lambda: self._template(name).safe_substitute(_text(values)),
+        )
 
     def compiled_stats(self) -> CacheStats:
         """Return compiled-template cache counters."""

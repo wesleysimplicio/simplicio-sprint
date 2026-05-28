@@ -69,7 +69,9 @@ class LlmClient:
         self.api_key = api_key or self._resolve_api_key()
         self.base_url = base_url or self._resolve_base_url()
         self.timeout = timeout
-        self.cache_enabled = _env_flag("SENDSPRINT_LLM_CACHE", True) if cache_enabled is None else cache_enabled
+        self.cache_enabled = (
+            _env_flag("SENDSPRINT_LLM_CACHE", True) if cache_enabled is None else cache_enabled
+        )
         self._completion_cache = completion_cache or _DEFAULT_COMPLETION_CACHE
         self._owns_http_client = http_client is None
         self._http = http_client or httpx.Client(

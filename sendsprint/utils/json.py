@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json as _json
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 try:  # pragma: no cover - exercised when the dependency is installed.
     import orjson as _orjson
