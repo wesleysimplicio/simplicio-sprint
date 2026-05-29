@@ -127,15 +127,13 @@ The captured "print" of the delivered screen:
 
 ```bash
 # 1) SendSprint itself (published on PyPI as `simplicio-sprint`)
+#    This also pulls the current simplicio-cli / -mapper / -prompt packages.
 pip install simplicio-sprint
 
-# 2) the executor (required for real code edits)
-pip install simplicio-cli
-
-# 3) optional: Playwright screen evidence
+# 2) optional: Playwright screen evidence
 pip install "simplicio-sprint[screenshot]" && playwright install chromium
 
-# 4) optional but recommended: pull the latest of every external tool
+# 3) optional but recommended: pull the latest of every external tool
 #    (also installs the simplicio-prompt kernel used by --fanout)
 sendsprint update
 ```

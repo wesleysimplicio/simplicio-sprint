@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.3
+
+Dependency-alignment release for the Simplicio ecosystem.
+
+- `simplicio-sprint` now declares the current package graph directly:
+  `simplicio-cli>=0.4.3`, `simplicio-mapper>=0.6.1`, and
+  `simplicio-prompt>=1.12.0`.
+- A fresh `pip install -U simplicio-sprint` now pulls the updated executor,
+  mapper, and prompt packages from PyPI.
+
 ## 1.2.2
 
 Packaging release for the SendSprint cross-repo hardening plan.
