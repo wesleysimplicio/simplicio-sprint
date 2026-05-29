@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "simplicio-sprint"
-version = "1.2.1"
+version = "1.2.2"
 description = "Autonomous sprint-to-PR delivery agent. Reads Jira/Azure DevOps/GitHub tasks, delegates code edits to simplicio-cli, ships draft PRs with evidence."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -57,6 +57,7 @@ include = [
     "README.md",
     "README.pt-BR.md",
     "CHANGELOG.md",
+    "docs/cross-repo-issues.md",
     "LICENSE",
     "pyproject.toml",
 ]

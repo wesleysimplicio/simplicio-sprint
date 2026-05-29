@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.2
+
+Packaging release for the SendSprint cross-repo hardening plan.
+
+- Ships the partner repository issue contract in the source distribution:
+  `docs/cross-repo-issues.md`.
+- Keeps the runtime code from 1.2.1 unchanged; this release makes the merged
+  ecosystem coordination document available as the published package source.
+
 ## 1.2.1
 
 Performance release that bundles the work from issues #265 and #267.
