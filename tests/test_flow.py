@@ -49,6 +49,9 @@ class FakeExecutor:
     def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
         return StepReport(step=3, name=f"execute:{item.key}", status="ok", message="ok")
 
+    def index(self, repo_path=None, *, repo=None):  # noqa: ANN001
+        return StepReport(step=2, name="mapper:index", repo=repo, status="skipped")
+
     def revise(self, feedback, *, stack=None, target=None, repo=None):  # noqa: ANN001
         return StepReport(step=3, name="revise:pr-feedback", status="ok")
 
@@ -195,6 +198,121 @@ def test_run_aggregates_report(patched, tmp_path):
     assert len(report.prs) == 2
     assert report.failed is False
     assert "2 item" in report.summary
+
+
+def test_run_aborts_on_preflight_errors(patched, tmp_path, monkeypatch):
+    class UnexpectedExecutor(FakeExecutor):
+        def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
+            raise AssertionError("executor should not run after failed pre-flight")
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", UnexpectedExecutor)
+    items = [
+        SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open", parent_key="ABC-2"),
+        SprintItem(id="2", key="ABC-2", type="Task", title="b", status="open", parent_key="ABC-1"),
+    ]
+    report = _flow(FakeOperator(items), tmp_path).run()
+    assert report.failed is True
+    assert report.steps == [
+        StepReport(
+            step=1,
+            name="validate:sprint",
+            status="failed",
+            message=report.steps[0].message,
+        )
+    ]
+    assert "parent_cycle" in (report.steps[0].message or "")
+    assert report.prs == []
+
+
+def test_run_validate_only_exits_before_delivery(patched, tmp_path, monkeypatch):
+    class UnexpectedWorktree(FakeWorktree):
+        def create(self, branch, base="HEAD"):  # noqa: ANN001
+            raise AssertionError("worktree should not be created in validate-only mode")
+
+    monkeypatch.setattr(flow_mod, "WorktreeManager", UnexpectedWorktree)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="x", status="open")
+    report = _flow(FakeOperator([item]), tmp_path).run(validate_only=True)
+    assert report.failed is False
+    assert [step.name for step in report.steps] == ["validate:sprint"]
+    assert report.steps[0].status == "ok"
+    assert report.prs == []
+
+
+def test_topological_order_places_parent_before_children():
+    items = [
+        SprintItem(
+            id="3", key="ABC-3", type="Task", title="task", status="open", parent_key="ABC-2"
+        ),
+        SprintItem(
+            id="2", key="ABC-2", type="Story", title="story", status="open", parent_key="ABC-1"
+        ),
+        SprintItem(id="1", key="ABC-1", type="Epic", title="epic", status="open"),
+        SprintItem(id="4", key="ABC-4", type="Task", title="standalone", status="open"),
+    ]
+    ordered = flow_mod._topological_order(items)
+    assert [item.key for item in ordered] == ["ABC-1", "ABC-4", "ABC-2", "ABC-3"]
+
+
+def test_topological_order_preserves_items_without_keys():
+    items = [
+        SprintItem(id="0", key="", type="Task", title="imported", status="open"),
+        SprintItem(
+            id="2", key="ABC-2", type="Task", title="child", status="open", parent_key="ABC-1"
+        ),
+        SprintItem(id="1", key="ABC-1", type="Story", title="parent", status="open"),
+    ]
+    ordered = flow_mod._topological_order(items)
+    assert [item.id for item in ordered] == ["0", "1", "2"]
+
+
+def test_run_bootstraps_missing_mapper_index(patched, tmp_path, monkeypatch):
+    class BootstrappingExec(FakeExecutor):
+        def index(self, repo_path=None, *, repo=None):  # noqa: ANN001
+            project_map = tmp_path / ".simplicio" / "project-map.json"
+            project_map.parent.mkdir(parents=True)
+            project_map.write_text("{}")
+            return StepReport(step=2, name="mapper:index", repo=repo, status="ok")
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", BootstrappingExec)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="x", status="open")
+    report = _flow(FakeOperator([item]), tmp_path).run()
+    assert (tmp_path / ".simplicio" / "project-map.json").exists()
+    assert any(step.name == "mapper:index" and step.status == "ok" for step in report.steps)
+
+
+def test_run_skips_mapper_bootstrap_when_index_exists(patched, tmp_path, monkeypatch):
+    project_map = tmp_path / ".simplicio" / "project-map.json"
+    project_map.parent.mkdir(parents=True)
+    project_map.write_text("{}")
+
+    class UnexpectedIndexExec(FakeExecutor):
+        def index(self, repo_path=None, *, repo=None):  # noqa: ANN001
+            raise AssertionError("mapper index should not run when project-map exists")
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", UnexpectedIndexExec)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="x", status="open")
+    report = _flow(FakeOperator([item]), tmp_path).run()
+    assert any(
+        step.name == "mapper:index" and "already present" in (step.message or "")
+        for step in report.steps
+    )
+
+
+def test_run_records_mapper_bootstrap_gap_as_note(patched, tmp_path, monkeypatch):
+    class MissingIndexExec(FakeExecutor):
+        def index(self, repo_path=None, *, repo=None):  # noqa: ANN001
+            return StepReport(
+                step=2,
+                name="mapper:index",
+                repo=repo,
+                status="skipped",
+                message="simplicio not installed; mapper context degraded",
+            )
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", MissingIndexExec)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="x", status="open")
+    report = _flow(FakeOperator([item]), tmp_path).run()
+    assert "mapper context degraded" in report.notes[0]
 
 
 def test_deliver_item_skips_when_executor_fails(patched, tmp_path, monkeypatch):

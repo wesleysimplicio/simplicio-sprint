@@ -94,6 +94,23 @@ def test_run_item_returns_step(monkeypatch):
     assert step.name == "execute:ABC-1"
 
 
+def test_index_runs_mapper_command(monkeypatch, tmp_path):
+    runner = _runner(returncode=0)
+    ex = SimplicioExecutor(tmp_path, runner=runner)
+    monkeypatch.setattr(ex, "is_available", lambda: True)
+    step = ex.index(repo="r")
+    assert step.status == "ok"
+    assert runner.calls[0] == ["simplicio", "index", str(tmp_path)]
+
+
+def test_index_skips_when_not_installed(monkeypatch, tmp_path):
+    ex = SimplicioExecutor(tmp_path, runner=_runner())
+    monkeypatch.setattr(ex, "is_available", lambda: False)
+    step = ex.index(repo="r")
+    assert step.status == "skipped"
+    assert "not installed" in (step.message or "")
+
+
 def test_revise_builds_feedback_task(monkeypatch):
     captured = SimpleNamespace(task=None)
 

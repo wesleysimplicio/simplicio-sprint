@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import logging
 import re
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from sendsprint.core import validate_sprint_plan
 from sendsprint.delivery.evidence import EvidenceCollector
 from sendsprint.delivery.git_ops import GitError, GitOps
 from sendsprint.delivery.pr import PullRequestManager
@@ -86,7 +88,14 @@ class SprintFlow:
         self.write_specs = write_specs
         self.fanout = fanout
 
-    def run(self, **read_kwargs: object) -> RunReport:
+    def run(
+        self,
+        *,
+        validate_plan: bool = True,
+        validate_only: bool = False,
+        bootstrap_mapper: bool = True,
+        **read_kwargs: object,
+    ) -> RunReport:
         """Read the sprint, scope it, and deliver each item."""
         sprint = self.operator.read_sprint(**read_kwargs)
         if self.scope is not None:
@@ -98,6 +107,30 @@ class SprintFlow:
             scope_mode=(self.scope.mode if self.scope else "all"),
             user=(self.scope.user_email if self.scope else None),
         )
+        if validate_plan:
+            validation_step, validation_notes = _validate_sprint(sprint)
+            report.steps.append(validation_step)
+            report.notes.extend(validation_notes)
+            if validate_only or validation_step.status == "failed":
+                report.failed = validation_step.status == "failed"
+                report.summary = _validation_summary(sprint, validation_step, validation_notes)
+                return report
+        elif validate_only:
+            report.steps.append(
+                StepReport(
+                    step=1,
+                    name="validate:sprint",
+                    status="skipped",
+                    message="sprint validation disabled by --no-validate",
+                )
+            )
+            report.summary = _validation_summary(sprint, report.steps[-1], [])
+            return report
+        if bootstrap_mapper and self.write_specs:
+            bootstrap_step = self._ensure_mapper_bootstrap()
+            report.steps.append(bootstrap_step)
+            if bootstrap_step.status != "ok":
+                report.notes.append(bootstrap_step.message or "mapper bootstrap skipped")
         logger.info(
             "run start: %s (%d item(s), scope=%s, transport=%s)",
             sprint.name,
@@ -105,7 +138,8 @@ class SprintFlow:
             report.scope_mode,
             sprint.transport,
         )
-        for index, item in enumerate(sprint.items, start=1):
+        ordered_items = _topological_order(sprint.items)
+        for index, item in enumerate(ordered_items, start=1):
             outcome = self.deliver_item(item, sprint=sprint, index=index)
             for step in outcome.steps:
                 logger.info(
@@ -292,6 +326,19 @@ class SprintFlow:
             mapper_context or None,
         )
 
+    def _ensure_mapper_bootstrap(self) -> StepReport:
+        project_map = self.target.path / ".simplicio" / "project-map.json"
+        if project_map.exists():
+            return StepReport(
+                step=2,
+                name="mapper:index",
+                repo=self.target.name,
+                status="skipped",
+                message=".simplicio/project-map.json already present",
+            )
+        executor = SimplicioExecutor(self.target.path, binary=self.simplicio_binary)
+        return executor.index(self.target.path, repo=self.target.name)
+
     def _fan_out(
         self, item: SprintItem, *, mapper_context: dict | None = None
     ) -> tuple[StepReport, str | None]:
@@ -459,3 +506,92 @@ class SprintFlow:
 def _slug(text: str, *, max_len: int = 40) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
     return slug[:max_len].strip("-") or "task"
+
+
+def _validate_sprint(sprint: Sprint) -> tuple[StepReport, list[str]]:
+    report = validate_sprint_plan(sprint)
+    findings = list(report.get("findings") or [])
+    errors = [f for f in findings if f.get("severity") == "error"]
+    notes = [
+        _format_validation_finding(f) for f in findings if f.get("severity") in {"warning", "info"}
+    ]
+    message = (
+        _validation_message(report, errors) if errors else _validation_message(report, findings)
+    )
+    return (
+        StepReport(
+            step=1,
+            name="validate:sprint",
+            status="failed" if errors else "ok",
+            message=message,
+        ),
+        notes,
+    )
+
+
+def _validation_message(report: dict, findings: list[dict]) -> str:
+    counts = (
+        f"{report.get('item_count', 0)} item(s), "
+        f"{report.get('error_count', 0)} error(s), "
+        f"{report.get('warning_count', 0)} warning(s), "
+        f"{report.get('info_count', 0)} info"
+    )
+    if not findings:
+        return f"sprint plan valid ({counts})"
+    details = "; ".join(_format_validation_finding(f) for f in findings[:5])
+    suffix = f"; +{len(findings) - 5} more" if len(findings) > 5 else ""
+    return f"sprint plan has findings ({counts}): {details}{suffix}"
+
+
+def _validation_summary(sprint: Sprint, step: StepReport, notes: list[str]) -> str:
+    note_count = f", {len(notes)} note(s)" if notes else ""
+    return f"{sprint.name}: validation {step.status}{note_count}: {step.message}"
+
+
+def _format_validation_finding(finding: dict) -> str:
+    item_key = finding.get("item_key")
+    prefix = f"{item_key}: " if item_key else ""
+    return f"{prefix}{finding.get('code', 'finding')} - {finding.get('message', '')}".strip()
+
+
+def _topological_order(items: list[SprintItem]) -> list[SprintItem]:
+    """Return items with parents before children while preserving source order."""
+    if len(items) < 2:
+        return list(items)
+
+    keys = [item.key for item in items if item.key]
+    if len(keys) != len(set(keys)):
+        logger.warning("duplicate sprint item key; processing in source order")
+        return list(items)
+
+    node_ids = [item.key if item.key else f"__item_{index}" for index, item in enumerate(items)]
+    by_node = dict(zip(node_ids, items, strict=True))
+    key_to_node = {item.key: node for node, item in zip(node_ids, items, strict=True) if item.key}
+    children: dict[str, list[str]] = {node: [] for node in node_ids}
+    indegree: dict[str, int] = {node: 0 for node in node_ids}
+
+    for node, item in zip(node_ids, items, strict=True):
+        if not item.key:
+            continue
+        parent = item.parent_key
+        if not parent or parent not in key_to_node or parent == item.key:
+            continue
+        parent_node = key_to_node[parent]
+        children[parent_node].append(node)
+        indegree[node] += 1
+
+    ready = deque(node for node in node_ids if indegree[node] == 0)
+    ordered_nodes: list[str] = []
+    while ready:
+        node = ready.popleft()
+        ordered_nodes.append(node)
+        for child_node in children.get(node, []):
+            indegree[child_node] -= 1
+            if indegree[child_node] == 0:
+                ready.append(child_node)
+
+    if len(ordered_nodes) != len(items):
+        logger.warning("parent_key cycle detected during ordering; processing in source order")
+        return list(items)
+
+    return [by_node[node] for node in ordered_nodes]

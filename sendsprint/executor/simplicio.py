@@ -39,6 +39,7 @@ Runner = Callable[..., subprocess.CompletedProcess[str]]
 DEFAULT_BINARY = "simplicio"
 DEFAULT_TIMEOUT_S = 1800
 EXECUTE_STEP = 3
+MAPPER_STEP = 2
 
 
 class SimplicioNotInstalled(RuntimeError):
@@ -213,6 +214,71 @@ class SimplicioExecutor:
             tech=stack,
             status=result.status,  # type: ignore[arg-type]
             message=result.message,
+        )
+
+    def index(self, repo_path: str | Path | None = None, *, repo: str | None = None) -> StepReport:
+        """Refresh mapper artifacts for a repository before sprint execution."""
+        target = Path(repo_path) if repo_path is not None else self.repo_path
+        argv = [self.binary, "index", str(target)]
+        if not self.is_available():
+            return StepReport(
+                step=MAPPER_STEP,
+                name="mapper:index",
+                repo=repo,
+                status="skipped",
+                message=f"{self.binary} not installed; mapper context degraded",
+            )
+        try:
+            proc = self._runner(
+                argv,
+                cwd=str(target),
+                capture_output=True,
+                text=True,
+                timeout=self.timeout_s,
+                env=self._env,
+            )
+        except FileNotFoundError:
+            return StepReport(
+                step=MAPPER_STEP,
+                name="mapper:index",
+                repo=repo,
+                status="skipped",
+                message=f"{self.binary} not installed; mapper context degraded",
+            )
+        except subprocess.TimeoutExpired:
+            message = (
+                f"{self.binary} index timed out after {self.timeout_s}s; mapper context degraded"
+            )
+            return StepReport(
+                step=MAPPER_STEP,
+                name="mapper:index",
+                repo=repo,
+                status="skipped",
+                message=message,
+            )
+        if proc.returncode in {0, 2}:
+            status = "ok" if proc.returncode == 0 else "skipped"
+            message = (
+                "mapper index refreshed" if proc.returncode == 0 else "mapper index already fresh"
+            )
+            return StepReport(
+                step=MAPPER_STEP,
+                name="mapper:index",
+                repo=repo,
+                status=status,
+                message=message,
+            )
+        detail = (proc.stderr or proc.stdout or "").strip()
+        suffix = f": {detail}" if detail else ""
+        return StepReport(
+            step=MAPPER_STEP,
+            name="mapper:index",
+            repo=repo,
+            status="skipped",
+            message=(
+                f"{self.binary} index failed (exit {proc.returncode}){suffix}; "
+                "mapper context degraded"
+            ),
         )
 
     def revise(
