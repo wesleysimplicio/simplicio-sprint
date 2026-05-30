@@ -1,0 +1,766 @@
+{
+  "schema": "simplicio.precedent-index/v1",
+  "version": 1,
+  "generated_at": "2026-05-30T20:28:55.891Z",
+  "source_project_map": ".simplicio/project-map.json",
+  "items": [
+    {
+      "id": "4171d8fe7271ae02",
+      "path": "bench/validate_sprint_plan.py",
+      "line": 23,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "bench",
+        "validate",
+        "sprint",
+        "plan"
+      ],
+      "summary": "feature precedent in bench/validate_sprint_plan.py",
+      "snippet": "\n\ndef build_sprint(n: int, *, with_issues: bool = True) -> dict[str, Any]:\n    items: list[dict[str, Any]] = []\n    for i in range(n):"
+    },
+    {
+      "id": "0d42bd79bd5a1aae",
+      "path": "docs/presentations/build_sendsprint_implementation_deck.py",
+      "line": 43,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "docs",
+        "presentations",
+        "build",
+        "sendsprint",
+        "implementation",
+        "deck"
+      ],
+      "summary": "feature precedent in docs/presentations/build_sendsprint_implementation_deck.py",
+      "snippet": "\n@dataclass(frozen=True)\nclass Slide:\n    title: str\n    kicker: str"
+    },
+    {
+      "id": "cfa85127ec734d7d",
+      "path": "sendsprint/bootstrap.py",
+      "line": 31,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "bootstrap"
+      ],
+      "summary": "feature precedent in sendsprint/bootstrap.py",
+      "snippet": "\n\ndef cache_dir() -> Path:\n    \"\"\"Where SendSprint caches git-cloned tools (override: ``SENDSPRINT_CACHE_DIR``).\"\"\"\n    return Path(os.environ.get(\"SENDSPRINT_CACHE_DIR\", \"~/.cache/sendsprint\")).expanduser()"
+    },
+    {
+      "id": "dc6aa9ad8b857971",
+      "path": "sendsprint/cli.py",
+      "line": 49,
+      "language": "python",
+      "change_type": "route",
+      "tags": [
+        "entrypoint",
+        "python",
+        "sendsprint",
+        "cli"
+      ],
+      "summary": "route precedent in sendsprint/cli.py",
+      "snippet": "\n\n@app.callback()\ndef _main(\n    log_level: str = typer.Option(\"INFO\", \"--log-level\", help=\"DEBUG | INFO | WARNING | ERROR\"),"
+    },
+    {
+      "id": "3adfcb1ca44e86c8",
+      "path": "sendsprint/core.py",
+      "line": 21,
+      "language": "python",
+      "change_type": "error-handling",
+      "tags": [
+        "python",
+        "sendsprint",
+        "core"
+      ],
+      "summary": "error-handling precedent in sendsprint/core.py",
+      "snippet": "from typing import Any\n\ntry:  # pragma: no cover - presence depends on wheel install\n    import sendsprint_core as _rust_core  # type: ignore[import-not-found]\nexcept ImportError:  # pragma: no cover - Python-only environments"
+    },
+    {
+      "id": "bb2b957061941c84",
+      "path": "sendsprint/credentials.py",
+      "line": 25,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "credentials"
+      ],
+      "summary": "feature precedent in sendsprint/credentials.py",
+      "snippet": "\n\nclass CredentialError(RuntimeError):\n    \"\"\"Raised when credentials cannot be read or written.\"\"\"\n"
+    },
+    {
+      "id": "984e8df5c36c6569",
+      "path": "sendsprint/delivery/evidence.py",
+      "line": 42,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "delivery",
+        "evidence"
+      ],
+      "summary": "feature precedent in sendsprint/delivery/evidence.py",
+      "snippet": "\n@dataclass(frozen=True)\nclass EvidenceCommand:\n    kind: EvidenceKind\n    title: str"
+    },
+    {
+      "id": "856b01a531e77807",
+      "path": "sendsprint/delivery/git_ops.py",
+      "line": 21,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "delivery",
+        "git",
+        "ops"
+      ],
+      "summary": "feature precedent in sendsprint/delivery/git_ops.py",
+      "snippet": "\n\nclass GitError(RuntimeError):\n    pass\n"
+    },
+    {
+      "id": "5d59744cce00a269",
+      "path": "sendsprint/delivery/pr.py",
+      "line": 28,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "delivery"
+      ],
+      "summary": "feature precedent in sendsprint/delivery/pr.py",
+      "snippet": "\n\nclass PullRequestManager:\n    \"\"\"Open PRs and manage the evidence + review surface for one repo.\"\"\"\n"
+    },
+    {
+      "id": "79b29dbdb7581575",
+      "path": "sendsprint/delivery/worktree.py",
+      "line": 13,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "delivery",
+        "worktree"
+      ],
+      "summary": "feature precedent in sendsprint/delivery/worktree.py",
+      "snippet": "\n\nclass WorktreeError(RuntimeError):\n    pass\n"
+    },
+    {
+      "id": "79788dd69957b7e2",
+      "path": "sendsprint/executor/simplicio.py",
+      "line": 45,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "executor",
+        "simplicio"
+      ],
+      "summary": "feature precedent in sendsprint/executor/simplicio.py",
+      "snippet": "\n\nclass SimplicioNotInstalled(RuntimeError):\n    \"\"\"Raised when the ``simplicio`` binary is not on PATH.\"\"\"\n"
+    },
+    {
+      "id": "0cf0ed8dc7c3ab8d",
+      "path": "sendsprint/flow.py",
+      "line": 48,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "flow"
+      ],
+      "summary": "feature precedent in sendsprint/flow.py",
+      "snippet": "\n@dataclass\nclass RepoTarget:\n    \"\"\"One repository SendSprint delivers against.\"\"\"\n"
+    },
+    {
+      "id": "29e7bc35b89c3eef",
+      "path": "sendsprint/github_integration.py",
+      "line": 31,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "github",
+        "integration"
+      ],
+      "summary": "feature precedent in sendsprint/github_integration.py",
+      "snippet": "\n\ndef _default_headers(token: str | None = None) -> dict[str, str]:\n    tok = token or os.getenv(\"GITHUB_TOKEN\", \"\")\n    headers: dict[str, str] = {\"Accept\": \"application/vnd.github+json\"}"
+    },
+    {
+      "id": "17e69aba3b212786",
+      "path": "sendsprint/installer.py",
+      "line": 51,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "installer"
+      ],
+      "summary": "feature precedent in sendsprint/installer.py",
+      "snippet": "\n@dataclass(frozen=True)\nclass Target:\n    \"\"\"One agent's skill destination.\"\"\"\n"
+    },
+    {
+      "id": "3331b94564680143",
+      "path": "sendsprint/llm/client.py",
+      "line": 38,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "llm",
+        "client"
+      ],
+      "summary": "feature precedent in sendsprint/llm/client.py",
+      "snippet": "\n\nclass LlmError(RuntimeError):\n    \"\"\"Raised when an LLM call fails or no provider is configured.\"\"\"\n"
+    },
+    {
+      "id": "8026ef19b05914f4",
+      "path": "sendsprint/logging_setup.py",
+      "line": 25,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "logging",
+        "setup"
+      ],
+      "summary": "feature precedent in sendsprint/logging_setup.py",
+      "snippet": "\n\ndef log_dir() -> Path:\n    \"\"\"Where run logs live (override: ``SENDSPRINT_LOG_DIR``).\"\"\"\n    return Path(os.environ.get(\"SENDSPRINT_LOG_DIR\", \"~/.local/state/sendsprint/logs\")).expanduser()"
+    },
+    {
+      "id": "c2e376e44d7bde5c",
+      "path": "sendsprint/mapper/adapter.py",
+      "line": 46,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "mapper",
+        "adapter"
+      ],
+      "summary": "feature precedent in sendsprint/mapper/adapter.py",
+      "snippet": "\n@dataclass\nclass MaterializedSprint:\n    \"\"\"Paths written when a sprint is rendered into ``.specs/``.\"\"\"\n"
+    },
+    {
+      "id": "af90c59bbb39bf18",
+      "path": "sendsprint/models/reports.py",
+      "line": 15,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "domain",
+        "python",
+        "sendsprint",
+        "models",
+        "reports"
+      ],
+      "summary": "feature precedent in sendsprint/models/reports.py",
+      "snippet": "\n\ndef _now() -> datetime:\n    return datetime.now(UTC)\n"
+    },
+    {
+      "id": "5084e110a175e212",
+      "path": "sendsprint/models/sprint.py",
+      "line": 13,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "domain",
+        "python",
+        "sendsprint",
+        "models",
+        "sprint"
+      ],
+      "summary": "feature precedent in sendsprint/models/sprint.py",
+      "snippet": "\n\nclass Link(BaseModel):\n    type: str\n    target_key: str"
+    },
+    {
+      "id": "afb71bf835526eca",
+      "path": "sendsprint/models/workspace.py",
+      "line": 15,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "domain",
+        "python",
+        "sendsprint",
+        "models",
+        "workspace"
+      ],
+      "summary": "feature precedent in sendsprint/models/workspace.py",
+      "snippet": "\n\nclass RepoConfig(BaseModel):\n    \"\"\"A single repository inside the workspace.\"\"\"\n"
+    },
+    {
+      "id": "4912a31833b047e7",
+      "path": "sendsprint/operators/_mcp_bridge.py",
+      "line": 40,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "operators",
+        "mcp",
+        "bridge"
+      ],
+      "summary": "feature precedent in sendsprint/operators/_mcp_bridge.py",
+      "snippet": "\n\nclass MCPProviderUnavailable(TransportUnavailable):\n    \"\"\"Raised when no MCP provider is registered for the requested source.\"\"\"\n"
+    },
+    {
+      "id": "7707fb88ee4cba28",
+      "path": "sendsprint/operators/azure_devops_operator.py",
+      "line": 30,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "operators",
+        "azure",
+        "devops",
+        "operator"
+      ],
+      "summary": "feature precedent in sendsprint/operators/azure_devops_operator.py",
+      "snippet": "\n\nclass AzureDevopsOperator(BaseOperator):\n    \"\"\"Reads an Azure DevOps iteration (sprint) via MCP or REST API.\n"
+    },
+    {
+      "id": "a5708b903c886558",
+      "path": "sendsprint/operators/base.py",
+      "line": 19,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "operators",
+        "base"
+      ],
+      "summary": "feature precedent in sendsprint/operators/base.py",
+      "snippet": "\n\nclass TransportUnavailable(RuntimeError):\n    \"\"\"Raised when a requested transport cannot be initialised.\"\"\"\n"
+    },
+    {
+      "id": "e718d9d249f54a89",
+      "path": "sendsprint/operators/github_issues_operator.py",
+      "line": 29,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "operators",
+        "github",
+        "issues",
+        "operator"
+      ],
+      "summary": "feature precedent in sendsprint/operators/github_issues_operator.py",
+      "snippet": "\n\nclass GitHubIssuesOperator(BaseOperator):\n    \"\"\"Reads GitHub issues (optionally scoped to a milestone) as a Sprint.\"\"\"\n"
+    },
+    {
+      "id": "476320d90ce9e757",
+      "path": "sendsprint/operators/jira_operator.py",
+      "line": 30,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "operators",
+        "jira",
+        "operator"
+      ],
+      "summary": "feature precedent in sendsprint/operators/jira_operator.py",
+      "snippet": "\n\nclass JiraOperator(BaseOperator):\n    \"\"\"Reads a Jira sprint and returns a Sprint with all its items.\n"
+    },
+    {
+      "id": "3cb529e56311bab5",
+      "path": "sendsprint/profile.py",
+      "line": 26,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "profile"
+      ],
+      "summary": "feature precedent in sendsprint/profile.py",
+      "snippet": "\n\nclass JiraProfile(BaseModel):\n    model_config = ConfigDict(extra=\"forbid\")\n    base_url: str | None = None"
+    },
+    {
+      "id": "a4305035fe09f34b",
+      "path": "sendsprint/progress.py",
+      "line": 20,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "progress"
+      ],
+      "summary": "feature precedent in sendsprint/progress.py",
+      "snippet": "\n@dataclass(frozen=True)\nclass ProgressItem:\n    key: str\n    type: str"
+    },
+    {
+      "id": "54f1c2791862c9ec",
+      "path": "sendsprint/prompt/fanout.py",
+      "line": 41,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "prompt",
+        "fanout"
+      ],
+      "summary": "feature precedent in sendsprint/prompt/fanout.py",
+      "snippet": "\n@dataclass\nclass FanoutResult:\n    \"\"\"Aggregated outcome of one fan-out across N subagents.\"\"\"\n"
+    },
+    {
+      "id": "2f5408ded58efc67",
+      "path": "sendsprint/scope.py",
+      "line": 9,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "scope"
+      ],
+      "summary": "feature precedent in sendsprint/scope.py",
+      "snippet": "\n\ndef _matches_user(item: SprintItem, scope: ScopeConfig) -> bool:\n    \"\"\"True if item assignee matches the configured user identity.\"\"\"\n    if scope.user_account_id and item.assignee_account_id == scope.user_account_id:"
+    },
+    {
+      "id": "810b1e259eb75bf7",
+      "path": "sendsprint/state.py",
+      "line": 14,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "state"
+      ],
+      "summary": "feature precedent in sendsprint/state.py",
+      "snippet": "\n\ndef state_dir(repo_root: str | Path) -> Path:\n    return Path(repo_root) / STATE_DIR\n"
+    },
+    {
+      "id": "6d86cfcc66b4aed6",
+      "path": "sendsprint/tech/detector.py",
+      "line": 118,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "tech",
+        "detector"
+      ],
+      "summary": "feature precedent in sendsprint/tech/detector.py",
+      "snippet": "\n\nclass TechFingerprint(BaseModel):\n    repo_path: str\n    roles: list[str] = Field(default_factory=list)"
+    },
+    {
+      "id": "795b678238bf1196",
+      "path": "sendsprint/utils/cache.py",
+      "line": 19,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "utils",
+        "cache"
+      ],
+      "summary": "feature precedent in sendsprint/utils/cache.py",
+      "snippet": "\n@dataclass(frozen=True)\nclass CacheStats:\n    \"\"\"Snapshot of cache counters.\"\"\"\n"
+    },
+    {
+      "id": "6c0865198a205a1b",
+      "path": "sendsprint/utils/json.py",
+      "line": 9,
+      "language": "python",
+      "change_type": "error-handling",
+      "tags": [
+        "python",
+        "sendsprint",
+        "utils",
+        "json"
+      ],
+      "summary": "error-handling precedent in sendsprint/utils/json.py",
+      "snippet": "from typing import Any\n\ntry:  # pragma: no cover - exercised when the dependency is installed.\n    import orjson as _orjson\nexcept ImportError:  # pragma: no cover - keeps source checkouts usable before install."
+    },
+    {
+      "id": "5e787f8c1503df82",
+      "path": "sendsprint/utils/templates.py",
+      "line": 65,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "utils",
+        "templates"
+      ],
+      "summary": "feature precedent in sendsprint/utils/templates.py",
+      "snippet": "\n\nclass TemplateRenderer:\n    \"\"\"Render named templates with cached compiled and rendered artifacts.\"\"\"\n"
+    },
+    {
+      "id": "0017203b7a725f59",
+      "path": "sendsprint/watch.py",
+      "line": 25,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "watch"
+      ],
+      "summary": "feature precedent in sendsprint/watch.py",
+      "snippet": "\n\nclass Watcher:\n    \"\"\"Poll a source and deliver newly assigned cards through a SprintFlow.\"\"\"\n"
+    },
+    {
+      "id": "e2a11795fc693a61",
+      "path": "sendsprint/workspace/loader.py",
+      "line": 12,
+      "language": "python",
+      "change_type": "feature",
+      "tags": [
+        "python",
+        "sendsprint",
+        "workspace",
+        "loader"
+      ],
+      "summary": "feature precedent in sendsprint/workspace/loader.py",
+      "snippet": "\n\ndef _read_text(path: Path) -> str:\n    if not path.exists():\n        raise FileNotFoundError(f\"workspace file not found: {path}\")"
+    },
+    {
+      "id": "491c6842b767aae5",
+      "path": "tests/test_bootstrap.py",
+      "line": 11,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "bootstrap"
+      ],
+      "summary": "test precedent in tests/test_bootstrap.py",
+      "snippet": "\n\ndef _runner(returncode: int = 0, stdout: str = \"\", stderr: str = \"\"):\n    calls: list[list[str]] = []\n"
+    },
+    {
+      "id": "7106e98c5d598d92",
+      "path": "tests/test_cli.py",
+      "line": 11,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "cli"
+      ],
+      "summary": "test precedent in tests/test_cli.py",
+      "snippet": "\n\ndef test_run_passes_validate_only_to_flow(monkeypatch, tmp_path):\n    captured: dict[str, object] = {}\n    flow = _FakeFlow(captured)"
+    },
+    {
+      "id": "ee03a97f81736198",
+      "path": "tests/test_core_validator.py",
+      "line": 13,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "core",
+        "validator"
+      ],
+      "summary": "test precedent in tests/test_core_validator.py",
+      "snippet": "\n\ndef _base_sprint(items: list[dict]) -> dict:\n    return {\"id\": \"S-1\", \"name\": \"Test Sprint\", \"items\": items}\n"
+    },
+    {
+      "id": "5c0ed37bcb5d6382",
+      "path": "tests/test_delivery.py",
+      "line": 20,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "delivery"
+      ],
+      "summary": "test precedent in tests/test_delivery.py",
+      "snippet": "\n\ndef _git_runner(script):\n    \"\"\"script: dict mapping a command-suffix to (returncode, stdout).\"\"\"\n    calls: list[list[str]] = []"
+    },
+    {
+      "id": "501102ad960ef3bf",
+      "path": "tests/test_e2e_frontend_sim.py",
+      "line": 34,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "e2e",
+        "frontend",
+        "sim"
+      ],
+      "summary": "test precedent in tests/test_e2e_frontend_sim.py",
+      "snippet": "\n\ndef _frontend_card_payload() -> dict:\n    return {\n        \"sprint\": {\"id\": \"42\", \"name\": \"Sprint 42 — Auth UI\", \"state\": \"active\"},"
+    },
+    {
+      "id": "fcbb3debe70d256d",
+      "path": "tests/test_executor.py",
+      "line": 12,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "executor"
+      ],
+      "summary": "test precedent in tests/test_executor.py",
+      "snippet": "\n\ndef _item(**kw) -> SprintItem:\n    base = {\n        \"id\": \"1\","
+    },
+    {
+      "id": "45ccee4b07a6a9d8",
+      "path": "tests/test_fanout.py",
+      "line": 29,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "fanout"
+      ],
+      "summary": "test precedent in tests/test_fanout.py",
+      "snippet": "\n\ndef _runner(returncode: int = 0, stdout: str = \"\", stderr: str = \"\"):\n    calls: list[list[str]] = []\n"
+    },
+    {
+      "id": "42d398cafa886a2c",
+      "path": "tests/test_flow.py",
+      "line": 16,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "flow"
+      ],
+      "summary": "test precedent in tests/test_flow.py",
+      "snippet": "\n\nclass FakeOperator:\n    source = \"github\"\n"
+    },
+    {
+      "id": "cba6f3a46e63fd24",
+      "path": "tests/test_installer.py",
+      "line": 10,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "installer"
+      ],
+      "summary": "test precedent in tests/test_installer.py",
+      "snippet": "\n\ndef test_install_dedicated_file_targets(tmp_path):\n    install(tmp_path, [\"claude\", \"cursor\", \"kiro\"])\n    claude = tmp_path / \".claude/skills/sendsprint/SKILL.md\""
+    },
+    {
+      "id": "3deaa32412ced668",
+      "path": "tests/test_logging.py",
+      "line": 11,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "logging"
+      ],
+      "summary": "test precedent in tests/test_logging.py",
+      "snippet": "\n\ndef _flush() -> None:\n    for handler in logging.getLogger(PKG_LOGGER).handlers:\n        handler.flush()"
+    },
+    {
+      "id": "8248aec195559cce",
+      "path": "tests/test_mapper.py",
+      "line": 12,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "mapper"
+      ],
+      "summary": "test precedent in tests/test_mapper.py",
+      "snippet": "\n\ndef _item(**kw) -> SprintItem:\n    base = dict(id=\"1\", key=\"ABC-12\", type=\"Task\", title=\"Add login button\", status=\"open\")\n    base.update(kw)"
+    },
+    {
+      "id": "d5e724910126b65a",
+      "path": "tests/test_mcp_bridge.py",
+      "line": 15,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "mcp",
+        "bridge"
+      ],
+      "summary": "test precedent in tests/test_mcp_bridge.py",
+      "snippet": "\n@pytest.fixture(autouse=True)\ndef _clear_providers():\n    _mcp_bridge.clear_providers()\n    yield"
+    },
+    {
+      "id": "f98ba01d83a15fd4",
+      "path": "tests/test_operators.py",
+      "line": 11,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "operators"
+      ],
+      "summary": "test precedent in tests/test_operators.py",
+      "snippet": "\n\ndef test_next_link_parsing():\n    header = (\n        '<https://api.github.com/x?page=2>; rel=\"next\", '"
+    },
+    {
+      "id": "d72d79036bfc9bbd",
+      "path": "tests/test_package_metadata.py",
+      "line": 7,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "package",
+        "metadata"
+      ],
+      "summary": "test precedent in tests/test_package_metadata.py",
+      "snippet": "\n\ndef test_package_version_matches_release_metadata() -> None:\n    project = tomllib.loads(Path(\"pyproject.toml\").read_text(encoding=\"utf-8\"))[\"project\"]\n"
+    },
+    {
+      "id": "4ffea2debad3af7c",
+      "path": "tests/test_watch.py",
+      "line": 12,
+      "language": "python",
+      "change_type": "test",
+      "tags": [
+        "test",
+        "python",
+        "watch"
+      ],
+      "summary": "test precedent in tests/test_watch.py",
+      "snippet": "\n\nclass StubOperator:\n    source = \"github\"\n"
+    }
+  ]
+}

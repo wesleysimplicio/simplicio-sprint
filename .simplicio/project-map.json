@@ -1,0 +1,2711 @@
+{
+  "schema": "simplicio.project-map/v1",
+  "version": 1,
+  "generated_at": "2026-05-30T20:28:55.891Z",
+  "update_mode": "full",
+  "product": {
+    "name": "simplicio-sprint",
+    "stack": "python",
+    "project_mode": "root"
+  },
+  "files": [
+    {
+      "path": ".gitattributes",
+      "language": "text",
+      "size_bytes": 66,
+      "last_modified": "2026-05-27T19:13:53.058Z",
+      "file_hash": "09270aa25cfe95e1b223e6ef29aee576e8d6063a1d8583e9fe1ea907b81f9818",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".github/workflows/publish.yml",
+      "language": "yaml",
+      "size_bytes": 1497,
+      "last_modified": "2026-05-27T19:13:53.058Z",
+      "file_hash": "8c5e8a30b1f991a0d12a1444721fd0db932a815614aef139816c1ece36b035c8",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".github/workflows/sendsprint.yml",
+      "language": "yaml",
+      "size_bytes": 1780,
+      "last_modified": "2026-05-27T19:13:53.058Z",
+      "file_hash": "42f02fb60f6330832b75605d74384edb9d901bf653b1a05a600c793899c91a4d",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".gitignore",
+      "language": "text",
+      "size_bytes": 705,
+      "last_modified": "2026-05-29T16:48:11.480Z",
+      "file_hash": "659053108371bd952cbca23dee71d4a3030d6a35a823e045cd5053cb8adcf79e",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".pytest_cache/.gitignore",
+      "language": "text",
+      "size_bytes": 37,
+      "last_modified": "2026-05-27T19:38:29.400Z",
+      "file_hash": "3ed731b65d06150c138e2dadb0be0697550888a6b47eb8c45ecc9adba8b8e9bd",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".pytest_cache/README.md",
+      "language": "markdown",
+      "size_bytes": 302,
+      "last_modified": "2026-05-27T19:38:29.400Z",
+      "file_hash": "73fd6fccdd802c419a6b2d983d6c3173b7da97558ac4b589edec2dfe443db9ad",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".pytest_cache/v/cache/lastfailed",
+      "language": "text",
+      "size_bytes": 31,
+      "last_modified": "2026-05-30T20:21:35.833Z",
+      "file_hash": "bf0c7aaad3487bba200767c760e85f7d0b12c0a0fb0ca063739eb6dc18e16e04",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".pytest_cache/v/cache/nodeids",
+      "language": "text",
+      "size_bytes": 9593,
+      "last_modified": "2026-05-30T20:27:59.342Z",
+      "file_hash": "9b5bbacd3b4def3be02dda0fdd81e102cf5d9eb5bca5a98b8e507183b15adc17",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".ruff_cache/.gitignore",
+      "language": "text",
+      "size_bytes": 35,
+      "last_modified": "2026-05-27T19:42:30.658Z",
+      "file_hash": "9e3a60f1e6ec4ae60215c11d54b171392745ec25e9dded433d5bd921363af316",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".ruff_cache/0.15.12/2078950570100708101",
+      "language": "text",
+      "size_bytes": 132,
+      "last_modified": "2026-05-27T19:42:30.764Z",
+      "file_hash": "70067077e2ddad5c6f0bcffb7dca2d30d59a26744c44e6a848bb5603f570e4e6",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".ruff_cache/0.15.12/3462458357525478758",
+      "language": "text",
+      "size_bytes": 1517,
+      "last_modified": "2026-05-27T19:45:24.700Z",
+      "file_hash": "13524da9ed20623b8e557bedc54e6ea3854b21e140dc80ad5070254cee47f1b8",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".ruff_cache/0.15.12/9819268403161966685",
+      "language": "text",
+      "size_bytes": 536,
+      "last_modified": "2026-05-27T19:43:25.796Z",
+      "file_hash": "40dc947bdf561c64684f6d041c5e33b3ab2e14dfcfba4e0da41ce808ed23a2a6",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".ruff_cache/0.15.15/10667020683460045639",
+      "language": "text",
+      "size_bytes": 1691,
+      "last_modified": "2026-05-29T18:43:18.355Z",
+      "file_hash": "649a20874785ab7783e85edde6f0d4ebd70c066a767c8591b32a0ee4ea9d929c",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".ruff_cache/0.15.15/17145984999595463390",
+      "language": "text",
+      "size_bytes": 624,
+      "last_modified": "2026-05-29T18:43:18.355Z",
+      "file_hash": "15c2e957d982e661071169cc684f0b9a4fcabf187867c4eb1d0cd9d0352d4dd1",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".ruff_cache/0.15.15/3565536582787017068",
+      "language": "text",
+      "size_bytes": 132,
+      "last_modified": "2026-05-29T18:38:36.295Z",
+      "file_hash": "4c6ddd00c2bde3980c3e5cd4051dd655560914347051a1224f68e5ac905f9fc6",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": ".ruff_cache/0.15.15/7876884906907802200",
+      "language": "text",
+      "size_bytes": 103,
+      "last_modified": "2026-05-29T18:38:36.294Z",
+      "file_hash": "31b4cfb05117df7653d0f3e737b82da8319760884b7ad884e16143e665186a60",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "AGENTS.md",
+      "language": "markdown",
+      "size_bytes": 4262,
+      "last_modified": "2026-05-29T16:48:11.481Z",
+      "file_hash": "b0c46cec4eb9e6c1f137db59df8a851ee7598c303d20bc27f69f137dee3e7dcc",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "bench/results/2026-05-28.txt",
+      "language": "txt",
+      "size_bytes": 763,
+      "last_modified": "2026-05-29T16:48:11.485Z",
+      "file_hash": "9b10b6d5b27b1b351b5df7911e546845887b5b6d84c948cf7a57c8a57200e010",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "bench/validate_sprint_plan.py",
+      "language": "python",
+      "size_bytes": 3200,
+      "last_modified": "2026-05-29T16:48:11.486Z",
+      "file_hash": "277d7b2ff5f0f90fd66a6aa04c3d4d835f752c247136b7e0a80e7731a36c5582",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "json",
+        "os",
+        "sendsprint",
+        "statistics",
+        "time",
+        "typing"
+      ],
+      "exports": [
+        "build_sprint",
+        "fmt",
+        "main",
+        "run"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "CHANGELOG.md",
+      "language": "markdown",
+      "size_bytes": 6818,
+      "last_modified": "2026-05-30T20:18:37.482Z",
+      "file_hash": "acf9114115803cf975c4969cc3c3131946c1a7ce3f0294c67d32b8a37999fb2d",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "CLAUDE.md",
+      "language": "markdown",
+      "size_bytes": 1345,
+      "last_modified": "2026-05-27T19:13:53.059Z",
+      "file_hash": "f3d0cef5738cca3442e82b8f464f52037643bb1e2c1f36d08c7790b373d43805",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "crates/sendsprint-core/Cargo.toml",
+      "language": "toml",
+      "size_bytes": 459,
+      "last_modified": "2026-05-29T16:48:11.486Z",
+      "file_hash": "70969d521232d35760fca4ef23209d014b952ed81f7a9ecb4aea4d67635f7251",
+      "git_status": "clean",
+      "roles": [
+        "config"
+      ],
+      "imports": [],
+      "exports": [],
+      "importance": 0.32
+    },
+    {
+      "path": "crates/sendsprint-core/pyproject.toml",
+      "language": "toml",
+      "size_bytes": 534,
+      "last_modified": "2026-05-29T16:48:11.490Z",
+      "file_hash": "5acd4516377bffd381a89ff6d4bc43daef3a9a36fb34a269178728a08aba2b1e",
+      "git_status": "clean",
+      "roles": [
+        "config"
+      ],
+      "imports": [],
+      "exports": [],
+      "importance": 0.32
+    },
+    {
+      "path": "crates/sendsprint-core/src/lib.rs",
+      "language": "rust",
+      "size_bytes": 12140,
+      "last_modified": "2026-05-29T16:48:11.490Z",
+      "file_hash": "c0e2289ea29426dfb43b0ef11bd3f2c88c5c5d906d256e91403c813558102e4c",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "docs/cross-repo-issues.md",
+      "language": "markdown",
+      "size_bytes": 9333,
+      "last_modified": "2026-05-29T16:48:11.491Z",
+      "file_hash": "918eb44db65245e19318e32b3d578ae8ae357bf563b43a03e07298f112ff9e21",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "docs/perf/rust-pyo3-evaluation.md",
+      "language": "markdown",
+      "size_bytes": 10862,
+      "last_modified": "2026-05-29T16:48:11.491Z",
+      "file_hash": "f176615e9f893be9ecbe637f09b0366771cbe3c873d99007cea25bb67c829dff",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "docs/presentations/build_sendsprint_implementation_deck.py",
+      "language": "python",
+      "size_bytes": 22286,
+      "last_modified": "2026-05-27T19:13:53.073Z",
+      "file_hash": "06f3060b64efe0bda0cc1f874db0628366aea5ae93a3fa9fdeb120c16c61a9fc",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "PIL",
+        "__future__",
+        "dataclasses",
+        "pathlib",
+        "pptx",
+        "pptx.dml.color",
+        "pptx.enum.text",
+        "pptx.util",
+        "reportlab.lib.pagesizes",
+        "reportlab.lib.units",
+        "reportlab.pdfgen",
+        "textwrap"
+      ],
+      "exports": [
+        "Slide",
+        "add_picture_contain",
+        "add_textbox",
+        "build_all",
+        "build_pdf_and_previews",
+        "build_pptx",
+        "draw_wrapped",
+        "hex_rgb",
+        "make_preview_image",
+        "rgb_tuple"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "docs/presentations/README.md",
+      "language": "markdown",
+      "size_bytes": 736,
+      "last_modified": "2026-05-27T19:13:53.073Z",
+      "file_hash": "190142fd7775a6661e89f0177386adf1af8cf495f6b6685258b059e3afe75137",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "LICENSE",
+      "language": "text",
+      "size_bytes": 1073,
+      "last_modified": "2026-05-27T19:13:53.059Z",
+      "file_hash": "33d9f26f261199983345c208e369ab2224838fc032d04e97575c4602c4fb27b3",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "pyproject.toml",
+      "language": "toml",
+      "size_bytes": 2171,
+      "last_modified": "2026-05-30T20:18:37.483Z",
+      "file_hash": "eef160c0a49c123754a1b4488b0b389c184c68f51a22f181e77acfc41da9def3",
+      "git_status": "clean",
+      "roles": [
+        "config"
+      ],
+      "imports": [],
+      "exports": [],
+      "importance": 0.32
+    },
+    {
+      "path": "README.md",
+      "language": "markdown",
+      "size_bytes": 19440,
+      "last_modified": "2026-05-29T18:42:47.833Z",
+      "file_hash": "a6df43e284c6f3bfd97296f7b7f393dbb17d62ac27f5fa2b0f8d2df6b086289c",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "README.pt-BR.md",
+      "language": "markdown",
+      "size_bytes": 20031,
+      "last_modified": "2026-05-29T18:42:47.834Z",
+      "file_hash": "81edf6d0b43bde0ef58377a335434f33a21d4051e65e5bc26719d02159539474",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "sendsprint/__init__.py",
+      "language": "python",
+      "size_bytes": 387,
+      "last_modified": "2026-05-30T20:18:37.483Z",
+      "file_hash": "761b7e7d2e12310856271742b6ea054c9716a89e0846c73cde5c2dca10dabc15",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "sendsprint/bootstrap.py",
+      "language": "python",
+      "size_bytes": 6516,
+      "last_modified": "2026-05-30T15:33:03.960Z",
+      "file_hash": "ade86b352dd3437d886407951d9c093296af7bd7e5d8e0f0459d85fc69d15e77",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "logging",
+        "os",
+        "pathlib",
+        "shutil",
+        "subprocess",
+        "sys"
+      ],
+      "exports": [
+        "StartupReport",
+        "UpdateResult",
+        "Updater",
+        "__init__",
+        "_git_sync",
+        "_run",
+        "_which",
+        "cache_dir",
+        "default_prompt_kernel",
+        "line",
+        "ok",
+        "run_startup",
+        "update_all",
+        "update_simplicio_cli",
+        "update_simplicio_mapper",
+        "update_simplicio_prompt",
+        "verify_dependencies"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/cli.py",
+      "language": "python",
+      "size_bytes": 19886,
+      "last_modified": "2026-05-30T15:33:03.961Z",
+      "file_hash": "cdefe4b00374ce9b13aaa08934e23c93c568e4f0d080ea14ffb86b3262b5388d",
+      "git_status": "clean",
+      "roles": [
+        "entrypoint"
+      ],
+      "imports": [
+        "__future__",
+        "datetime",
+        "logging",
+        "os",
+        "pathlib",
+        "rich.console",
+        "rich.live",
+        "rich.table",
+        "sendsprint",
+        "sendsprint.bootstrap",
+        "sendsprint.flow",
+        "sendsprint.installer",
+        "sendsprint.logging_setup",
+        "sendsprint.models",
+        "sendsprint.operators",
+        "sendsprint.progress",
+        "sendsprint.prompt",
+        "sendsprint.scope",
+        "sendsprint.watch",
+        "typing"
+      ],
+      "exports": [
+        "__call__",
+        "__init__",
+        "_archive_report",
+        "_build_flow",
+        "_build_operator",
+        "_build_scope",
+        "_ensure_row",
+        "_format_dod",
+        "_format_elapsed",
+        "_format_pr",
+        "_main",
+        "_read_kwargs",
+        "_refresh",
+        "_row_cost",
+        "_row_counts",
+        "_start",
+        "_startup",
+        "_summary_text",
+        "_table",
+        "install",
+        "login",
+        "logout",
+        "main",
+        "run",
+        "update",
+        "version",
+        "watch"
+      ],
+      "importance": 0.73
+    },
+    {
+      "path": "sendsprint/core.py",
+      "language": "python",
+      "size_bytes": 10221,
+      "last_modified": "2026-05-30T15:33:03.961Z",
+      "file_hash": "3ae73ef4f30fdf2690caa17e84586d9a3a5720192b300cabd60a7b241832f9da",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "json",
+        "os",
+        "sendsprint_core",
+        "typing"
+      ],
+      "exports": [
+        "_detect_cycles",
+        "_env_flag",
+        "_finding",
+        "_normalize",
+        "_python_validate",
+        "backend",
+        "use_rust",
+        "validate_sprint_plan"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/credentials.py",
+      "language": "python",
+      "size_bytes": 4422,
+      "last_modified": "2026-05-27T19:13:53.132Z",
+      "file_hash": "2e226911b9fadcbab3dbda51cc0c1f0b691fd493d0d254d9c70af696b7d482ed",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "contextlib",
+        "keyring",
+        "logging",
+        "os",
+        "typer",
+        "typing"
+      ],
+      "exports": [
+        "CredentialError",
+        "_cache_key",
+        "_keyring",
+        "_username",
+        "delete_secret",
+        "get_or_prompt",
+        "get_secret",
+        "set_secret"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/delivery/__init__.py",
+      "language": "python",
+      "size_bytes": 668,
+      "last_modified": "2026-05-27T19:13:53.132Z",
+      "file_hash": "b761465e2ac55219e5c7f28c983777eda9b1e592220cc6bcae95c78736c18ca9",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "sendsprint.delivery.evidence",
+        "sendsprint.delivery.git_ops",
+        "sendsprint.delivery.pr",
+        "sendsprint.delivery.worktree"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/delivery/evidence.py",
+      "language": "python",
+      "size_bytes": 18073,
+      "last_modified": "2026-05-30T15:33:03.961Z",
+      "file_hash": "4f4465a9bf5968336bb838b8e5058e1dbe44ea172953ed3a794ff7699c5aaab7",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "logging",
+        "os",
+        "pathlib",
+        "playwright.sync_api",
+        "sendsprint.models.reports",
+        "sendsprint.tech",
+        "shlex",
+        "subprocess",
+        "typing"
+      ],
+      "exports": [
+        "EvidenceCollector",
+        "EvidenceCommand",
+        "__init__",
+        "_command_cwd",
+        "_dedupe_evidence",
+        "_dedupe_feedback",
+        "_discover_hyperframes",
+        "_evidence_key",
+        "_evidence_record",
+        "_evidence_status",
+        "_feedback_key",
+        "_feedback_record",
+        "_playwright_screenshot",
+        "_process_output",
+        "_root_for",
+        "_skipped_delivery_video",
+        "_split_command",
+        "_write",
+        "capture_screenshot",
+        "collect_command",
+        "collect_detected",
+        "collect_tests",
+        "evidence_dir",
+        "render_delivery_video",
+        "select_evidence_commands",
+        "write_manifest"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/delivery/git_ops.py",
+      "language": "python",
+      "size_bytes": 2805,
+      "last_modified": "2026-05-27T19:13:53.132Z",
+      "file_hash": "bad3be5bc966e7c4251f104f920a2793d8fb2b05233e549d63c3da7345ab7bc5",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "logging",
+        "pathlib",
+        "subprocess",
+        "time"
+      ],
+      "exports": [
+        "GitError",
+        "GitOps",
+        "__init__",
+        "_run",
+        "commit_all",
+        "current_branch",
+        "has_changes",
+        "push"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/delivery/pr.py",
+      "language": "python",
+      "size_bytes": 8867,
+      "last_modified": "2026-05-30T15:33:03.962Z",
+      "file_hash": "2acf583b0021618109a3fae1befba053625bcc6337344e220f79bb73b3a71eb9",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "base64",
+        "collections.abc",
+        "httpx",
+        "logging",
+        "os",
+        "sendsprint.github_integration",
+        "sendsprint.models.reports"
+      ],
+      "exports": [
+        "PullRequestManager",
+        "__init__",
+        "_create_ado_pr",
+        "_create_github_pr",
+        "_dedupe_evidence",
+        "_dedupe_feedback",
+        "_evidence_key",
+        "_feedback_key",
+        "_github_client",
+        "_raw_url",
+        "_render_evidence",
+        "create_pr",
+        "post_evidence",
+        "read_feedback"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/delivery/worktree.py",
+      "language": "python",
+      "size_bytes": 2694,
+      "last_modified": "2026-05-27T19:13:53.133Z",
+      "file_hash": "6ebe6d22f33a335148a8e1ab3e23d48d7feaddfa8ceab23f694b62bde6f5bec9",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "logging",
+        "pathlib",
+        "re",
+        "subprocess"
+      ],
+      "exports": [
+        "WorktreeError",
+        "WorktreeManager",
+        "__init__",
+        "_run",
+        "create",
+        "current_branch",
+        "list_worktrees",
+        "remove",
+        "worktree_dir"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/executor/__init__.py",
+      "language": "python",
+      "size_bytes": 601,
+      "last_modified": "2026-05-27T19:13:53.133Z",
+      "file_hash": "358f5f7fad045d200a358f72f767f92fa9d664ee919bc57e7689215dee56107c",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "sendsprint.executor.simplicio"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/executor/simplicio.py",
+      "language": "python",
+      "size_bytes": 10629,
+      "last_modified": "2026-05-30T15:33:03.962Z",
+      "file_hash": "71b2d76a5755668b17c359b7972b7591356f729291af4ccd38e871b3d38bc48b",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "logging",
+        "pathlib",
+        "sendsprint.models.reports",
+        "sendsprint.models.sprint",
+        "shutil",
+        "subprocess"
+      ],
+      "exports": [
+        "SimplicioExecutor",
+        "SimplicioNotInstalled",
+        "SimplicioResult",
+        "SimplicioTask",
+        "__init__",
+        "_slug",
+        "argv",
+        "index",
+        "is_available",
+        "revise",
+        "run",
+        "run_item",
+        "task_from_item"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/flow.py",
+      "language": "python",
+      "size_bytes": 34622,
+      "last_modified": "2026-05-30T15:33:03.963Z",
+      "file_hash": "e85ee03a8a06c46fdc21ac7e1bacbab81156d7d5514cf97190b4336c100c85b3",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections",
+        "collections.abc",
+        "contextlib",
+        "dataclasses",
+        "pathlib",
+        "sendsprint.core",
+        "sendsprint.delivery.evidence",
+        "sendsprint.delivery.git_ops",
+        "sendsprint.delivery.pr",
+        "sendsprint.delivery.worktree",
+        "sendsprint.executor",
+        "sendsprint.mapper",
+        "sendsprint.models",
+        "sendsprint.operators.base",
+        "sendsprint.progress",
+        "sendsprint.prompt",
+        "sendsprint.scope",
+        "sendsprint.state",
+        "sendsprint.tech"
+      ],
+      "exports": [
+        "ItemOutcome",
+        "RepoTarget",
+        "SprintFlow",
+        "__init__",
+        "_branch_name",
+        "_collect_evidence",
+        "_commit_message",
+        "_ensure_mapper_bootstrap",
+        "_fan_out",
+        "_handle_sigint",
+        "_handler",
+        "_load_run_state",
+        "_mark_cancelled",
+        "_open_pr",
+        "_pr_body",
+        "_pr_manager",
+        "_pr_number",
+        "_review_feedback_text",
+        "_save_run_state",
+        "_should_drain",
+        "_slug",
+        "_state_key",
+        "_summarize",
+        "_update_ticket",
+        "_write_retrospective",
+        "_write_spec",
+        "deliver_item",
+        "request_drain",
+        "revise_pr",
+        "run"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/github_integration.py",
+      "language": "python",
+      "size_bytes": 12529,
+      "last_modified": "2026-05-27T19:41:14.071Z",
+      "file_hash": "e79850a70c9d90caa99afa98035c3f31d89e276cadb5e73e033a69e9bd445e81",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "httpx",
+        "logging",
+        "os",
+        "time",
+        "typing"
+      ],
+      "exports": [
+        "CIMonitor",
+        "CIStatus",
+        "DuplicateDetector",
+        "DuplicateResult",
+        "ProgressReporter",
+        "ReviewFeedback",
+        "ReviewReader",
+        "__init__",
+        "_append_feedback",
+        "_default_headers",
+        "_get_client",
+        "_get_json",
+        "attach_evidence_summary",
+        "check_ci_status",
+        "check_concurrent_work",
+        "check_duplicate_issues",
+        "check_duplicate_prs",
+        "extract_actionable_feedback",
+        "has_concurrent_work",
+        "has_duplicates",
+        "is_green",
+        "is_red",
+        "post_progress_comment",
+        "read_review_comments",
+        "read_reviews",
+        "wait_for_ci"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/installer.py",
+      "language": "python",
+      "size_bytes": 5105,
+      "last_modified": "2026-05-27T19:13:53.134Z",
+      "file_hash": "4ae1d3d4f3679b1104120bf8bfc7edb0175d31cd77433902b051e43a2450d76a",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "pathlib",
+        "re"
+      ],
+      "exports": [
+        "InstallResult",
+        "Target",
+        "_write_block",
+        "_write_file",
+        "install",
+        "line",
+        "render"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/llm/__init__.py",
+      "language": "python",
+      "size_bytes": 124,
+      "last_modified": "2026-05-27T19:13:53.134Z",
+      "file_hash": "4f9500b79dc832cc22fa6068f784c29876a7b71882ac0d5a535bb2cf46f35ff5",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "sendsprint.llm.client"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/llm/client.py",
+      "language": "python",
+      "size_bytes": 9733,
+      "last_modified": "2026-05-29T16:48:11.500Z",
+      "file_hash": "4b6b5d0d6ac97c91ec4d1d25054d22a835d45800d6c039ec8756564c74f6bfdb",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "hashlib",
+        "httpx",
+        "logging",
+        "os",
+        "sendsprint.utils.cache",
+        "sendsprint.utils.json",
+        "typing"
+      ],
+      "exports": [
+        "LlmClient",
+        "LlmError",
+        "__enter__",
+        "__exit__",
+        "__init__",
+        "_cache_key",
+        "_call_anthropic",
+        "_call_google",
+        "_call_groq",
+        "_call_ollama",
+        "_call_openai",
+        "_call_openai_compatible",
+        "_complete_uncached",
+        "_env_flag",
+        "_post_json",
+        "_resolve_api_key",
+        "_resolve_base_url",
+        "close",
+        "complete"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/logging_setup.py",
+      "language": "python",
+      "size_bytes": 3128,
+      "last_modified": "2026-05-27T19:13:53.134Z",
+      "file_hash": "a4e3a7b05e0dfa1dbc2f7a0b49365eae86bcb759879c42532ea17ab82dd6b61f",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "datetime",
+        "json",
+        "logging",
+        "logging.handlers",
+        "os",
+        "pathlib",
+        "sys"
+      ],
+      "exports": [
+        "JsonLineFormatter",
+        "_coerce_level",
+        "configure",
+        "format",
+        "log_dir"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/mapper/__init__.py",
+      "language": "python",
+      "size_bytes": 777,
+      "last_modified": "2026-05-27T19:13:53.134Z",
+      "file_hash": "dd3df3a7b00f08709eb4bf2a994591f58bb6b168fd50360ceecf4472f2445e98",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "sendsprint.mapper.adapter"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/mapper/adapter.py",
+      "language": "python",
+      "size_bytes": 22294,
+      "last_modified": "2026-05-30T15:33:03.963Z",
+      "file_hash": "893d300ec8c10420132f7caf2e2db7d85b37dfd68d2771cc920079147fb593ee",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "json",
+        "pathlib",
+        "re",
+        "sendsprint.models.reports",
+        "sendsprint.models.sprint",
+        "sendsprint.utils.templates",
+        "typing"
+      ],
+      "exports": [
+        "MapperAdapter",
+        "MaterializedSprint",
+        "__init__",
+        "_final_item_status",
+        "_item_text",
+        "_map_status",
+        "_pr_for_item",
+        "_pr_link",
+        "_rank_files",
+        "_rank_precedents",
+        "_read_json",
+        "_render_acceptance",
+        "_render_links",
+        "_slug",
+        "_task_id",
+        "_tokens",
+        "load_structured_context",
+        "mapper_context_for_item",
+        "materialize_sprint",
+        "render_backlog",
+        "render_retrospective",
+        "render_sprint",
+        "render_task",
+        "sprint_dir_name",
+        "sprints_root",
+        "structured_context_for_item",
+        "task_filename",
+        "write_item",
+        "write_retrospective"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/models/__init__.py",
+      "language": "python",
+      "size_bytes": 1029,
+      "last_modified": "2026-05-27T19:13:53.134Z",
+      "file_hash": "158a36c9c4ec706001159168a4b38b754bf7b3bccfcf7104c78107a8db3d5aec",
+      "git_status": "clean",
+      "roles": [
+        "domain"
+      ],
+      "imports": [
+        "sendsprint.models.reports",
+        "sendsprint.models.sprint",
+        "sendsprint.models.workspace"
+      ],
+      "exports": [],
+      "importance": 0.4
+    },
+    {
+      "path": "sendsprint/models/reports.py",
+      "language": "python",
+      "size_bytes": 2699,
+      "last_modified": "2026-05-30T15:33:03.963Z",
+      "file_hash": "0c4bee226996d91714b3058cf9c53fd909c35269656ac449396c567b9bacdccc",
+      "git_status": "clean",
+      "roles": [
+        "domain"
+      ],
+      "imports": [
+        "__future__",
+        "datetime",
+        "pydantic",
+        "typing"
+      ],
+      "exports": [
+        "PrInfo",
+        "RunReport",
+        "SecurityFinding",
+        "StepReport",
+        "TestEvidence",
+        "_now",
+        "details"
+      ],
+      "importance": 0.48
+    },
+    {
+      "path": "sendsprint/models/sprint.py",
+      "language": "python",
+      "size_bytes": 3278,
+      "last_modified": "2026-05-27T19:13:53.134Z",
+      "file_hash": "a1e5dc4104dbc76bc78c14c2947e5c902c1aa0ccc34a878d140a2c112071d8d3",
+      "git_status": "clean",
+      "roles": [
+        "domain"
+      ],
+      "imports": [
+        "__future__",
+        "datetime",
+        "pydantic",
+        "typing"
+      ],
+      "exports": [
+        "ArchitectureReport",
+        "Attachment",
+        "Comment",
+        "Link",
+        "Sprint",
+        "SprintItem",
+        "bugs",
+        "epics",
+        "features",
+        "is_mapped",
+        "issues",
+        "stories",
+        "subtasks",
+        "tasks"
+      ],
+      "importance": 0.48
+    },
+    {
+      "path": "sendsprint/models/workspace.py",
+      "language": "python",
+      "size_bytes": 3084,
+      "last_modified": "2026-05-27T19:13:53.134Z",
+      "file_hash": "6125abc6b7ef588384fc440d6b98a141eaf4be7de4701c8a9141b0837e282985",
+      "git_status": "clean",
+      "roles": [
+        "domain"
+      ],
+      "imports": [
+        "__future__",
+        "pydantic",
+        "typing"
+      ],
+      "exports": [
+        "RepoConfig",
+        "ScopeConfig",
+        "WatchConfig",
+        "WorkspaceConfig"
+      ],
+      "importance": 0.48
+    },
+    {
+      "path": "sendsprint/operators/__init__.py",
+      "language": "python",
+      "size_bytes": 498,
+      "last_modified": "2026-05-27T19:13:53.135Z",
+      "file_hash": "6c7a2739dc78b2791eed69327747f5245db6a4c2e7ee17aa1aba64643365bb12",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "sendsprint.operators.azure_devops_operator",
+        "sendsprint.operators.base",
+        "sendsprint.operators.github_issues_operator",
+        "sendsprint.operators.jira_operator"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/operators/_mcp_bridge.py",
+      "language": "python",
+      "size_bytes": 2944,
+      "last_modified": "2026-05-27T19:13:53.135Z",
+      "file_hash": "f66ba50c7d0e278ffa17aefb4aee4b1e20ebdd2b0296b5ea1c99eba39f01e383",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "logging",
+        "sendsprint.operators",
+        "sendsprint.operators.base",
+        "typing"
+      ],
+      "exports": [
+        "MCPProviderUnavailable",
+        "clear_providers",
+        "fetch",
+        "has_provider",
+        "register_provider",
+        "unregister_provider"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/operators/azure_devops_operator.py",
+      "language": "python",
+      "size_bytes": 10604,
+      "last_modified": "2026-05-27T19:13:53.135Z",
+      "file_hash": "79f14f8e50dba4109ca68b1a26810225da4a2688015bfb4a86bb4d1eb98d326e",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "base64",
+        "datetime",
+        "html",
+        "httpx",
+        "importlib",
+        "logging",
+        "os",
+        "re",
+        "sendsprint",
+        "sendsprint.models",
+        "sendsprint.operators.base",
+        "typing"
+      ],
+      "exports": [
+        "AzureDevopsOperator",
+        "__init__",
+        "_api_available",
+        "_chunked",
+        "_parse_dt",
+        "_read_via_api",
+        "_read_via_mcp",
+        "_sprint_from_workitems",
+        "_strip_html",
+        "_workitem_to_item",
+        "current_user",
+        "update_status"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/operators/base.py",
+      "language": "python",
+      "size_bytes": 3147,
+      "last_modified": "2026-05-27T19:13:53.135Z",
+      "file_hash": "b85f46a2ef85f3445126a6adf6bc99b902f185c5fcab4315d4903e65493bc273",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "abc",
+        "httpx",
+        "logging",
+        "os",
+        "sendsprint.models",
+        "sendsprint.operators",
+        "typing"
+      ],
+      "exports": [
+        "BaseOperator",
+        "TransportUnavailable",
+        "__init__",
+        "_api_available",
+        "_available_transports",
+        "_mcp_available",
+        "_read_via_api",
+        "_read_via_mcp",
+        "_read_with_transport",
+        "read_sprint",
+        "update_status"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/operators/github_issues_operator.py",
+      "language": "python",
+      "size_bytes": 7228,
+      "last_modified": "2026-05-27T19:13:53.135Z",
+      "file_hash": "ba03579341f5b56d3ceac303ae229ea44ef521de594ed2c52b6df9bfd4da6d50",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "datetime",
+        "httpx",
+        "importlib",
+        "logging",
+        "os",
+        "sendsprint.models",
+        "sendsprint.operators.base",
+        "typing"
+      ],
+      "exports": [
+        "GitHubIssuesOperator",
+        "__init__",
+        "_api_available",
+        "_comments",
+        "_headers",
+        "_issue_to_item",
+        "_next_link",
+        "_parse_dt",
+        "_read_via_api",
+        "_read_via_mcp",
+        "_sprint_from_issues",
+        "current_user",
+        "update_status"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/operators/jira_operator.py",
+      "language": "python",
+      "size_bytes": 11169,
+      "last_modified": "2026-05-27T19:13:53.135Z",
+      "file_hash": "6c9ead5b1e55c5e42f08bf629aa8c2e148c6adec796db398d545d8db59aebc15",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "datetime",
+        "httpx",
+        "importlib",
+        "logging",
+        "os",
+        "sendsprint",
+        "sendsprint.models",
+        "sendsprint.operators.base",
+        "typing"
+      ],
+      "exports": [
+        "JiraOperator",
+        "__init__",
+        "_api_available",
+        "_extract_text",
+        "_issue_to_item",
+        "_parse_dt",
+        "_read_via_api",
+        "_read_via_mcp",
+        "_sprint_from_jira_issues",
+        "current_user",
+        "update_status"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/profile.py",
+      "language": "python",
+      "size_bytes": 4680,
+      "last_modified": "2026-05-27T19:13:53.135Z",
+      "file_hash": "aeee41c3072e98af66dcc5320dae32072e2f41ebdad0dc2fca79d6e98312ae31",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "contextlib",
+        "datetime",
+        "logging",
+        "os",
+        "pathlib",
+        "pydantic",
+        "stat",
+        "typing",
+        "yaml"
+      ],
+      "exports": [
+        "AzureDevopsProfile",
+        "BranchProfile",
+        "JiraProfile",
+        "LlmProfile",
+        "Profile",
+        "RuntimeProfile",
+        "_ensure_dir",
+        "load",
+        "save",
+        "update"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/progress.py",
+      "language": "python",
+      "size_bytes": 1224,
+      "last_modified": "2026-05-30T15:33:03.963Z",
+      "file_hash": "58b413713433065ea8f29091d420286b9a3845bdac742ddc68ee47c29febfc07",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "typing"
+      ],
+      "exports": [
+        "ProgressEvent",
+        "ProgressItem"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/prompt/__init__.py",
+      "language": "python",
+      "size_bytes": 719,
+      "last_modified": "2026-05-27T19:13:53.135Z",
+      "file_hash": "e8fbb1e6dc78c98a3e0ff33b78ce796f97fce51c96ab72cf077b92377f7f36a5",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "sendsprint.prompt.fanout"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/prompt/fanout.py",
+      "language": "python",
+      "size_bytes": 13469,
+      "last_modified": "2026-05-27T19:42:52.732Z",
+      "file_hash": "8327234699622ffffa26eb065f2f3da334d38ffacf79b64f569664e93486981a",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "contextlib",
+        "dataclasses",
+        "importlib",
+        "json",
+        "logging",
+        "math",
+        "os",
+        "pathlib",
+        "sendsprint.bootstrap",
+        "sendsprint.models.sprint",
+        "subprocess",
+        "sys",
+        "typing"
+      ],
+      "exports": [
+        "FanoutResult",
+        "PromptFanout",
+        "__init__",
+        "_batch_shape",
+        "_brainstorm_task",
+        "_estimate_tokens",
+        "_load_tuple_module",
+        "_parse",
+        "_run_tuple",
+        "_total_cost",
+        "_tuple_adapter_path",
+        "argv",
+        "brainstorm",
+        "is_available",
+        "run",
+        "summary"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/scope.py",
+      "language": "python",
+      "size_bytes": 3424,
+      "last_modified": "2026-05-27T19:13:53.136Z",
+      "file_hash": "ed2295b4e99372ded3944ed095b6f46bff0ac15afd7bfea73ce5b1aaea5c398a",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        ".models.sprint",
+        ".models.workspace",
+        "__future__"
+      ],
+      "exports": [
+        "_matches_key",
+        "_matches_status",
+        "_matches_user",
+        "_norm",
+        "apply_scope",
+        "build_scope"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/state.py",
+      "language": "python",
+      "size_bytes": 4575,
+      "last_modified": "2026-05-30T15:33:03.964Z",
+      "file_hash": "12e739ff1fa8fb417997c3a619033b8d02292711c29436a40afb13b910eabf1e",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "json",
+        "pathlib",
+        "typing"
+      ],
+      "exports": [
+        "RunState",
+        "_clean_keys",
+        "_last_pr",
+        "_str_set",
+        "for_sprint",
+        "load",
+        "mark_completed",
+        "mark_failed",
+        "save",
+        "should_run",
+        "state_dir",
+        "state_path",
+        "stop_file_path",
+        "stop_requested",
+        "sync_items"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/tech/__init__.py",
+      "language": "python",
+      "size_bytes": 175,
+      "last_modified": "2026-05-27T19:13:53.136Z",
+      "file_hash": "16bed2d68e5568f36e8da27451bb32ced6ff1f29ed516f1a6e104ff90d5be87b",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        ".detector"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/tech/detector.py",
+      "language": "python",
+      "size_bytes": 13492,
+      "last_modified": "2026-05-30T15:33:03.964Z",
+      "file_hash": "f8cc0e4c52cdd377ba259054eb07adf60a6b35051da7f788b45678d7d9bd0fd5",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "contextlib",
+        "json",
+        "pathlib",
+        "pydantic",
+        "re"
+      ],
+      "exports": [
+        "TechFingerprint",
+        "_add",
+        "_candidate_roots",
+        "_has_stack_marker",
+        "_relative_root",
+        "_roles_for",
+        "_scan_bun",
+        "_scan_deno",
+        "_scan_dotnet",
+        "_scan_java",
+        "_scan_misc",
+        "_scan_node",
+        "_scan_python",
+        "add",
+        "detect_tech",
+        "primary_role",
+        "primary_tech"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/utils/__init__.py",
+      "language": "python",
+      "size_bytes": 396,
+      "last_modified": "2026-05-29T16:48:11.501Z",
+      "file_hash": "c9efe7efde537bcee3e09d7bdf690fb265478db9076b133995f16d03c8d6639d",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "sendsprint.utils.cache",
+        "sendsprint.utils.json",
+        "sendsprint.utils.templates"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/utils/cache.py",
+      "language": "python",
+      "size_bytes": 3616,
+      "last_modified": "2026-05-29T16:48:11.501Z",
+      "file_hash": "043b6cd4c043e14586cb6cfd344da2b932911dc40e50ac4e14678252bb68fc73",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections",
+        "collections.abc",
+        "dataclasses",
+        "threading",
+        "time",
+        "typing"
+      ],
+      "exports": [
+        "CacheStats",
+        "LruTtlCache",
+        "__init__",
+        "__len__",
+        "_expired",
+        "_purge_expired",
+        "clear",
+        "get",
+        "get_or_set",
+        "set",
+        "stats"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/utils/json.py",
+      "language": "python",
+      "size_bytes": 2158,
+      "last_modified": "2026-05-29T16:48:11.503Z",
+      "file_hash": "eae00d8cb069a560a3830e7e476c65bcb15345ca05091e195fce311410332ec4",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "json",
+        "orjson",
+        "typing"
+      ],
+      "exports": [
+        "dumps_json",
+        "dumps_json_bytes",
+        "loads_json"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/utils/templates.py",
+      "language": "python",
+      "size_bytes": 3474,
+      "last_modified": "2026-05-30T15:33:03.964Z",
+      "file_hash": "4ba7e83ebad7d8f5ca48596287525a28d6d841b1882b75d9ac65ed8bba78a390",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "hashlib",
+        "sendsprint.utils.cache",
+        "sendsprint.utils.json",
+        "string",
+        "typing"
+      ],
+      "exports": [
+        "TemplateRenderer",
+        "__init__",
+        "_render_key",
+        "_stringify",
+        "_template",
+        "_text",
+        "compiled_stats",
+        "register",
+        "render",
+        "rendered_stats"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/watch.py",
+      "language": "python",
+      "size_bytes": 3585,
+      "last_modified": "2026-05-27T19:13:53.136Z",
+      "file_hash": "3f764c46c71fd2a43aa0b211d698b55a99cd89d13ca47b04398e32dc9858c01c",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "__future__",
+        "collections.abc",
+        "json",
+        "logging",
+        "pathlib",
+        "sendsprint.flow",
+        "sendsprint.models",
+        "sendsprint.scope",
+        "time"
+      ],
+      "exports": [
+        "Watcher",
+        "__init__",
+        "_load_delivered",
+        "_save_delivered",
+        "loop",
+        "run_once"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "sendsprint/workspace/__init__.py",
+      "language": "python",
+      "size_bytes": 204,
+      "last_modified": "2026-05-27T19:13:53.136Z",
+      "file_hash": "47e19cac31cfc932d782384c41d7e3f8837455740f340c0723e1b9ef44d896ff",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        ".loader"
+      ],
+      "exports": [],
+      "importance": 0.2
+    },
+    {
+      "path": "sendsprint/workspace/loader.py",
+      "language": "python",
+      "size_bytes": 2359,
+      "last_modified": "2026-05-27T19:13:53.136Z",
+      "file_hash": "eefb5bfbcfd61d0eb773d8d68929db581e87e2c12c1982987faac7d848d5a859",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [
+        "..models.workspace",
+        "__future__",
+        "json",
+        "pathlib",
+        "typing",
+        "yaml"
+      ],
+      "exports": [
+        "_parse",
+        "_read_text",
+        "load_workspace",
+        "new_project_dir",
+        "resolve_repo_path"
+      ],
+      "importance": 0.28
+    },
+    {
+      "path": "skills/claude/SKILL.md",
+      "language": "markdown",
+      "size_bytes": 3135,
+      "last_modified": "2026-05-27T19:13:53.137Z",
+      "file_hash": "adbec91536bf96a5d58b7c75e4c547e5aece51467081cefbd613269dbbbbbd0a",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "skills/codex/AGENTS.md",
+      "language": "markdown",
+      "size_bytes": 1544,
+      "last_modified": "2026-05-27T19:13:53.137Z",
+      "file_hash": "b54d6172f5d87eae54c27d91811911ba888485479db9b6909ded38739633584e",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    },
+    {
+      "path": "tests/__init__.py",
+      "language": "python",
+      "size_bytes": 0,
+      "last_modified": "2026-05-27T19:13:53.137Z",
+      "file_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [],
+      "exports": [],
+      "importance": 0.37
+    },
+    {
+      "path": "tests/test_bootstrap.py",
+      "language": "python",
+      "size_bytes": 3440,
+      "last_modified": "2026-05-27T19:13:53.137Z",
+      "file_hash": "7c54e74574c3dc486ed1326caa1ff0bb7464166179b6bbaa78831388111b4cc0",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "os",
+        "sendsprint.bootstrap",
+        "sendsprint.profile",
+        "subprocess"
+      ],
+      "exports": [
+        "_runner",
+        "run",
+        "test_prompt_clone_when_absent_sets_env",
+        "test_prompt_pull_when_present",
+        "test_run_startup_all_off_is_empty",
+        "test_run_startup_respects_profile_flags",
+        "test_update_all_aggregates",
+        "test_update_cli_failed",
+        "test_update_cli_ok",
+        "test_verify_dependencies_reports_git_and_kernel"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_cli.py",
+      "language": "python",
+      "size_bytes": 5381,
+      "last_modified": "2026-05-30T15:33:03.964Z",
+      "file_hash": "40a26c20d3906cba189b079fec2809d91badcaae1a2a4a685585b902df14dfc6",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "sendsprint",
+        "sendsprint.models",
+        "typer.testing"
+      ],
+      "exports": [
+        "__init__",
+        "_patch_cli",
+        "archive",
+        "build_flow",
+        "run",
+        "startup",
+        "test_run_cancelled_report_exits_130",
+        "test_run_passes_evidence_video_to_flow_builder",
+        "test_run_passes_no_bootstrap_mapper_to_flow",
+        "test_run_passes_no_retro_to_flow",
+        "test_run_passes_no_validate_to_flow",
+        "test_run_passes_resume_to_flow",
+        "test_run_passes_validate_only_to_flow",
+        "test_run_quiet_suppresses_progress_and_archives_quiet"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_core_validator.py",
+      "language": "python",
+      "size_bytes": 6628,
+      "last_modified": "2026-05-29T16:48:11.506Z",
+      "file_hash": "484e739134842e6a50c739737d91b1a2bf1aca821f0cb64fb68b88402b5b0f74",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "json",
+        "os",
+        "pytest",
+        "sendsprint"
+      ],
+      "exports": [
+        "_base_sprint",
+        "_item",
+        "backend",
+        "test_accepts_bytes",
+        "test_accepts_str",
+        "test_backend_reflects_env",
+        "test_clean_sprint_is_ok",
+        "test_duplicate_key_is_error",
+        "test_duplicate_label_is_info",
+        "test_external_link_is_info",
+        "test_invalid_json_bytes_raises",
+        "test_invalid_story_points_is_error",
+        "test_orphan_parent_is_warning",
+        "test_parent_cycle_is_error",
+        "test_python_and_rust_agree_on_complex_sprint",
+        "test_self_parent_is_error",
+        "test_story_with_acceptance_criteria_passes",
+        "test_story_without_acceptance_criteria_warns",
+        "test_unknown_status_is_warning"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_delivery.py",
+      "language": "python",
+      "size_bytes": 17362,
+      "last_modified": "2026-05-30T15:33:03.965Z",
+      "file_hash": "8580c0ffb13c4ec49c858af64fc901501aa5393abc46c625b3d7b553568ab03a",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "json",
+        "pathlib",
+        "pytest",
+        "sendsprint.delivery.evidence",
+        "sendsprint.delivery.git_ops",
+        "sendsprint.delivery.pr",
+        "sendsprint.github_integration",
+        "sendsprint.models.reports",
+        "sendsprint.tech",
+        "subprocess"
+      ],
+      "exports": [
+        "__enter__",
+        "__exit__",
+        "__init__",
+        "_git_runner",
+        "fake_shot",
+        "json",
+        "raise_for_status",
+        "run",
+        "runner",
+        "test_capture_screenshot_unavailable",
+        "test_capture_screenshot_with_injected_fn",
+        "test_collect_detected_failure_marks_evidence_failed",
+        "test_collect_detected_monorepo_runs_python_and_node_suites",
+        "test_collect_detected_node_vitest_runs_no_pytest",
+        "test_collect_tests_failure",
+        "test_collect_tests_no_command_skips",
+        "test_collect_tests_runs_and_records",
+        "test_commit_all_commits_when_dirty",
+        "test_commit_all_skips_when_no_changes",
+        "test_detect_tech_finds_angular_and_js_config_markers",
+        "test_detect_tech_finds_frontend_backend_monorepo",
+        "test_detect_tech_finds_js_test_and_lint_tools",
+        "test_push_retries_then_raises",
+        "test_push_succeeds_first_try",
+        "test_render_delivery_video_skips_when_hyperframes_unavailable",
+        "test_render_delivery_video_uses_env_cli_without_npx_probe",
+        "test_render_delivery_video_uses_npx_hyperframes_after_discovery",
+        "test_select_evidence_commands_nextjs_skips_unit_and_lints",
+        "test_write_manifest_deduplicates_evidence_and_review_feedback",
+        "test_write_manifest_treats_skipped_video_as_non_failing"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_e2e_frontend_sim.py",
+      "language": "python",
+      "size_bytes": 7625,
+      "last_modified": "2026-05-30T15:33:03.965Z",
+      "file_hash": "fcb7b43cf913cad70b446c43d6b01890cfe16f94c3430cc47dbefff2922927d7",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "base64",
+        "pathlib",
+        "pytest",
+        "sendsprint",
+        "sendsprint.delivery",
+        "sendsprint.delivery.pr",
+        "sendsprint.flow",
+        "sendsprint.models.reports",
+        "sendsprint.operators",
+        "sendsprint.operators.jira_operator",
+        "sys"
+      ],
+      "exports": [
+        "FakeGit",
+        "FakeWorktree",
+        "FrontendExecutor",
+        "RecordingPR",
+        "__init__",
+        "_clear_providers",
+        "_frontend_card_payload",
+        "commit_all",
+        "create",
+        "create_pr",
+        "fake_capture",
+        "post_evidence",
+        "push",
+        "remove",
+        "run_item",
+        "test_frontend_card_to_pr_with_screenshot",
+        "test_pr_body_embeds_screenshot_image",
+        "worktree_dir"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_executor.py",
+      "language": "python",
+      "size_bytes": 4345,
+      "last_modified": "2026-05-30T15:33:03.965Z",
+      "file_hash": "f01b0d7ba84cec8e0f53a44a5e7f290b8310f27ace80b00ef2397f40fd902aeb",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "sendsprint.executor",
+        "sendsprint.models.sprint",
+        "subprocess",
+        "types"
+      ],
+      "exports": [
+        "_item",
+        "_runner",
+        "boom",
+        "run",
+        "spy",
+        "test_index_runs_mapper_command",
+        "test_index_skips_when_not_installed",
+        "test_revise_builds_feedback_task",
+        "test_run_failed",
+        "test_run_item_returns_step",
+        "test_run_ok",
+        "test_run_skipped_when_not_installed",
+        "test_run_timeout",
+        "test_task_argv_builds_all_flags",
+        "test_task_from_item_uses_title_description_and_criteria"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_fanout.py",
+      "language": "python",
+      "size_bytes": 5950,
+      "last_modified": "2026-05-27T19:43:07.142Z",
+      "file_hash": "535c31cbd1bd1d6a12aa4dee138276087163a9701fe9bb228942b3291235e967",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "json",
+        "sendsprint.models.sprint",
+        "sendsprint.prompt",
+        "subprocess"
+      ],
+      "exports": [
+        "PromptFanout",
+        "Receipt",
+        "__init__",
+        "_kernel",
+        "_runner",
+        "boom",
+        "record_tokens",
+        "run",
+        "snapshot",
+        "spawn_task",
+        "test_brainstorm_builds_task_from_item",
+        "test_dry_run_adds_flag",
+        "test_run_failed_on_bad_json",
+        "test_run_failed_on_nonzero",
+        "test_run_ok_parses_report",
+        "test_skipped_when_kernel_missing",
+        "test_timeout_is_failed",
+        "test_tuple_runtime_uses_prompt_fanout_adapter"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_flow.py",
+      "language": "python",
+      "size_bytes": 25587,
+      "last_modified": "2026-05-30T15:33:03.966Z",
+      "file_hash": "8fdbb37bd690deef3ff315ab795477694516adc7f331f11cf04a80ce31d0d6cc",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "json",
+        "pytest",
+        "sendsprint",
+        "sendsprint.flow",
+        "sendsprint.github_integration",
+        "sendsprint.models.reports",
+        "sendsprint.models.sprint",
+        "sendsprint.prompt",
+        "signal",
+        "subprocess"
+      ],
+      "exports": [
+        "BootstrappingExec",
+        "FailingExec",
+        "FakeEvidence",
+        "FakeExecutor",
+        "FakeGit",
+        "FakeOperator",
+        "FakePR",
+        "FakeWorktree",
+        "FeedbackPR",
+        "InterruptingExec",
+        "MissingIndexExec",
+        "RecordingEvidence",
+        "RecordingExec",
+        "StateAwareExec",
+        "StopAfterFirstExec",
+        "UnexpectedExecutor",
+        "UnexpectedIndexExec",
+        "UnexpectedWorktree",
+        "__init__",
+        "collect_detected",
+        "collect_tests",
+        "create",
+        "current_user",
+        "index",
+        "read_sprint",
+        "remove",
+        "revise",
+        "run_item",
+        "update_status",
+        "worktree_dir"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_installer.py",
+      "language": "python",
+      "size_bytes": 2150,
+      "last_modified": "2026-05-27T19:13:53.137Z",
+      "file_hash": "22e1f51ca79c8fb03f4eafb754901f81351c70c1a3cb415272a3568fcecc3e23",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "pytest",
+        "sendsprint.installer"
+      ],
+      "exports": [
+        "test_block_idempotent",
+        "test_block_preserves_existing_content",
+        "test_block_targets_share_agents_md",
+        "test_install_all_covers_every_target",
+        "test_install_dedicated_file_targets",
+        "test_unknown_target_raises"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_logging.py",
+      "language": "python",
+      "size_bytes": 1279,
+      "last_modified": "2026-05-27T19:13:53.138Z",
+      "file_hash": "465424970060ac6d0c757fedc41ef979e0841c892bc07a504d780794d1c96899",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "json",
+        "logging",
+        "sendsprint.logging_setup"
+      ],
+      "exports": [
+        "_flush",
+        "test_configure_writes_file_and_captures",
+        "test_idempotent_no_duplicate_handlers",
+        "test_json_lines"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_mapper.py",
+      "language": "python",
+      "size_bytes": 8945,
+      "last_modified": "2026-05-30T15:33:03.966Z",
+      "file_hash": "7946a28d8d000291f5796ec35afb9e6e472eecceafc25a45d1a73b6fe02c2a52",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "json",
+        "sendsprint.mapper",
+        "sendsprint.models.reports",
+        "sendsprint.models.sprint"
+      ],
+      "exports": [
+        "_item",
+        "test_default_acceptance_when_missing",
+        "test_done_status",
+        "test_login_user",
+        "test_materialize_sprint_writes_specs",
+        "test_status_mapping_and_acceptance",
+        "test_structured_mapper_context_uses_project_map_and_precedents",
+        "test_write_item_without_sprint_synthesizes",
+        "test_write_retrospective_links_pr_url_without_number",
+        "test_write_retrospective_marks_skipped_item_blocked",
+        "test_write_retrospective_renders_tasks_prs_and_notes"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_mcp_bridge.py",
+      "language": "python",
+      "size_bytes": 3894,
+      "last_modified": "2026-05-27T19:13:53.138Z",
+      "file_hash": "79959bae251c4f4cc19c4a0a26b4565bbfbe56cc5b974e7e47bd0e6021e0246e",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "pytest",
+        "sendsprint.operators",
+        "sendsprint.operators.azure_devops_operator",
+        "sendsprint.operators.base",
+        "sendsprint.operators.github_issues_operator",
+        "sendsprint.operators.jira_operator"
+      ],
+      "exports": [
+        "_clear_providers",
+        "test_ado_reads_via_mcp",
+        "test_fetch_raises_without_provider",
+        "test_fetch_rejects_non_dict_payload",
+        "test_github_reads_via_mcp_and_drops_prs",
+        "test_jira_falls_back_to_api_when_no_provider",
+        "test_jira_reads_via_mcp",
+        "test_mcp_available_reflects_registration",
+        "test_register_unregister_has_provider"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_operators.py",
+      "language": "python",
+      "size_bytes": 3184,
+      "last_modified": "2026-05-27T19:43:16.194Z",
+      "file_hash": "ff40cdf44975678228ea914bdebe79131461531206ea27b9c5b259bb5b785ebd",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "httpx",
+        "sendsprint.models.sprint",
+        "sendsprint.operators.github_issues_operator",
+        "sendsprint.scope"
+      ],
+      "exports": [
+        "FakeClient",
+        "FakeResp",
+        "__enter__",
+        "__exit__",
+        "__init__",
+        "_gh_item",
+        "get",
+        "json",
+        "raise_for_status",
+        "test_issue_to_item_mapping",
+        "test_next_link_parsing",
+        "test_read_via_api_drops_prs_and_maps",
+        "test_scope_mine_filters_by_email"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_package_metadata.py",
+      "language": "python",
+      "size_bytes": 666,
+      "last_modified": "2026-05-30T20:27:34.492Z",
+      "file_hash": "6244aaf8951ca8ac1222cffb8983c99546d118cdaa8dec3b1afbdc4f108456ad",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "pathlib",
+        "sendsprint",
+        "tomllib"
+      ],
+      "exports": [
+        "test_package_version_matches_release_metadata",
+        "test_simplicio_ecosystem_dependencies_are_current"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "tests/test_watch.py",
+      "language": "python",
+      "size_bytes": 1928,
+      "last_modified": "2026-05-27T19:13:53.138Z",
+      "file_hash": "17705be73b85fc414ba66bd37f1dd1a0af7921558be3f37429af88873d50b32e",
+      "git_status": "clean",
+      "roles": [
+        "test"
+      ],
+      "imports": [
+        "__future__",
+        "sendsprint.flow",
+        "sendsprint.models.reports",
+        "sendsprint.models.sprint",
+        "sendsprint.scope",
+        "sendsprint.watch"
+      ],
+      "exports": [
+        "StubOperator",
+        "__init__",
+        "_flow",
+        "fake_deliver",
+        "read_sprint",
+        "test_run_once_delivers_pending_and_records"
+      ],
+      "importance": 0.53
+    },
+    {
+      "path": "video/.gitignore",
+      "language": "text",
+      "size_bytes": 46,
+      "last_modified": "2026-05-27T19:13:53.138Z",
+      "file_hash": "59c4f7aa5cfd2daa04b1ac81dfcfd5bd99ff55b1e85763fc4f66e3f7f9edc479",
+      "git_status": "clean",
+      "roles": [],
+      "imports": [],
+      "exports": [],
+      "importance": 0.12
+    }
+  ],
+  "entry_points": [
+    "sendsprint/cli.py"
+  ],
+  "test_files": [
+    "tests/__init__.py",
+    "tests/test_bootstrap.py",
+    "tests/test_cli.py",
+    "tests/test_core_validator.py",
+    "tests/test_delivery.py",
+    "tests/test_e2e_frontend_sim.py",
+    "tests/test_executor.py",
+    "tests/test_fanout.py",
+    "tests/test_flow.py",
+    "tests/test_installer.py",
+    "tests/test_logging.py",
+    "tests/test_mapper.py",
+    "tests/test_mcp_bridge.py",
+    "tests/test_operators.py",
+    "tests/test_package_metadata.py",
+    "tests/test_watch.py"
+  ],
+  "config_files": [
+    "crates/sendsprint-core/Cargo.toml",
+    "crates/sendsprint-core/pyproject.toml",
+    "pyproject.toml"
+  ],
+  "modules": [
+    {
+      "name": ".",
+      "files": [
+        ".gitattributes",
+        ".gitignore",
+        "AGENTS.md",
+        "CHANGELOG.md",
+        "CLAUDE.md",
+        "LICENSE",
+        "pyproject.toml",
+        "README.md",
+        "README.pt-BR.md"
+      ],
+      "roles": [
+        "config"
+      ],
+      "file_count": 9
+    },
+    {
+      "name": ".github",
+      "files": [
+        ".github/workflows/publish.yml",
+        ".github/workflows/sendsprint.yml"
+      ],
+      "roles": [],
+      "file_count": 2
+    },
+    {
+      "name": ".pytest_cache",
+      "files": [
+        ".pytest_cache/.gitignore",
+        ".pytest_cache/README.md",
+        ".pytest_cache/v/cache/lastfailed",
+        ".pytest_cache/v/cache/nodeids"
+      ],
+      "roles": [],
+      "file_count": 4
+    },
+    {
+      "name": ".ruff_cache",
+      "files": [
+        ".ruff_cache/.gitignore",
+        ".ruff_cache/0.15.12/2078950570100708101",
+        ".ruff_cache/0.15.12/3462458357525478758",
+        ".ruff_cache/0.15.12/9819268403161966685",
+        ".ruff_cache/0.15.15/10667020683460045639",
+        ".ruff_cache/0.15.15/17145984999595463390",
+        ".ruff_cache/0.15.15/3565536582787017068",
+        ".ruff_cache/0.15.15/7876884906907802200"
+      ],
+      "roles": [],
+      "file_count": 8
+    },
+    {
+      "name": "bench",
+      "files": [
+        "bench/results/2026-05-28.txt",
+        "bench/validate_sprint_plan.py"
+      ],
+      "roles": [],
+      "file_count": 2
+    },
+    {
+      "name": "crates",
+      "files": [
+        "crates/sendsprint-core/Cargo.toml",
+        "crates/sendsprint-core/pyproject.toml",
+        "crates/sendsprint-core/src/lib.rs"
+      ],
+      "roles": [
+        "config"
+      ],
+      "file_count": 3
+    },
+    {
+      "name": "docs",
+      "files": [
+        "docs/cross-repo-issues.md",
+        "docs/perf/rust-pyo3-evaluation.md",
+        "docs/presentations/build_sendsprint_implementation_deck.py",
+        "docs/presentations/README.md"
+      ],
+      "roles": [],
+      "file_count": 4
+    },
+    {
+      "name": "sendsprint",
+      "files": [
+        "sendsprint/__init__.py",
+        "sendsprint/bootstrap.py",
+        "sendsprint/cli.py",
+        "sendsprint/core.py",
+        "sendsprint/credentials.py",
+        "sendsprint/delivery/__init__.py",
+        "sendsprint/delivery/evidence.py",
+        "sendsprint/delivery/git_ops.py",
+        "sendsprint/delivery/pr.py",
+        "sendsprint/delivery/worktree.py",
+        "sendsprint/executor/__init__.py",
+        "sendsprint/executor/simplicio.py",
+        "sendsprint/flow.py",
+        "sendsprint/github_integration.py",
+        "sendsprint/installer.py",
+        "sendsprint/llm/__init__.py",
+        "sendsprint/llm/client.py",
+        "sendsprint/logging_setup.py",
+        "sendsprint/mapper/__init__.py",
+        "sendsprint/mapper/adapter.py"
+      ],
+      "roles": [
+        "domain",
+        "entrypoint"
+      ],
+      "file_count": 45
+    },
+    {
+      "name": "skills",
+      "files": [
+        "skills/claude/SKILL.md",
+        "skills/codex/AGENTS.md"
+      ],
+      "roles": [],
+      "file_count": 2
+    },
+    {
+      "name": "tests",
+      "files": [
+        "tests/__init__.py",
+        "tests/test_bootstrap.py",
+        "tests/test_cli.py",
+        "tests/test_core_validator.py",
+        "tests/test_delivery.py",
+        "tests/test_e2e_frontend_sim.py",
+        "tests/test_executor.py",
+        "tests/test_fanout.py",
+        "tests/test_flow.py",
+        "tests/test_installer.py",
+        "tests/test_logging.py",
+        "tests/test_mapper.py",
+        "tests/test_mcp_bridge.py",
+        "tests/test_operators.py",
+        "tests/test_package_metadata.py",
+        "tests/test_watch.py"
+      ],
+      "roles": [
+        "test"
+      ],
+      "file_count": 16
+    },
+    {
+      "name": "video",
+      "files": [
+        "video/.gitignore"
+      ],
+      "roles": [],
+      "file_count": 1
+    }
+  ],
+  "entities": [
+    {
+      "name": "run",
+      "score": 88
+    },
+    {
+      "name": "init",
+      "score": 64
+    },
+    {
+      "name": "item",
+      "score": 54
+    },
+    {
+      "name": "evidence",
+      "score": 45
+    },
+    {
+      "name": "sprint",
+      "score": 44
+    },
+    {
+      "name": "read",
+      "score": 38
+    },
+    {
+      "name": "and",
+      "score": 36
+    },
+    {
+      "name": "update",
+      "score": 32
+    },
+    {
+      "name": "status",
+      "score": 30
+    },
+    {
+      "name": "render",
+      "score": 28
+    },
+    {
+      "name": "write",
+      "score": 28
+    },
+    {
+      "name": "fake",
+      "score": 26
+    },
+    {
+      "name": "feedback",
+      "score": 26
+    },
+    {
+      "name": "json",
+      "score": 25
+    },
+    {
+      "name": "collect",
+      "score": 24
+    },
+    {
+      "name": "via",
+      "score": 24
+    },
+    {
+      "name": "api",
+      "score": 22
+    },
+    {
+      "name": "flow",
+      "score": 22
+    },
+    {
+      "name": "key",
+      "score": 22
+    },
+    {
+      "name": "task",
+      "score": 22
+    },
+    {
+      "name": "all",
+      "score": 20
+    },
+    {
+      "name": "dir",
+      "score": 20
+    },
+    {
+      "name": "mcp",
+      "score": 20
+    },
+    {
+      "name": "when",
+      "score": 20
+    },
+    {
+      "name": "build",
+      "score": 19
+    },
+    {
+      "name": "available",
+      "score": 18
+    },
+    {
+      "name": "for",
+      "score": 18
+    },
+    {
+      "name": "git",
+      "score": 17
+    },
+    {
+      "name": "operator",
+      "score": 17
+    },
+    {
+      "name": "simplicio",
+      "score": 17
+    }
+  ],
+  "architecture": {
+    "signals": [
+      "angular",
+      "django",
+      "dotnet",
+      "express",
+      "fastapi",
+      "go",
+      "nestjs",
+      "nextjs",
+      "playwright",
+      "react",
+      "rust",
+      "vue"
+    ],
+    "system_type": "web"
+  },
+  "dependencies": {
+    "package_manager": "npm",
+    "manifest": null,
+    "runtime": [],
+    "dev": []
+  },
+  "recent_changes": [],
+  "changed_files": [],
+  "integration": {
+    "dev_cli_mapper": "read .simplicio/project-map.json, then use .simplicio/precedent-index.json for task-specific examples",
+    "contract": "SIMPLICIO_INTEGRATION.md"
+  }
+}
