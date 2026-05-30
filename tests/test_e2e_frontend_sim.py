@@ -11,6 +11,7 @@ file committed under ``.sendsprint/evidence/``.
 from __future__ import annotations
 
 import base64
+import sys
 
 import pytest
 
@@ -75,9 +76,7 @@ class FrontendExecutor:
     def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
         index = self.work_dir / "index.html"
         html = index.read_text()
-        html = html.replace(
-            "</header>", '<a href="/login"><button>Login</button></a></header>'
-        )
+        html = html.replace("</header>", '<a href="/login"><button>Login</button></a></header>')
         index.write_text(html)
         return StepReport(step=3, name=f"execute:{item.key}", status="ok", message="diff applied")
 
@@ -161,7 +160,7 @@ def test_frontend_card_to_pr_with_screenshot(tmp_path, monkeypatch):
         name="acme/web",
         repo_slug="acme/web",
         tech="html",
-        test_command="true",  # passes
+        test_command=f'"{sys.executable}" -c "pass"',  # passes cross-platform
         base_branch="develop",
         pr_provider="github",
         frontend_url=f"file://{tmp_path}/index.html",

@@ -17,9 +17,12 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import typer
 from rich.console import Console
+from rich.live import Live
+from rich.table import Table
 
 from sendsprint import __version__
 from sendsprint import credentials as creds
@@ -31,6 +34,7 @@ from sendsprint.operators import (
     GitHubIssuesOperator,
     JiraOperator,
 )
+from sendsprint.progress import ProgressEvent
 from sendsprint.prompt import PromptFanout
 from sendsprint.scope import build_scope
 from sendsprint.watch import Watcher
@@ -132,6 +136,11 @@ def run(
     tech: str | None = typer.Option(None, help="Override detected stack for simplicio --stack"),
     test_command: str | None = typer.Option(None, help="Command to run for test evidence"),
     frontend_url: str | None = typer.Option(None, help="URL to screenshot for screen evidence"),
+    evidence_video: bool = typer.Option(
+        False,
+        "--evidence-video",
+        help="Render delivery-<KEY>.mp4 with hyperframes after screenshot evidence",
+    ),
     draft: bool = typer.Option(True, help="Open PRs as drafts pending your review"),
     specs: bool = typer.Option(True, help="Write simplicio-mapper .specs/ task files per card"),
     fanout: bool = typer.Option(False, help="Run a simplicio-prompt subagent fan-out per card"),
@@ -159,11 +168,12 @@ def run(
         "--resume",
         help="Resume pending items from .sendsprint/state/<sprint>.json",
     ),
+    quiet: bool = typer.Option(False, "--quiet", help="Suppress human progress output"),
     no_update: bool = typer.Option(False, help="Skip the start-up tool update (profile-driven)"),
     output: Path | None = typer.Option(None, "-o", "--output", help="Write RunReport JSON"),
 ) -> None:
     """Deliver a sprint: each card → simplicio task → evidence → draft PR."""
-    _startup(no_update)
+    _startup(no_update or quiet)
     operator = _build_operator(source)
     flow = _build_flow(
         operator,
@@ -176,6 +186,7 @@ def run(
         tech=tech,
         test_command=test_command,
         frontend_url=frontend_url,
+        evidence_video=evidence_video,
         draft=draft,
         write_specs=specs,
         fanout=fanout,
@@ -183,23 +194,27 @@ def run(
         fanout_provider=fanout_provider,
         fanout_dry_run=fanout_dry_run,
     )
+    progress = None if quiet else _RunProgressRenderer(console)
     report = flow.run(
         validate_plan=validate,
         validate_only=validate_only,
         bootstrap_mapper=bootstrap_mapper,
         retro=retro,
         resume=resume,
+        progress=progress,
         **_read_kwargs(source, sprint, flow.scope),
     )
-    console.print(f"[bold]{report.summary}[/bold]")
-    for note in report.notes:
-        console.print(f"  note: {note}")
-    for pr in report.prs:
-        console.print(f"  PR: {pr.url or pr.number} ({pr.state})")
-    _archive_report(report)
+    if not quiet:
+        console.print(f"[bold]{report.summary}[/bold]")
+        for note in report.notes:
+            console.print(f"  note: {note}")
+        for pr in report.prs:
+            console.print(f"  PR: {pr.url or pr.number} ({pr.state})")
+    _archive_report(report, quiet=quiet)
     if output:
         output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
-        console.print(f"report written to {output}")
+        if not quiet:
+            console.print(f"report written to {output}")
     raise typer.Exit(code=130 if report.cancelled else 1 if report.failed else 0)
 
 
@@ -213,6 +228,11 @@ def watch(
     base: str = typer.Option("develop", help="PR target branch"),
     tech: str | None = typer.Option(None, help="Override detected stack"),
     test_command: str | None = typer.Option(None, help="Command to run for test evidence"),
+    evidence_video: bool = typer.Option(
+        False,
+        "--evidence-video",
+        help="Render delivery-<KEY>.mp4 with hyperframes after screenshot evidence",
+    ),
     interval: int = typer.Option(15, help="Minutes between cycles in loop mode"),
     once: bool = typer.Option(False, help="Run a single cycle and exit (for cron/CI triggers)"),
     max_per_cycle: int = typer.Option(1, help="Max cards delivered per cycle"),
@@ -232,6 +252,7 @@ def watch(
         tech=tech,
         test_command=test_command,
         frontend_url=None,
+        evidence_video=evidence_video,
         draft=True,
     )
     watcher = Watcher(flow, interval_minutes=interval, max_per_cycle=max_per_cycle)
@@ -262,7 +283,7 @@ def _startup(skip: bool) -> None:
         logger.warning("startup update skipped: %s", exc)
 
 
-def _archive_report(report: object) -> None:
+def _archive_report(report: object, *, quiet: bool = False) -> None:
     """Persist the run report JSON next to the logs. Best-effort."""
     try:
         from datetime import UTC, datetime
@@ -273,9 +294,167 @@ def _archive_report(report: object) -> None:
         path = log_dir() / f"run-{stamp}.report.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(report.model_dump_json(indent=2), encoding="utf-8")  # type: ignore[attr-defined]
-        console.print(f"[dim]run report archived to {path}[/dim]")
+        if not quiet:
+            console.print(f"[dim]run report archived to {path}[/dim]")
     except Exception as exc:  # noqa: BLE001 — archiving is best-effort
         logger.warning("could not archive run report: %s", exc)
+
+
+class _RunProgressRenderer:
+    def __init__(self, target_console: Console) -> None:
+        self.console = target_console
+        self.live: Live | None = None
+        self.title = "SendSprint"
+        self.total_items = 0
+        self.rows: dict[str, dict[str, Any]] = {}
+        self.order: list[str] = []
+        self.summary = ""
+
+    def __call__(self, event: ProgressEvent) -> None:
+        if event.kind == "run_started":
+            self.title = f"SendSprint - {event.sprint_slug or event.sprint_name or 'run'}"
+            self.total_items = event.total_items
+            for item in event.items:
+                self._ensure_row(item.key, item.type)
+            self._start()
+        elif event.item_key:
+            self._ensure_row(event.item_key, event.item_type or "")
+            row = self.rows[event.item_key]
+            if event.kind == "item_started":
+                row.update(status="running", message="")
+            elif event.kind == "item_skipped":
+                row.update(
+                    status="skipped",
+                    pr=event.pr_number,
+                    dod=event.dod,
+                    message=event.reason or "",
+                )
+            elif event.kind == "item_finished":
+                row.update(
+                    status=event.status or "done",
+                    pr=event.pr_number or event.pr_url,
+                    dod=event.dod,
+                    elapsed_s=event.elapsed_s,
+                    cost_usd=event.cost_usd,
+                    message=event.message or "",
+                )
+        elif event.kind == "drain_requested":
+            self.summary = event.message or "drain requested"
+        elif event.kind == "run_finished":
+            self.summary = self._summary_text(event)
+        self._refresh(final=event.kind == "run_finished")
+
+    def _ensure_row(self, key: str, item_type: str) -> None:
+        if key in self.rows:
+            if item_type:
+                self.rows[key]["type"] = item_type
+            return
+        self.order.append(key)
+        self.rows[key] = {
+            "type": item_type,
+            "status": "pending",
+            "pr": None,
+            "dod": None,
+            "elapsed_s": None,
+            "message": "",
+        }
+
+    def _start(self) -> None:
+        if self.live is None:
+            self.live = Live(
+                self._table(),
+                console=self.console,
+                refresh_per_second=4,
+                transient=False,
+            )
+            self.live.start()
+
+    def _refresh(self, *, final: bool = False) -> None:
+        if self.live is not None:
+            self.live.update(self._table())
+            if final:
+                self.live.stop()
+                self.live = None
+
+    def _table(self) -> Table:
+        table = Table(title=f"{self.title} ({self.total_items} items)")
+        table.add_column("KEY")
+        table.add_column("TYPE")
+        table.add_column("STATUS")
+        table.add_column("PR")
+        table.add_column("DoD")
+        table.add_column("TIME", justify="right")
+        table.add_column("DETAIL")
+        for key in self.order:
+            row = self.rows[key]
+            table.add_row(
+                key,
+                str(row.get("type") or "-"),
+                str(row.get("status") or "pending"),
+                _format_pr(row.get("pr")),
+                _format_dod(row.get("dod")),
+                _format_elapsed(row.get("elapsed_s")),
+                str(row.get("message") or ""),
+            )
+        if self.summary:
+            table.caption = self.summary
+        return table
+
+    def _summary_text(self, event: ProgressEvent) -> str:
+        counts = _row_counts(self.rows)
+        cost = event.cost_usd if event.cost_usd is not None else _row_cost(self.rows)
+        parts = [
+            f"totals: {counts['ok']} ok",
+            f"{counts['failed']} failed",
+            f"{counts['skipped']} skipped",
+        ]
+        if cost:
+            parts.append(f"cost ~${cost:.2f}")
+        if event.cancelled:
+            parts.append("cancelled")
+        return " | ".join(parts)
+
+
+def _format_pr(value: object) -> str:
+    if isinstance(value, int):
+        return f"#{value}"
+    if isinstance(value, str) and value:
+        return value
+    return "-"
+
+
+def _format_dod(value: object) -> str:
+    if value is True:
+        return "✓"
+    if value is False:
+        return "✗"
+    return "-"
+
+
+def _format_elapsed(value: object) -> str:
+    if not isinstance(value, int | float):
+        return "-"
+    seconds = max(0, int(round(value)))
+    minutes, remaining = divmod(seconds, 60)
+    return f"{minutes}m{remaining:02d}s" if minutes else f"{remaining}s"
+
+
+def _row_counts(rows: dict[str, dict[str, Any]]) -> dict[str, int]:
+    counts = {"ok": 0, "failed": 0, "skipped": 0}
+    for row in rows.values():
+        status = row.get("status")
+        if status in counts:
+            counts[status] += 1
+    return counts
+
+
+def _row_cost(rows: dict[str, dict[str, Any]]) -> float:
+    total = 0.0
+    for row in rows.values():
+        value = row.get("cost_usd")
+        if isinstance(value, int | float):
+            total += float(value)
+    return total
 
 
 def _build_operator(source: str) -> BaseOperator:
@@ -301,6 +480,7 @@ def _build_flow(
     tech: str | None,
     test_command: str | None,
     frontend_url: str | None,
+    evidence_video: bool = False,
     draft: bool,
     write_specs: bool = True,
     fanout: bool = False,
@@ -317,6 +497,7 @@ def _build_flow(
         pr_provider=pr_provider,
         repo_slug=repo_slug,
         frontend_url=frontend_url,
+        evidence_video=evidence_video,
     )
     scope = _build_scope(operator, scope_mode)
     fan = (

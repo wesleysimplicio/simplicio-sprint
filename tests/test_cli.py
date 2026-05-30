@@ -21,6 +21,7 @@ def test_run_passes_validate_only_to_flow(monkeypatch, tmp_path):
     assert result.exit_code == 0
     assert captured["validate_plan"] is True
     assert captured["validate_only"] is True
+    assert captured["progress"] is not None
     assert captured["read_kwargs"] == {"sprint_id": "42"}
 
 
@@ -94,6 +95,44 @@ def test_run_cancelled_report_exits_130(monkeypatch, tmp_path):
     assert result.exit_code == 130
 
 
+def test_run_quiet_suppresses_progress_and_archives_quiet(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+    flow = _FakeFlow(captured)
+    _patch_cli(monkeypatch, flow)
+
+    result = CliRunner().invoke(
+        cli_mod.app,
+        ["run", "jira", "42", "--repo", str(tmp_path), "--no-update", "--quiet"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["progress"] is None
+    assert captured["archive_quiet"] is True
+    assert captured["startup_skip"] is True
+
+
+def test_run_passes_evidence_video_to_flow_builder(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+    flow = _FakeFlow(captured)
+    _patch_cli(monkeypatch, flow)
+
+    result = CliRunner().invoke(
+        cli_mod.app,
+        [
+            "run",
+            "jira",
+            "42",
+            "--repo",
+            str(tmp_path),
+            "--no-update",
+            "--evidence-video",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert captured["build_kwargs"]["evidence_video"] is True
+
+
 class _FakeFlow:
     scope = None
 
@@ -111,6 +150,7 @@ class _FakeFlow:
         bootstrap_mapper: bool = True,
         retro: bool = True,
         resume: bool = False,
+        progress: object | None = None,
         **read_kwargs: object,
     ) -> RunReport:
         self.captured["validate_plan"] = validate_plan
@@ -118,12 +158,25 @@ class _FakeFlow:
         self.captured["bootstrap_mapper"] = bootstrap_mapper
         self.captured["retro"] = retro
         self.captured["resume"] = resume
+        self.captured["progress"] = progress
         self.captured["read_kwargs"] = read_kwargs
         return self.report
 
 
 def _patch_cli(monkeypatch, flow: _FakeFlow) -> None:
-    monkeypatch.setattr(cli_mod, "_startup", lambda skip: None)
+    def startup(skip):  # noqa: ANN001
+        flow.captured["startup_skip"] = skip
+
+    monkeypatch.setattr(cli_mod, "_startup", startup)
     monkeypatch.setattr(cli_mod, "_build_operator", lambda source: object())
-    monkeypatch.setattr(cli_mod, "_build_flow", lambda *args, **kwargs: flow)
-    monkeypatch.setattr(cli_mod, "_archive_report", lambda report: None)
+
+    def build_flow(*args, **kwargs):  # noqa: ANN002, ANN003
+        flow.captured["build_kwargs"] = kwargs
+        return flow
+
+    monkeypatch.setattr(cli_mod, "_build_flow", build_flow)
+
+    def archive(report, *, quiet=False):  # noqa: ANN001
+        flow.captured["archive_quiet"] = quiet
+
+    monkeypatch.setattr(cli_mod, "_archive_report", archive)

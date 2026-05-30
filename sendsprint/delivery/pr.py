@@ -168,15 +168,18 @@ class PullRequestManager:
             lines.append("")
         lines.append("### Tests & screens")
         for ev in _dedupe_evidence(evidence):
-            mark = "✅" if ev.passed else "❌"
+            status = ev.status or ("passed" if ev.passed else "failed")
+            mark = {"passed": "✅", "failed": "❌", "skipped": "⏭️"}[status]
             detail = f" — {ev.message}" if ev.message else ""
             lines.append(f"- {mark} **{ev.kind}**: {ev.title}{detail}")
-            if ev.passed and ev.path:
+            if status == "passed" and ev.path:
                 raw = self._raw_url(branch, ev.path)
                 if raw and ev.kind == "screenshot":
                     lines.append("")
                     lines.append(f"  ![{ev.title}]({raw})")
                     lines.append("")
+                elif raw and ev.kind == "video":
+                    lines.append(f"  Video: [{ev.title}]({raw})")
                 elif raw:
                     lines.append(f"  Artifact: [{ev.title}]({raw})")
         return "\n".join(lines)

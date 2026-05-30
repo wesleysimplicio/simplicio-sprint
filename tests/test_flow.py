@@ -73,6 +73,9 @@ class FakeEvidence:
     def capture_screenshot(self, url, *, name="screen", screenshot_fn=None):  # noqa: ANN001
         return None
 
+    def render_delivery_video(self, *, enabled=True, name="delivery", env=None, timeout_s=300):
+        return None
+
     def write_manifest(self, evidence, *, steps_completed=None, review_feedback=None):  # noqa: ANN001
         path = self.work_dir / ".sendsprint/evidence" / self.item_key / "manifest.json"
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -225,6 +228,73 @@ def test_deliver_item_uses_detected_evidence_without_explicit_test_command(
     assert RecordingEvidence.fingerprints == [fingerprint]
 
 
+def test_collect_evidence_renders_video_when_enabled(patched, tmp_path, monkeypatch):
+    class RecordingEvidence(FakeEvidence):
+        videos: int = 0
+
+        def capture_screenshot(self, url, *, name="screen", screenshot_fn=None):  # noqa: ANN001
+            return TestEvidence(kind="screenshot", title=url, passed=True, path="screen.png")
+
+        def render_delivery_video(self, *, enabled=True, name="delivery", env=None, timeout_s=300):
+            self.__class__.videos += 1
+            return TestEvidence(
+                kind="video", title="delivery video", passed=True, path="delivery.mp4"
+            )
+
+    monkeypatch.setattr(flow_mod, "EvidenceCollector", RecordingEvidence)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="do x", status="open")
+    target = RepoTarget(
+        path=tmp_path,
+        name="o/r",
+        repo_slug="o/r",
+        tech="html",
+        test_command="pytest",
+        frontend_url="http://localhost:3000",
+        evidence_video=True,
+    )
+
+    outcome = SprintFlow(FakeOperator([item]), target, draft_prs=True).deliver_item(item)
+
+    assert outcome.pr is not None
+    assert RecordingEvidence.videos == 1
+    evidence = next(step.evidence for step in outcome.steps if step.name.startswith("evidence:"))
+    assert any(ev.kind == "video" and ev.path == "delivery.mp4" for ev in evidence)
+
+
+def test_collect_evidence_skips_missing_video_without_failing_step(patched, tmp_path, monkeypatch):
+    class RecordingEvidence(FakeEvidence):
+        def capture_screenshot(self, url, *, name="screen", screenshot_fn=None):  # noqa: ANN001
+            return TestEvidence(kind="screenshot", title=url, passed=True, path="screen.png")
+
+        def render_delivery_video(self, *, enabled=True, name="delivery", env=None, timeout_s=300):
+            return TestEvidence(
+                kind="video",
+                title="delivery video",
+                passed=False,
+                status="skipped",
+                message="hyperframes not available; skipped",
+            )
+
+    monkeypatch.setattr(flow_mod, "EvidenceCollector", RecordingEvidence)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="do x", status="open")
+    target = RepoTarget(
+        path=tmp_path,
+        name="o/r",
+        repo_slug="o/r",
+        tech="html",
+        test_command="pytest",
+        frontend_url="http://localhost:3000",
+        evidence_video=True,
+    )
+
+    outcome = SprintFlow(FakeOperator([item]), target, draft_prs=True).deliver_item(item)
+
+    evidence_step = next(step for step in outcome.steps if step.name.startswith("evidence:"))
+    assert evidence_step.status == "ok"
+    assert outcome.pr is not None
+    assert any(ev.kind == "video" and ev.status == "skipped" for ev in evidence_step.evidence)
+
+
 def test_run_aggregates_report(patched, tmp_path):
     items = [
         SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open"),
@@ -234,6 +304,34 @@ def test_run_aggregates_report(patched, tmp_path):
     assert len(report.prs) == 2
     assert report.failed is False
     assert "2 item" in report.summary
+
+
+def test_run_emits_progress_events_with_elapsed_and_summary(patched, tmp_path):
+    events: list[flow_mod.ProgressEvent] = []
+    items = [
+        SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open"),
+        SprintItem(id="2", key="ABC-2", type="Task", title="b", status="open"),
+    ]
+
+    report = _flow(FakeOperator(items), tmp_path).run(progress=events.append)
+
+    assert report.failed is False
+    assert [event.kind for event in events] == [
+        "run_started",
+        "item_started",
+        "item_finished",
+        "item_started",
+        "item_finished",
+        "run_finished",
+    ]
+    assert events[0].total_items == 2
+    assert [item.key for item in events[0].items] == ["ABC-1", "ABC-2"]
+    finished = [event for event in events if event.kind == "item_finished"]
+    assert all(event.status == "ok" for event in finished)
+    assert all(event.dod is True for event in finished)
+    assert all(event.elapsed_s is not None for event in finished)
+    assert events[-1].ok_count == 2
+    assert events[-1].cost_usd is None
 
 
 def test_run_writes_state_before_first_item(patched, tmp_path, monkeypatch):

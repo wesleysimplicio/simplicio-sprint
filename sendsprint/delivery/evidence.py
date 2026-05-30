@@ -12,8 +12,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import shlex
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -27,8 +29,13 @@ Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 EVIDENCE_DIRNAME = ".sendsprint/evidence"
 LOG_TAIL_CHARS = 4000
+HYPERFRAMES_CLI_ENV = "HYPERFRAMES_CLI"
+HYPERFRAMES_NPX_COMMAND = ["npx", "--no-install", "hyperframes"]
+HYPERFRAMES_DISCOVERY_TIMEOUT_S = 15
+HYPERFRAMES_RENDER_TIMEOUT_S = 300
+DELIVERY_VIDEO_TITLE = "delivery video"
 
-EvidenceKind = Literal["unit", "e2e", "lint", "build", "screenshot", "log"]
+EvidenceKind = Literal["unit", "e2e", "lint", "build", "screenshot", "video", "log"]
 
 
 @dataclass(frozen=True)
@@ -149,6 +156,93 @@ class EvidenceCollector:
             )
         return TestEvidence(kind="screenshot", title=url, passed=True, path=str(out))
 
+    def render_delivery_video(
+        self,
+        *,
+        enabled: bool = True,
+        name: str | None = None,
+        env: Mapping[str, str] | None = None,
+        timeout_s: int = HYPERFRAMES_RENDER_TIMEOUT_S,
+    ) -> TestEvidence | None:
+        """Render a delivery video from the current evidence folder with hyperframes.
+
+        This is intentionally callable without CLI/flow wiring. Later integration
+        can opt in after screenshots are captured, while missing hyperframes stays
+        non-fatal for the batch.
+        """
+        if not enabled:
+            return None
+
+        environment = os.environ if env is None else env
+        command = _discover_hyperframes(
+            self._runner,
+            cwd=self.work_dir,
+            env=environment,
+        )
+        if command is None:
+            return _skipped_delivery_video("hyperframes not available; skipped")
+
+        self.evidence_dir.mkdir(parents=True, exist_ok=True)
+        video_name = name or f"delivery-{self.item_key}"
+        out = self.evidence_dir / f"{video_name}.mp4"
+        render_command = [
+            *command,
+            "--evidence-mode",
+            str(self.evidence_dir),
+            "-o",
+            str(out),
+        ]
+        try:
+            proc = self._runner(
+                render_command,
+                cwd=str(self.work_dir),
+                shell=False,
+                capture_output=True,
+                text=True,
+                timeout=timeout_s,
+            )
+        except FileNotFoundError:
+            return _skipped_delivery_video("hyperframes not available; skipped")
+        except subprocess.TimeoutExpired:
+            return TestEvidence(
+                kind="video",
+                title=DELIVERY_VIDEO_TITLE,
+                passed=False,
+                message=f"hyperframes timed out after {timeout_s}s",
+            )
+        except subprocess.SubprocessError as exc:
+            return TestEvidence(
+                kind="video",
+                title=DELIVERY_VIDEO_TITLE,
+                passed=False,
+                message=f"hyperframes failed: {exc}",
+            )
+
+        output = _process_output(proc)
+        if proc.returncode == 2:
+            return _skipped_delivery_video(output or "hyperframes skipped: no screenshots found")
+        if proc.returncode != 0:
+            return TestEvidence(
+                kind="video",
+                title=DELIVERY_VIDEO_TITLE,
+                passed=False,
+                message=output or f"hyperframes exit {proc.returncode}",
+            )
+        if not out.exists():
+            return TestEvidence(
+                kind="video",
+                title=DELIVERY_VIDEO_TITLE,
+                passed=False,
+                message=f"hyperframes did not create {video_name}.mp4",
+            )
+        return TestEvidence(
+            kind="video",
+            title=DELIVERY_VIDEO_TITLE,
+            passed=True,
+            path=str(out),
+            message="hyperframes rendered",
+        )
+
     def write_manifest(
         self,
         evidence: list[TestEvidence],
@@ -159,16 +253,18 @@ class EvidenceCollector:
         """Write a stable manifest for PR comments and review-loop revisions."""
         artifacts = [_evidence_record(ev) for ev in _dedupe_evidence(evidence)]
         feedback = [_feedback_record(fb) for fb in _dedupe_feedback(review_feedback or [])]
+        failed = [ev for ev in evidence if _evidence_status(ev) == "failed"]
         manifest = {
             "schema": "sendsprint.evidence/v1",
             "item_key": self.item_key,
-            "status": "passed" if all(ev.passed for ev in evidence) else "failed",
+            "status": "failed" if failed else "passed",
             "steps_completed": steps_completed or [],
             "artifacts": artifacts,
             "review_feedback": feedback,
             "summary": {
-                "passed": sum(1 for ev in evidence if ev.passed),
-                "failed": sum(1 for ev in evidence if not ev.passed),
+                "passed": sum(1 for ev in evidence if _evidence_status(ev) == "passed"),
+                "failed": len(failed),
+                "skipped": sum(1 for ev in evidence if _evidence_status(ev) == "skipped"),
             },
         }
         return self._write("manifest.json", json.dumps(manifest, indent=2, sort_keys=True) + "\n")
@@ -319,6 +415,53 @@ def _playwright_screenshot(url: str, out_path: str) -> bool:
     return True
 
 
+def _discover_hyperframes(
+    runner: Runner,
+    *,
+    cwd: Path,
+    env: Mapping[str, str],
+) -> list[str] | None:
+    configured = env.get(HYPERFRAMES_CLI_ENV, "").strip()
+    if configured:
+        return _split_command(configured)
+
+    try:
+        proc = runner(
+            [*HYPERFRAMES_NPX_COMMAND, "--help"],
+            cwd=str(cwd),
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=HYPERFRAMES_DISCOVERY_TIMEOUT_S,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    if proc.returncode == 0:
+        return HYPERFRAMES_NPX_COMMAND.copy()
+    return None
+
+
+def _split_command(command: str) -> list[str]:
+    parts = shlex.split(command, posix=os.name != "nt")
+    if os.name == "nt":
+        return [part.strip('"') for part in parts]
+    return parts
+
+
+def _process_output(proc: subprocess.CompletedProcess[str]) -> str:
+    return ((proc.stdout or "") + (proc.stderr or "")).strip()[-LOG_TAIL_CHARS:]
+
+
+def _skipped_delivery_video(message: str) -> TestEvidence:
+    return TestEvidence(
+        kind="video",
+        title=DELIVERY_VIDEO_TITLE,
+        passed=False,
+        status="skipped",
+        message=message,
+    )
+
+
 def _evidence_key(ev: TestEvidence) -> tuple[str, str, str, str, bool]:
     return (ev.kind, ev.title, ev.path or "", ev.message or "", ev.passed)
 
@@ -362,6 +505,7 @@ def _evidence_record(ev: TestEvidence) -> dict[str, Any]:
         "kind": ev.kind,
         "title": ev.title,
         "passed": ev.passed,
+        "status": _evidence_status(ev),
         "path": ev.path,
         "message": ev.message,
         "duration_ms": ev.duration_ms,
@@ -369,6 +513,10 @@ def _evidence_record(ev: TestEvidence) -> dict[str, Any]:
     compact = json.dumps(payload, sort_keys=True, default=str)
     payload["id"] = hashlib.blake2b(compact.encode("utf-8"), digest_size=8).hexdigest()
     return {key: value for key, value in payload.items() if value is not None}
+
+
+def _evidence_status(ev: TestEvidence) -> str:
+    return ev.status or ("passed" if ev.passed else "failed")
 
 
 def _feedback_record(feedback: Any) -> dict[str, Any]:

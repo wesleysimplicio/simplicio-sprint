@@ -13,8 +13,10 @@ SendSprint's responsibility.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import signal
+import time
 from collections import deque
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -30,6 +32,7 @@ from sendsprint.executor import SimplicioExecutor
 from sendsprint.mapper import MapperAdapter
 from sendsprint.models import RunReport, ScopeConfig, Sprint, SprintItem, StepReport, TestEvidence
 from sendsprint.operators.base import BaseOperator, TransportUnavailable
+from sendsprint.progress import ProgressCallback, ProgressEvent, ProgressItem
 from sendsprint.prompt import PromptFanout
 from sendsprint.scope import apply_scope
 from sendsprint.state import RunState, stop_requested
@@ -53,6 +56,7 @@ class RepoTarget:
     pr_provider: str = "github"
     repo_slug: str = ""  # owner/repo (github) or repository id (ado)
     frontend_url: str | None = None
+    evidence_video: bool = False
     branch_template: str = DEFAULT_BRANCH_TEMPLATE
     organization: str = ""
     project: str = ""
@@ -102,6 +106,7 @@ class SprintFlow:
         bootstrap_mapper: bool = True,
         retro: bool = True,
         resume: bool = False,
+        progress: ProgressCallback | None = None,
         **read_kwargs: object,
     ) -> RunReport:
         """Read the sprint, scope it, and deliver each item."""
@@ -151,34 +156,92 @@ class SprintFlow:
         if run_state is None:
             report.summary = self._summarize(sprint, report)
             return report
+        _emit_progress(
+            progress,
+            ProgressEvent(
+                kind="run_started",
+                sprint_name=sprint.name,
+                sprint_slug=run_state.sprint_slug,
+                total_items=len(ordered_items),
+                completed_count=len(run_state.completed),
+                failed_count=len(run_state.failed),
+                pending_count=len(run_state.pending),
+                resume=resume,
+                items=[
+                    ProgressItem(key=_state_key(item), type=item.type) for item in ordered_items
+                ],
+            ),
+        )
         self._drain_requested = False
         self._drain_reason = None
         with self._handle_sigint():
             for index, item in enumerate(ordered_items, start=1):
                 item_key = _state_key(item)
                 if not run_state.should_run(item_key):
+                    _emit_progress(
+                        progress,
+                        ProgressEvent(
+                            kind="item_skipped",
+                            item_key=item_key,
+                            item_type=item.type,
+                            index=index,
+                            status="skipped",
+                            pr_number=run_state.last_pr.get(item_key),
+                            dod=item_key in run_state.completed,
+                            reason=_skip_reason(item_key, run_state),
+                        ),
+                    )
                     continue
                 if self._should_drain():
-                    self._mark_cancelled(report, run_state)
+                    self._mark_cancelled(report, run_state, progress=progress)
                     break
+                _emit_progress(
+                    progress,
+                    ProgressEvent(
+                        kind="item_started",
+                        item_key=item_key,
+                        item_type=item.type,
+                        index=index,
+                        status="running",
+                    ),
+                )
+                started = time.perf_counter()
                 outcome = self.deliver_item(item, sprint=sprint, index=index)
+                elapsed_s = time.perf_counter() - started
                 for step in outcome.steps:
                     logger.info(
                         "step %s %s [%s] %s", step.step, step.name, step.status, step.message or ""
                     )
                 report.steps.extend(outcome.steps)
+                item_status, dod, message = _outcome_progress(outcome)
                 if outcome.pr is not None:
                     report.prs.append(outcome.pr)  # type: ignore[arg-type]
                     run_state.mark_completed(item_key, pr_number=_pr_number(outcome.pr))
                 else:
                     run_state.mark_failed(item_key)
+                _emit_progress(
+                    progress,
+                    ProgressEvent(
+                        kind="item_finished",
+                        item_key=item_key,
+                        item_type=item.type,
+                        index=index,
+                        status=item_status,
+                        pr_number=_pr_number(outcome.pr),
+                        pr_url=getattr(outcome.pr, "url", None),
+                        dod=dod,
+                        elapsed_s=elapsed_s,
+                        cost_usd=_cost_usd(outcome.steps),
+                        message=message,
+                    ),
+                )
                 if not self._save_run_state(run_state, report):
                     break
                 if self._should_drain():
-                    self._mark_cancelled(report, run_state)
+                    self._mark_cancelled(report, run_state, progress=progress)
                     break
         if self._should_drain():
-            self._mark_cancelled(report, run_state)
+            self._mark_cancelled(report, run_state, progress=progress)
         report.failed = any(s.status == "failed" for s in report.steps)
         if retro and self.write_specs:
             retro_step = self._write_retrospective(sprint, report)
@@ -187,6 +250,22 @@ class SprintFlow:
                 report.notes.append(retro_step.message or "retrospective skipped")
             report.failed = any(s.status == "failed" for s in report.steps)
         report.summary = self._summarize(sprint, report)
+        _emit_progress(
+            progress,
+            ProgressEvent(
+                kind="run_finished",
+                sprint_name=sprint.name,
+                sprint_slug=run_state.sprint_slug,
+                total_items=len(ordered_items),
+                ok_count=len(report.prs),
+                failed_count=sum(1 for step in report.steps if step.status == "failed"),
+                skipped_count=sum(1 for step in report.steps if step.status == "skipped"),
+                pending_count=len(run_state.pending),
+                cost_usd=_cost_usd(report.steps),
+                cancelled=report.cancelled,
+                message=report.summary,
+            ),
+        )
         logger.info("run done: %s", report.summary)
         return report
 
@@ -446,13 +525,30 @@ class SprintFlow:
             return True
         return False
 
-    def _mark_cancelled(self, report: RunReport, run_state: RunState) -> None:
+    def _mark_cancelled(
+        self,
+        report: RunReport,
+        run_state: RunState,
+        *,
+        progress: ProgressCallback | None = None,
+    ) -> None:
         if report.cancelled:
             return
         report.cancelled = True
         reason = self._drain_reason or "requested"
         pending = len(run_state.pending)
-        report.notes.append(f"run cancelled by {reason}; {pending} item(s) pending")
+        message = f"run cancelled by {reason}; {pending} item(s) pending"
+        report.notes.append(message)
+        _emit_progress(
+            progress,
+            ProgressEvent(
+                kind="drain_requested",
+                reason=reason,
+                pending_count=pending,
+                cancelled=True,
+                message=message,
+            ),
+        )
 
     @contextmanager
     def _handle_sigint(self) -> Generator[None]:
@@ -489,6 +585,8 @@ class SprintFlow:
                 tech=self.target.tech,
                 status=status,  # type: ignore[arg-type]
                 message=result.summary(),
+                elapsed_s=result.elapsed_s,
+                cost_usd=result.cost_usd,
             ),
             note,
         )
@@ -510,7 +608,11 @@ class SprintFlow:
             shot = collector.capture_screenshot(self.target.frontend_url, name="screen")
             if shot is not None:
                 evidence.append(shot)
-        passed = all(e.passed for e in evidence)
+            if _evidence_video_enabled(self.target):
+                video = collector.render_delivery_video()
+                if video is not None:
+                    evidence.append(video)
+        passed = all(_evidence_status(e) != "failed" for e in evidence)
         manifest = collector.write_manifest(evidence, steps_completed=["evidence"])
         evidence.append(
             TestEvidence(
@@ -656,6 +758,46 @@ def _state_key(item: SprintItem) -> str:
 def _pr_number(pr_info: object | None) -> int | None:
     number = getattr(pr_info, "number", None)
     return number if isinstance(number, int) else None
+
+
+def _evidence_video_enabled(target: RepoTarget) -> bool:
+    if target.evidence_video:
+        return True
+    return os.getenv("SENDSPRINT_EVIDENCE_VIDEO", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _evidence_status(evidence: TestEvidence) -> str:
+    return evidence.status or ("passed" if evidence.passed else "failed")
+
+
+def _emit_progress(progress: ProgressCallback | None, event: ProgressEvent) -> None:
+    if progress is not None:
+        progress(event)
+
+
+def _skip_reason(item_key: str, run_state: RunState) -> str:
+    if item_key in run_state.completed:
+        return "resume_completed"
+    if item_key in run_state.failed:
+        return "resume_failed"
+    return "not_pending"
+
+
+def _outcome_progress(outcome: ItemOutcome) -> tuple[str, bool, str | None]:
+    failed = next((step for step in outcome.steps if step.status == "failed"), None)
+    if failed is not None:
+        return "failed", False, failed.message or failed.name
+    if outcome.pr is not None:
+        return "ok", True, None
+    skipped = next((step for step in outcome.steps if step.status == "skipped"), None)
+    if skipped is not None:
+        return "skipped", False, skipped.message or skipped.name
+    return "failed", False, "no pull request opened"
+
+
+def _cost_usd(steps: list[StepReport]) -> float | None:
+    costs = [step.cost_usd for step in steps if step.cost_usd is not None]
+    return sum(costs) if costs else None
 
 
 def _validate_sprint(sprint: Sprint) -> tuple[StepReport, list[str]]:

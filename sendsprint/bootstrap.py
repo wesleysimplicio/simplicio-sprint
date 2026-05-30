@@ -97,7 +97,7 @@ class Updater:
         if res.status == "ok":
             kernel = dest / PROMPT_KERNEL_REL
             res.detail = f"{res.detail}; kernel at {kernel}"
-            os.environ.setdefault("SIMPLICIO_PROMPT_KERNEL", str(kernel))
+            os.environ.setdefault("SIMPLICIO_PROMPT_KERNEL", kernel.as_posix())
         return res
 
     def update_simplicio_mapper(self) -> UpdateResult:

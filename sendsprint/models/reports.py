@@ -19,9 +19,10 @@ def _now() -> datetime:
 class TestEvidence(BaseModel):
     """One test artifact (unit run, e2e screenshot, log)."""
 
-    kind: Literal["unit", "e2e", "lint", "build", "screenshot", "log"]
+    kind: Literal["unit", "e2e", "lint", "build", "screenshot", "video", "log"]
     title: str
     passed: bool
+    status: Literal["passed", "failed", "skipped"] | None = None
     path: str | None = None
     message: str | None = None
     duration_ms: int | None = None
@@ -62,6 +63,8 @@ class StepReport(BaseModel):
     status: StepStatus = "pending"
     started_at: datetime | None = None
     finished_at: datetime | None = None
+    elapsed_s: float | None = None
+    cost_usd: float | None = None
     message: str | None = None
     evidence: list[TestEvidence] = Field(default_factory=list)
     findings: list[SecurityFinding] = Field(default_factory=list)

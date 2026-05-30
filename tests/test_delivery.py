@@ -237,6 +237,109 @@ def test_capture_screenshot_unavailable(tmp_path):
     assert ev is not None and ev.passed is False
 
 
+def test_render_delivery_video_skips_when_hyperframes_unavailable(tmp_path):
+    calls: list[list[str]] = []
+
+    def runner(argv, **kwargs):  # noqa: ANN001
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 1, "", "not found")
+
+    ev = EvidenceCollector(tmp_path, item_key="ABC-1", runner=runner).render_delivery_video()
+
+    assert ev is not None
+    assert ev.kind == "video"
+    assert ev.passed is False
+    assert ev.status == "skipped"
+    assert ev.path is None
+    assert "skipped" in (ev.message or "")
+    assert calls == [["npx", "--no-install", "hyperframes", "--help"]]
+
+
+def test_write_manifest_treats_skipped_video_as_non_failing(tmp_path):
+    collector = EvidenceCollector(tmp_path, item_key="ABC-1")
+    manifest = collector.write_manifest(
+        [
+            TestEvidence(kind="unit", title="pytest", passed=True),
+            TestEvidence(
+                kind="video",
+                title="delivery video",
+                passed=False,
+                status="skipped",
+                message="hyperframes not available; skipped",
+            ),
+        ],
+        steps_completed=["evidence"],
+    )
+
+    data = json.loads(manifest.read_text(encoding="utf-8"))
+    assert data["status"] == "passed"
+    assert data["summary"] == {"failed": 0, "passed": 1, "skipped": 1}
+    assert any(artifact["status"] == "skipped" for artifact in data["artifacts"])
+
+
+def test_render_delivery_video_uses_npx_hyperframes_after_discovery(tmp_path):
+    calls: list[list[str]] = []
+
+    def runner(argv, **kwargs):  # noqa: ANN001
+        from pathlib import Path
+
+        calls.append(argv)
+        if argv[-1] == "--help":
+            return subprocess.CompletedProcess(argv, 0, "hyperframes", "")
+        out = Path(argv[-1])
+        out.write_bytes(b"MP4")
+        return subprocess.CompletedProcess(argv, 0, "rendered", "")
+
+    ev = EvidenceCollector(tmp_path, item_key="ABC-1", runner=runner).render_delivery_video()
+
+    out = tmp_path / ".sendsprint/evidence/ABC-1/delivery-ABC-1.mp4"
+    assert ev is not None and ev.passed is True
+    assert ev.kind == "video"
+    assert ev.path == str(out)
+    assert out.exists()
+    assert calls == [
+        ["npx", "--no-install", "hyperframes", "--help"],
+        [
+            "npx",
+            "--no-install",
+            "hyperframes",
+            "--evidence-mode",
+            str(tmp_path / ".sendsprint/evidence/ABC-1"),
+            "-o",
+            str(out),
+        ],
+    ]
+
+
+def test_render_delivery_video_uses_env_cli_without_npx_probe(tmp_path):
+    calls: list[list[str]] = []
+
+    def runner(argv, **kwargs):  # noqa: ANN001
+        from pathlib import Path
+
+        calls.append(argv)
+        Path(argv[-1]).write_bytes(b"MP4")
+        return subprocess.CompletedProcess(argv, 0, "rendered", "")
+
+    ev = EvidenceCollector(tmp_path, item_key="ABC-1", runner=runner).render_delivery_video(
+        env={"HYPERFRAMES_CLI": "hyperframes"}
+    )
+
+    out = tmp_path / ".sendsprint/evidence/ABC-1/delivery-ABC-1.mp4"
+    assert ev is not None and ev.passed is True
+    assert ev.kind == "video"
+    assert ev.path == str(out)
+    assert calls == [
+        [
+            "hyperframes",
+            "--evidence-mode",
+            str(tmp_path / ".sendsprint/evidence/ABC-1"),
+            "-o",
+            str(out),
+        ]
+    ]
+
+
 def test_write_manifest_deduplicates_evidence_and_review_feedback(tmp_path):
     collector = EvidenceCollector(tmp_path, item_key="ABC-1")
     evidence = [
@@ -340,6 +443,24 @@ def test_render_evidence_deduplicates_and_links_manifest():
     assert body.count("**unit**: pytest") == 1
     assert "Review feedback addressed" in body
     assert "[evidence manifest]" in body
+
+
+def test_render_evidence_links_delivery_video():
+    pr = PullRequestManager("github", "owner/repo", token="t")
+    evidence = [
+        TestEvidence(
+            kind="video",
+            title="delivery video",
+            passed=True,
+            path="/wt/.sendsprint/evidence/ABC-1/delivery-ABC-1.mp4",
+        )
+    ]
+    body = pr._render_evidence("feature/x", evidence, ["evidence"])
+    assert "Video: [delivery video]" in body
+    assert (
+        "raw.githubusercontent.com/owner/repo/feature/x/.sendsprint/evidence/ABC-1/delivery-ABC-1.mp4"
+        in body
+    )
 
 
 class _ReviewClient:
