@@ -20,6 +20,9 @@ KNOWN_TECHS = {
     "nextjs": "Next.js",
     "nestjs": "NestJS",
     "express": "Express",
+    "vitest": "Vitest",
+    "jest": "Jest",
+    "eslint": "ESLint",
     "python": "Python",
     "django": "Django",
     "fastapi": "FastAPI",
@@ -62,6 +65,54 @@ BACK_TECHS = {
 }
 MOBILE_TECHS = {"flutter", "ios", "android"}
 INFRA_TECHS = {"terraform", "docker", "k8s", "ansible"}
+MONOREPO_CONTAINER_DIRS = {
+    "apps",
+    "clients",
+    "frontend",
+    "packages",
+    "services",
+}
+SCAN_DIR_SKIP = {
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".sendsprint",
+    ".tox",
+    ".venv",
+    "dist",
+    "node_modules",
+    "venv",
+}
+STACK_MARKER_FILES = {
+    "package.json",
+    "deno.json",
+    "deno.jsonc",
+    "deno.lock",
+    "bun.lockb",
+    "bunfig.toml",
+    "pyproject.toml",
+    "requirements.txt",
+    "setup.py",
+    "Pipfile",
+    "go.mod",
+    "Cargo.toml",
+    "pubspec.yaml",
+    "Gemfile",
+    "composer.json",
+    "Dockerfile",
+    "Podfile",
+    "angular.json",
+    "build.gradle",
+    "build.gradle.kts",
+}
+STACK_MARKER_GLOBS = {
+    ".eslintrc.*",
+    "eslint.config.*",
+    "jest.config.*",
+    "vitest.config.*",
+}
 
 
 class TechFingerprint(BaseModel):
@@ -70,6 +121,7 @@ class TechFingerprint(BaseModel):
     techs: list[str] = Field(default_factory=list)
     package_managers: list[str] = Field(default_factory=list)
     signals: dict[str, str] = Field(default_factory=dict)
+    tech_roots: dict[str, str] = Field(default_factory=dict)
 
     @property
     def primary_tech(self) -> str | None:
@@ -135,8 +187,15 @@ def _scan_node(repo: Path, techs: list[str], signals: dict[str, str], pms: list[
     deps: dict[str, str] = {}
     for k in ("dependencies", "devDependencies", "peerDependencies"):
         deps.update(data.get(k) or {})
+    scripts = data.get("scripts") if isinstance(data.get("scripts"), dict) else {}
+    script_text = "\n".join(str(value) for value in scripts.values())
+    angular_config = (repo / "angular.json").exists()
     if "@angular/core" in deps:
         _add(techs, signals, "angular", "package.json:@angular/core")
+    elif "@angular/cli" in deps:
+        _add(techs, signals, "angular", "package.json:@angular/cli")
+    elif angular_config:
+        _add(techs, signals, "angular", "angular.json")
     if "react" in deps:
         if "next" in deps:
             _add(techs, signals, "nextjs", "package.json:next")
@@ -153,6 +212,21 @@ def _scan_node(repo: Path, techs: list[str], signals: dict[str, str], pms: list[
     )
     if not framework_detected and not runtime_locked:
         _add(techs, signals, "node", "package.json")
+    if (
+        "vitest" in deps
+        or re.search(r"\bvitest\b", script_text)
+        or any(repo.glob("vitest.config.*"))
+    ):
+        _add(techs, signals, "vitest", "package.json:vitest")
+    if "jest" in deps or re.search(r"\bjest\b", script_text) or any(repo.glob("jest.config.*")):
+        _add(techs, signals, "jest", "package.json:jest")
+    if (
+        "eslint" in deps
+        or re.search(r"\beslint\b", script_text)
+        or any(repo.glob("eslint.config.*"))
+        or any(repo.glob(".eslintrc.*"))
+    ):
+        _add(techs, signals, "eslint", "package.json:eslint")
 
 
 def _scan_python(repo: Path, techs: list[str], signals: dict[str, str], pms: list[str]) -> None:
@@ -261,6 +335,40 @@ def _roles_for(techs: list[str]) -> list[str]:
     return roles
 
 
+def _has_stack_marker(path: Path) -> bool:
+    if any((path / marker).exists() for marker in STACK_MARKER_FILES):
+        return True
+    if any(any(path.glob(pattern)) for pattern in STACK_MARKER_GLOBS):
+        return True
+    return any(path.glob("*.sln")) or any(path.glob("*.csproj")) or any(path.glob("*.xcodeproj"))
+
+
+def _candidate_roots(repo: Path) -> list[Path]:
+    """Return root plus nearby package roots for common frontend/backend monorepos."""
+    roots = [repo]
+    seen = {repo.resolve()}
+
+    def add(path: Path) -> None:
+        resolved = path.resolve()
+        if resolved not in seen and _has_stack_marker(path):
+            seen.add(resolved)
+            roots.append(path)
+
+    with contextlib.suppress(OSError):
+        for child in repo.iterdir():
+            if not child.is_dir() or child.name in SCAN_DIR_SKIP:
+                continue
+            add(child)
+            if child.name not in MONOREPO_CONTAINER_DIRS:
+                continue
+            with contextlib.suppress(OSError):
+                for grandchild in child.iterdir():
+                    if grandchild.is_dir() and grandchild.name not in SCAN_DIR_SKIP:
+                        add(grandchild)
+
+    return roots
+
+
 def detect_tech(repo_path: str | Path) -> TechFingerprint:
     """Inspect filesystem markers and return a TechFingerprint."""
     repo = Path(repo_path).expanduser().resolve()
@@ -270,14 +378,21 @@ def detect_tech(repo_path: str | Path) -> TechFingerprint:
     techs: list[str] = []
     signals: dict[str, str] = {}
     pms: list[str] = []
+    tech_roots: dict[str, str] = {}
 
-    _scan_bun(repo, techs, signals, pms)
-    _scan_deno(repo, techs, signals, pms)
-    _scan_node(repo, techs, signals, pms)
-    _scan_python(repo, techs, signals, pms)
-    _scan_dotnet(repo, techs, signals, pms)
-    _scan_java(repo, techs, signals, pms)
-    _scan_misc(repo, techs, signals, pms)
+    for root in _candidate_roots(repo):
+        before = set(techs)
+        _scan_bun(root, techs, signals, pms)
+        _scan_deno(root, techs, signals, pms)
+        _scan_node(root, techs, signals, pms)
+        _scan_python(root, techs, signals, pms)
+        _scan_dotnet(root, techs, signals, pms)
+        _scan_java(root, techs, signals, pms)
+        _scan_misc(root, techs, signals, pms)
+        root_rel = _relative_root(repo, root)
+        for tech in techs:
+            if tech not in before and tech not in tech_roots:
+                tech_roots[tech] = root_rel
 
     return TechFingerprint(
         repo_path=str(repo),
@@ -285,4 +400,12 @@ def detect_tech(repo_path: str | Path) -> TechFingerprint:
         techs=techs,
         package_managers=pms,
         signals=signals,
+        tech_roots=tech_roots,
     )
+
+
+def _relative_root(repo: Path, root: Path) -> str:
+    with contextlib.suppress(ValueError):
+        rel = root.relative_to(repo)
+        return "." if rel == Path(".") else rel.as_posix()
+    return str(root)

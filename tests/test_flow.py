@@ -64,6 +64,9 @@ class FakeEvidence:
     def collect_tests(self, cmd):  # noqa: ANN001
         return TestEvidence(kind="unit", title=cmd or "tests", passed=True, message="exit 0")
 
+    def collect_detected(self, fingerprint):  # noqa: ANN001
+        return [TestEvidence(kind="unit", title=fingerprint.primary_tech, passed=True)]
+
     def capture_screenshot(self, url, *, name="screen", screenshot_fn=None):  # noqa: ANN001
         return None
 
@@ -187,6 +190,36 @@ def test_deliver_item_records_mapper_and_fanout_steps(patched, tmp_path):
     assert any(n.startswith("fanout:") for n in names)
     # The mapper spec file lands in the worktree under .specs/.
     assert list(tmp_path.glob(".specs/sprints/*/*.task.md"))
+
+
+def test_deliver_item_uses_detected_evidence_without_explicit_test_command(
+    patched, tmp_path, monkeypatch
+):
+    class RecordingEvidence(FakeEvidence):
+        fingerprints = []
+
+        def collect_detected(self, fingerprint):  # noqa: ANN001
+            self.__class__.fingerprints.append(fingerprint)
+            return [TestEvidence(kind="unit", title="vitest", passed=True, message="exit 0")]
+
+    fingerprint = type("T", (), {"primary_tech": "node", "techs": ["node", "vitest"]})()
+    monkeypatch.setattr(flow_mod, "EvidenceCollector", RecordingEvidence)
+    monkeypatch.setattr(flow_mod, "detect_tech", lambda p: fingerprint)
+    target = RepoTarget(
+        path=tmp_path,
+        name="o/r",
+        repo_slug="o/r",
+        tech=None,
+        test_command=None,
+        base_branch="develop",
+        pr_provider="github",
+    )
+
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="do x", status="open")
+    outcome = SprintFlow(FakeOperator([item]), target, draft_prs=True).deliver_item(item)
+
+    assert outcome.pr is not None
+    assert RecordingEvidence.fingerprints == [fingerprint]
 
 
 def test_run_aggregates_report(patched, tmp_path):
