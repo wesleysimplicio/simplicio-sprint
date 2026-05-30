@@ -154,6 +154,11 @@ def run(
         "--retro/--no-retro",
         help="Write .specs sprint RETROSPECTIVE.md after a run",
     ),
+    resume: bool = typer.Option(
+        False,
+        "--resume",
+        help="Resume pending items from .sendsprint/state/<sprint>.json",
+    ),
     no_update: bool = typer.Option(False, help="Skip the start-up tool update (profile-driven)"),
     output: Path | None = typer.Option(None, "-o", "--output", help="Write RunReport JSON"),
 ) -> None:
@@ -183,6 +188,7 @@ def run(
         validate_only=validate_only,
         bootstrap_mapper=bootstrap_mapper,
         retro=retro,
+        resume=resume,
         **_read_kwargs(source, sprint, flow.scope),
     )
     console.print(f"[bold]{report.summary}[/bold]")
@@ -194,7 +200,7 @@ def run(
     if output:
         output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         console.print(f"report written to {output}")
-    raise typer.Exit(code=1 if report.failed else 0)
+    raise typer.Exit(code=130 if report.cancelled else 1 if report.failed else 0)
 
 
 @app.command()

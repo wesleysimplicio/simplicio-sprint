@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import signal
+
 import pytest
 
 from sendsprint import flow as flow_mod
@@ -231,6 +234,147 @@ def test_run_aggregates_report(patched, tmp_path):
     assert len(report.prs) == 2
     assert report.failed is False
     assert "2 item" in report.summary
+
+
+def test_run_writes_state_before_first_item(patched, tmp_path, monkeypatch):
+    state_path = tmp_path / ".sendsprint" / "state" / "sprint-s1.json"
+
+    class StateAwareExec(FakeExecutor):
+        def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
+            assert state_path.exists()
+            data = json.loads(state_path.read_text(encoding="utf-8"))
+            assert data["pending"] == ["ABC-1"]
+            return super().run_item(
+                item, stack=stack, target=target, repo=repo, extra_context=extra_context
+            )
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", StateAwareExec)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open")
+
+    report = _flow(FakeOperator([item]), tmp_path).run()
+
+    data = json.loads(state_path.read_text(encoding="utf-8"))
+    assert data["completed"] == ["ABC-1"]
+    assert data["failed"] == []
+    assert data["pending"] == []
+    assert data["last_pr"] == {"ABC-1": 11}
+    assert report.failed is False
+
+
+def test_run_resume_delivers_only_pending_items(patched, tmp_path, monkeypatch):
+    state_path = tmp_path / ".sendsprint" / "state" / "sprint-s1.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(
+        json.dumps(
+            {
+                "sprint_slug": "sprint-s1",
+                "completed": ["ABC-1"],
+                "failed": [],
+                "pending": ["ABC-2"],
+                "last_pr": {"ABC-1": 7},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    class RecordingExec(FakeExecutor):
+        calls: list[str] = []
+
+        def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
+            self.__class__.calls.append(item.key)
+            return super().run_item(
+                item, stack=stack, target=target, repo=repo, extra_context=extra_context
+            )
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", RecordingExec)
+    items = [
+        SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open"),
+        SprintItem(id="2", key="ABC-2", type="Task", title="b", status="open"),
+    ]
+
+    report = _flow(FakeOperator(items), tmp_path).run(resume=True)
+
+    assert RecordingExec.calls == ["ABC-2"]
+    assert len(report.prs) == 1
+    data = json.loads(state_path.read_text(encoding="utf-8"))
+    assert data["completed"] == ["ABC-1", "ABC-2"]
+    assert data["pending"] == []
+    assert any("skipped 1 settled" in note for note in report.notes)
+
+
+def test_run_resume_without_state_fails_before_delivery(patched, tmp_path, monkeypatch):
+    class UnexpectedExecutor(FakeExecutor):
+        def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
+            raise AssertionError("resume without state must not deliver items")
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", UnexpectedExecutor)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open")
+
+    report = _flow(FakeOperator([item]), tmp_path).run(resume=True)
+
+    assert report.failed is True
+    assert report.prs == []
+    assert report.steps[-1].name == "state:load"
+    assert "not found" in (report.steps[-1].message or "")
+
+
+def test_run_stop_file_drains_after_current_item(patched, tmp_path, monkeypatch):
+    stop_path = tmp_path / ".sendsprint" / "state" / "STOP"
+
+    class StopAfterFirstExec(FakeExecutor):
+        calls: list[str] = []
+
+        def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
+            self.__class__.calls.append(item.key)
+            if item.key == "ABC-1":
+                stop_path.parent.mkdir(parents=True, exist_ok=True)
+                stop_path.write_text("stop", encoding="utf-8")
+            return super().run_item(
+                item, stack=stack, target=target, repo=repo, extra_context=extra_context
+            )
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", StopAfterFirstExec)
+    items = [
+        SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open"),
+        SprintItem(id="2", key="ABC-2", type="Task", title="b", status="open"),
+    ]
+
+    report = _flow(FakeOperator(items), tmp_path).run()
+    data = json.loads((tmp_path / ".sendsprint" / "state" / "sprint-s1.json").read_text())
+
+    assert StopAfterFirstExec.calls == ["ABC-1"]
+    assert report.cancelled is True
+    assert report.failed is False
+    assert data["completed"] == ["ABC-1"]
+    assert data["pending"] == ["ABC-2"]
+    assert "cancelled" in (report.summary or "")
+
+
+def test_run_sigint_drains_after_current_item(patched, tmp_path, monkeypatch):
+    class InterruptingExec(FakeExecutor):
+        calls: list[str] = []
+
+        def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001
+            self.__class__.calls.append(item.key)
+            if item.key == "ABC-1":
+                signal.raise_signal(signal.SIGINT)
+            return super().run_item(
+                item, stack=stack, target=target, repo=repo, extra_context=extra_context
+            )
+
+    monkeypatch.setattr(flow_mod, "SimplicioExecutor", InterruptingExec)
+    items = [
+        SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open"),
+        SprintItem(id="2", key="ABC-2", type="Task", title="b", status="open"),
+    ]
+
+    report = _flow(FakeOperator(items), tmp_path).run()
+
+    assert InterruptingExec.calls == ["ABC-1"]
+    assert report.cancelled is True
+    assert report.failed is False
+    assert any("sigint" in note for note in report.notes)
+    assert (tmp_path / ".specs" / "sprints" / "sprint-s1" / "RETROSPECTIVE.md").exists()
 
 
 def test_run_writes_retrospective_by_default(patched, tmp_path):

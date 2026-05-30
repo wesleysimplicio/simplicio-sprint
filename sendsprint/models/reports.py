@@ -87,4 +87,5 @@ class RunReport(BaseModel):
     prs: list[PrInfo] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     failed: bool = False
+    cancelled: bool = False
     summary: str | None = None
