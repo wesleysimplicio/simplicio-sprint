@@ -233,6 +233,37 @@ def test_run_aggregates_report(patched, tmp_path):
     assert "2 item" in report.summary
 
 
+def test_run_writes_retrospective_by_default(patched, tmp_path):
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open")
+    report = _flow(FakeOperator([item]), tmp_path).run()
+    retro = tmp_path / ".specs" / "sprints" / "sprint-s1" / "RETROSPECTIVE.md"
+    assert retro.exists()
+    assert any(step.name == "retro:write" and step.status == "ok" for step in report.steps)
+    assert "https://github.com/o/r/pull/11" in retro.read_text(encoding="utf-8")
+
+
+def test_run_can_skip_retrospective(patched, tmp_path):
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open")
+    report = _flow(FakeOperator([item]), tmp_path).run(retro=False)
+
+    assert not any(step.name == "retro:write" for step in report.steps)
+    assert not list(tmp_path.glob(".specs/sprints/*/RETROSPECTIVE.md"))
+
+
+def test_run_marks_retrospective_write_failure(patched, tmp_path, monkeypatch):
+    def fail_retro(self, sprint, report):  # noqa: ANN001
+        raise OSError("cannot write retro")
+
+    monkeypatch.setattr(flow_mod.MapperAdapter, "write_retrospective", fail_retro)
+    item = SprintItem(id="1", key="ABC-1", type="Task", title="a", status="open")
+
+    report = _flow(FakeOperator([item]), tmp_path).run()
+
+    retro_step = next(step for step in report.steps if step.name == "retro:write")
+    assert retro_step.status == "failed"
+    assert report.failed is True
+
+
 def test_run_aborts_on_preflight_errors(patched, tmp_path, monkeypatch):
     class UnexpectedExecutor(FakeExecutor):
         def run_item(self, item, *, stack=None, target=None, repo=None, extra_context=None):  # noqa: ANN001

@@ -53,6 +53,20 @@ def test_run_passes_no_bootstrap_mapper_to_flow(monkeypatch, tmp_path):
     assert captured["bootstrap_mapper"] is False
 
 
+def test_run_passes_no_retro_to_flow(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+    flow = _FakeFlow(captured)
+    _patch_cli(monkeypatch, flow)
+
+    result = CliRunner().invoke(
+        cli_mod.app,
+        ["run", "jira", "42", "--repo", str(tmp_path), "--no-update", "--no-retro"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["retro"] is False
+
+
 class _FakeFlow:
     scope = None
 
@@ -65,11 +79,13 @@ class _FakeFlow:
         validate_plan: bool = True,
         validate_only: bool = False,
         bootstrap_mapper: bool = True,
+        retro: bool = True,
         **read_kwargs: object,
     ) -> RunReport:
         self.captured["validate_plan"] = validate_plan
         self.captured["validate_only"] = validate_only
         self.captured["bootstrap_mapper"] = bootstrap_mapper
+        self.captured["retro"] = retro
         self.captured["read_kwargs"] = read_kwargs
         return RunReport(workspace="repo", sprint_name="Sprint", sprint_id="42", summary="ok")
 
