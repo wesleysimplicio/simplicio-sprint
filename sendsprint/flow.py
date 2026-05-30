@@ -29,7 +29,7 @@ from sendsprint.models import RunReport, ScopeConfig, Sprint, SprintItem, StepRe
 from sendsprint.operators.base import BaseOperator, TransportUnavailable
 from sendsprint.prompt import PromptFanout
 from sendsprint.scope import apply_scope
-from sendsprint.tech import detect_tech
+from sendsprint.tech import TechFingerprint, detect_tech
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +170,10 @@ class SprintFlow:
             )
             return outcome
 
-        tech = self.target.tech or detect_tech(str(work_dir)).primary_tech
+        fingerprint: TechFingerprint | None = (
+            None if self.target.tech else detect_tech(str(work_dir))
+        )
+        tech = self.target.tech or (fingerprint.primary_tech if fingerprint else None)
 
         context_parts: list[str] = []
         mapper_context: dict | None = None
@@ -203,7 +206,7 @@ class SprintFlow:
             return outcome
 
         # Step 3b — collect evidence.
-        evidence_step, evidence = self._collect_evidence(work_dir, item, tech)
+        evidence_step, evidence = self._collect_evidence(work_dir, item, tech, fingerprint)
         outcome.steps.append(evidence_step)
 
         # Step 4 — commit + push.
@@ -362,10 +365,18 @@ class SprintFlow:
         )
 
     def _collect_evidence(
-        self, work_dir: Path, item: SprintItem, tech: str | None
+        self,
+        work_dir: Path,
+        item: SprintItem,
+        tech: str | None,
+        fingerprint: TechFingerprint | None = None,
     ) -> tuple[StepReport, list]:
         collector = EvidenceCollector(work_dir, item_key=item.key or item.id or "item")
-        evidence = [collector.collect_tests(self.target.test_command)]
+        evidence = (
+            [collector.collect_tests(self.target.test_command)]
+            if self.target.test_command is not None
+            else collector.collect_detected(fingerprint or detect_tech(str(work_dir)))
+        )
         if self.target.frontend_url:
             shot = collector.capture_screenshot(self.target.frontend_url, name="screen")
             if shot is not None:

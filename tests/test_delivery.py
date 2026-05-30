@@ -7,11 +7,12 @@ import subprocess
 
 import pytest
 
-from sendsprint.delivery.evidence import EvidenceCollector
+from sendsprint.delivery.evidence import EvidenceCollector, select_evidence_commands
 from sendsprint.delivery.git_ops import GitError, GitOps
 from sendsprint.delivery.pr import PullRequestManager
 from sendsprint.github_integration import ReviewFeedback, ReviewReader
 from sendsprint.models.reports import TestEvidence
+from sendsprint.tech import TechFingerprint, detect_tech
 
 # -- git_ops ----------------------------------------------------------------
 
@@ -85,6 +86,134 @@ def test_collect_tests_failure(tmp_path):
 
     ev = EvidenceCollector(tmp_path, item_key="ABC-1", runner=runner).collect_tests("pytest")
     assert ev.passed is False
+
+
+def test_collect_detected_node_vitest_runs_no_pytest(tmp_path):
+    calls: list[str] = []
+
+    def runner(cmd, **kwargs):  # noqa: ANN001
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "ok", "")
+
+    fp = TechFingerprint(repo_path=str(tmp_path), techs=["node", "vitest", "eslint"])
+    evidence = EvidenceCollector(tmp_path, item_key="ABC-1", runner=runner).collect_detected(fp)
+
+    assert calls == ["npx vitest run", "npx eslint ."]
+    assert all(ev.passed for ev in evidence)
+    assert not any("pytest" in cmd for cmd in calls)
+    assert (tmp_path / ".sendsprint/evidence/ABC-1/tests-vitest.log").exists()
+    assert (tmp_path / ".sendsprint/evidence/ABC-1/lint-eslint.log").exists()
+
+
+def test_collect_detected_monorepo_runs_python_and_node_suites(tmp_path):
+    calls: list[tuple[str, str]] = []
+
+    def runner(cmd, **kwargs):  # noqa: ANN001
+        calls.append((cmd, kwargs["cwd"]))
+        return subprocess.CompletedProcess(cmd, 0, "ok", "")
+
+    fp = TechFingerprint(
+        repo_path=str(tmp_path),
+        techs=["python", "vitest", "eslint"],
+        tech_roots={"python": "backend", "vitest": "frontend", "eslint": "frontend"},
+    )
+    evidence = EvidenceCollector(tmp_path, item_key="ABC-1", runner=runner).collect_detected(fp)
+
+    assert calls == [
+        ("pytest -q", str(tmp_path / "backend")),
+        ("ruff check", str(tmp_path / "backend")),
+        ("npx vitest run", str(tmp_path / "frontend")),
+        ("npx eslint .", str(tmp_path / "frontend")),
+    ]
+    assert [ev.kind for ev in evidence] == ["unit", "lint", "unit", "lint"]
+
+
+def test_collect_detected_failure_marks_evidence_failed(tmp_path):
+    def runner(cmd, **kwargs):  # noqa: ANN001
+        return subprocess.CompletedProcess(cmd, 1, "", "failed")
+
+    fp = TechFingerprint(repo_path=str(tmp_path), techs=["node", "jest"])
+    evidence = EvidenceCollector(tmp_path, item_key="ABC-1", runner=runner).collect_detected(fp)
+
+    assert [ev.title for ev in evidence] == ["jest", "eslint"]
+    assert all(ev.passed is False for ev in evidence)
+    assert all(ev.message == "exit 1" for ev in evidence)
+
+
+def test_select_evidence_commands_nextjs_skips_unit_and_lints(tmp_path):
+    fp = TechFingerprint(repo_path=str(tmp_path), techs=["nextjs"])
+
+    commands = select_evidence_commands(fp)
+
+    assert [(cmd.title, cmd.command) for cmd in commands] == [
+        ("next test", None),
+        ("next lint", "npx next lint"),
+    ]
+
+
+def test_detect_tech_finds_js_test_and_lint_tools(tmp_path):
+    (tmp_path / "package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {"test": "vitest run", "lint": "eslint ."},
+                "devDependencies": {"vitest": "^1.0.0", "eslint": "^9.0.0"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    fp = detect_tech(tmp_path)
+
+    assert "node" in fp.techs
+    assert "vitest" in fp.techs
+    assert "eslint" in fp.techs
+
+
+def test_detect_tech_finds_frontend_backend_monorepo(tmp_path):
+    backend = tmp_path / "backend"
+    backend.mkdir()
+    backend.joinpath("pyproject.toml").write_text(
+        """
+[project]
+dependencies = ["pytest", "ruff"]
+""",
+        encoding="utf-8",
+    )
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    frontend.joinpath("package.json").write_text(
+        json.dumps(
+            {
+                "scripts": {"test": "vitest run", "lint": "eslint ."},
+                "devDependencies": {"vitest": "^1.0.0", "eslint": "^9.0.0"},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    fp = detect_tech(tmp_path)
+
+    assert "python" in fp.techs
+    assert "node" in fp.techs
+    assert "vitest" in fp.techs
+    assert "eslint" in fp.techs
+    assert fp.tech_roots["python"] == "backend"
+    assert fp.tech_roots["node"] == "frontend"
+    assert fp.tech_roots["vitest"] == "frontend"
+    assert fp.tech_roots["eslint"] == "frontend"
+
+
+def test_detect_tech_finds_angular_and_js_config_markers(tmp_path):
+    (tmp_path / "package.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "angular.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "jest.config.js").write_text("export default {}", encoding="utf-8")
+    (tmp_path / "eslint.config.js").write_text("export default []", encoding="utf-8")
+
+    fp = detect_tech(tmp_path)
+
+    assert "angular" in fp.techs
+    assert "jest" in fp.techs
+    assert "eslint" in fp.techs
 
 
 def test_capture_screenshot_with_injected_fn(tmp_path):

@@ -14,10 +14,12 @@ import json
 import logging
 import subprocess
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from sendsprint.models.reports import TestEvidence
+from sendsprint.tech import TechFingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,18 @@ Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 EVIDENCE_DIRNAME = ".sendsprint/evidence"
 LOG_TAIL_CHARS = 4000
+
+EvidenceKind = Literal["unit", "e2e", "lint", "build", "screenshot", "log"]
+
+
+@dataclass(frozen=True)
+class EvidenceCommand:
+    kind: EvidenceKind
+    title: str
+    command: str | None
+    log_name: str
+    skip_message: str = "no command configured; skipped"
+    work_subdir: str = "."
 
 
 class EvidenceCollector:
@@ -49,17 +63,30 @@ class EvidenceCollector:
 
     def collect_tests(self, test_command: str | None) -> TestEvidence:
         """Run the configured test command and capture the result + log."""
-        if not test_command:
+        title = test_command or "tests"
+        return self.collect_command(EvidenceCommand("unit", title, test_command, "tests.log"))
+
+    def collect_detected(self, fingerprint: TechFingerprint | None) -> list[TestEvidence]:
+        """Run test/lint commands selected from a repository tech fingerprint."""
+        commands = select_evidence_commands(fingerprint)
+        if not commands:
+            return [self.collect_tests(None)]
+        return [self.collect_command(command) for command in commands]
+
+    def collect_command(self, evidence_command: EvidenceCommand) -> TestEvidence:
+        """Run one evidence command and capture the result + log."""
+        if not evidence_command.command:
             return TestEvidence(
-                kind="unit",
-                title="tests",
+                kind=evidence_command.kind,
+                title=evidence_command.title,
                 passed=True,
-                message="no test command configured; skipped",
+                message=evidence_command.skip_message,
             )
         try:
+            cwd = self._command_cwd(evidence_command)
             proc = self._runner(
-                test_command,
-                cwd=str(self.work_dir),
+                evidence_command.command,
+                cwd=str(cwd),
                 shell=True,
                 capture_output=True,
                 text=True,
@@ -67,20 +94,23 @@ class EvidenceCollector:
             )
         except FileNotFoundError:
             return TestEvidence(
-                kind="unit", title=test_command, passed=False, message="test runner not found"
+                kind=evidence_command.kind,
+                title=evidence_command.title,
+                passed=False,
+                message="test runner not found",
             )
         except subprocess.TimeoutExpired:
             return TestEvidence(
-                kind="unit",
-                title=test_command,
+                kind=evidence_command.kind,
+                title=evidence_command.title,
                 passed=False,
                 message=f"tests timed out after {self._test_timeout_s}s",
             )
         log = ((proc.stdout or "") + (proc.stderr or ""))[-LOG_TAIL_CHARS:]
-        log_path = self._write("tests.log", log)
+        log_path = self._write(evidence_command.log_name, log)
         return TestEvidence(
-            kind="unit",
-            title=test_command,
+            kind=evidence_command.kind,
+            title=evidence_command.title,
             passed=proc.returncode == 0,
             path=str(log_path),
             message=f"exit {proc.returncode}",
@@ -149,11 +179,135 @@ class EvidenceCollector:
         path.write_text(content, encoding="utf-8")
         return path
 
+    def _command_cwd(self, evidence_command: EvidenceCommand) -> Path:
+        if evidence_command.work_subdir in {"", "."}:
+            return self.work_dir
+        return self.work_dir / evidence_command.work_subdir
+
+
+def select_evidence_commands(fingerprint: TechFingerprint | None) -> list[EvidenceCommand]:
+    if fingerprint is None:
+        return []
+    techs = set(fingerprint.techs)
+    commands: list[EvidenceCommand] = []
+
+    if techs & {"python", "django", "fastapi", "flask"}:
+        root = _root_for(fingerprint, "python", "django", "fastapi", "flask")
+        commands.append(
+            EvidenceCommand("unit", "pytest", "pytest -q", "tests-python.log", work_subdir=root)
+        )
+        commands.append(
+            EvidenceCommand("lint", "ruff", "ruff check", "lint-ruff.log", work_subdir=root)
+        )
+
+    if "vitest" in techs:
+        commands.append(
+            EvidenceCommand(
+                "unit",
+                "vitest",
+                "npx vitest run",
+                "tests-vitest.log",
+                work_subdir=_root_for(fingerprint, "vitest", "node"),
+            )
+        )
+    elif "jest" in techs:
+        commands.append(
+            EvidenceCommand(
+                "unit",
+                "jest",
+                "npx jest --ci",
+                "tests-jest.log",
+                work_subdir=_root_for(fingerprint, "jest", "node"),
+            )
+        )
+    elif "angular" in techs:
+        commands.append(
+            EvidenceCommand(
+                "unit",
+                "angular",
+                "npx ng test --watch=false",
+                "tests-angular.log",
+                work_subdir=_root_for(fingerprint, "angular", "node"),
+            )
+        )
+    elif "nextjs" in techs:
+        commands.append(
+            EvidenceCommand(
+                "unit",
+                "next test",
+                None,
+                "tests-next.log",
+                "Next.js test runner not detected; skipped",
+                work_subdir=_root_for(fingerprint, "nextjs", "node"),
+            )
+        )
+
+    if "nextjs" in techs:
+        commands.append(
+            EvidenceCommand(
+                "lint",
+                "next lint",
+                "npx next lint",
+                "lint-next.log",
+                work_subdir=_root_for(fingerprint, "nextjs", "node"),
+            )
+        )
+    elif "angular" in techs:
+        commands.append(
+            EvidenceCommand(
+                "lint",
+                "angular lint",
+                "npx ng lint",
+                "lint-angular.log",
+                work_subdir=_root_for(fingerprint, "angular", "node"),
+            )
+        )
+    elif "eslint" in techs or techs & {"vitest", "jest"}:
+        commands.append(
+            EvidenceCommand(
+                "lint",
+                "eslint",
+                "npx eslint .",
+                "lint-eslint.log",
+                work_subdir=_root_for(fingerprint, "eslint", "vitest", "jest", "node"),
+            )
+        )
+
+    if "go" in techs:
+        root = _root_for(fingerprint, "go")
+        commands.append(
+            EvidenceCommand("unit", "go test", "go test ./...", "tests-go.log", work_subdir=root)
+        )
+        commands.append(
+            EvidenceCommand("lint", "go vet", "go vet ./...", "lint-go-vet.log", work_subdir=root)
+        )
+
+    if "dotnet" in techs:
+        commands.append(
+            EvidenceCommand(
+                "unit",
+                "dotnet test",
+                "dotnet test",
+                "tests-dotnet.log",
+                work_subdir=_root_for(fingerprint, "dotnet"),
+            )
+        )
+
+    return commands
+
+
+def _root_for(fingerprint: TechFingerprint, *techs: str) -> str:
+    for tech in techs:
+        root = fingerprint.tech_roots.get(tech)
+        if root:
+            return root
+    return "."
+
 
 def _playwright_screenshot(url: str, out_path: str) -> bool:
     """Capture ``url`` to ``out_path``. Returns False when Playwright is absent."""
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import sync_playwright  # type: ignore[import-not-found]
     except ImportError:
         return False
     with sync_playwright() as pw:  # pragma: no cover - requires a browser

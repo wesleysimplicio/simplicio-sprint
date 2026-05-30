@@ -19,7 +19,7 @@ from collections.abc import Iterable
 from typing import Any
 
 try:  # pragma: no cover - presence depends on wheel install
-    import sendsprint_core as _rust_core
+    import sendsprint_core as _rust_core  # type: ignore[import-not-found]
 except ImportError:  # pragma: no cover - Python-only environments
     _rust_core = None
 

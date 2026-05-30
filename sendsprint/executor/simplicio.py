@@ -29,7 +29,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from sendsprint.models.reports import StepReport
+from sendsprint.models.reports import StepReport, StepStatus
 from sendsprint.models.sprint import SprintItem
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ class SimplicioTask:
 class SimplicioResult:
     """Outcome of one ``simplicio task`` invocation."""
 
-    status: str  # "ok" | "failed" | "skipped"
+    status: StepStatus
     returncode: int | None
     stdout: str = ""
     stderr: str = ""
@@ -179,7 +179,7 @@ class SimplicioExecutor:
                 message=f"simplicio task timed out after {self.timeout_s}s",
                 argv=argv,
             )
-        status = "ok" if proc.returncode == 0 else "failed"
+        status: StepStatus = "ok" if proc.returncode == 0 else "failed"
         message = (
             "simplicio applied the diff and tests passed"
             if status == "ok"
@@ -257,7 +257,7 @@ class SimplicioExecutor:
                 message=message,
             )
         if proc.returncode in {0, 2}:
-            status = "ok" if proc.returncode == 0 else "skipped"
+            status: StepStatus = "ok" if proc.returncode == 0 else "skipped"
             message = (
                 "mapper index refreshed" if proc.returncode == 0 else "mapper index already fresh"
             )
