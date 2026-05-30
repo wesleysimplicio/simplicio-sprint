@@ -67,11 +67,41 @@ def test_run_passes_no_retro_to_flow(monkeypatch, tmp_path):
     assert captured["retro"] is False
 
 
+def test_run_passes_resume_to_flow(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+    flow = _FakeFlow(captured)
+    _patch_cli(monkeypatch, flow)
+
+    result = CliRunner().invoke(
+        cli_mod.app,
+        ["run", "jira", "42", "--repo", str(tmp_path), "--no-update", "--resume"],
+    )
+
+    assert result.exit_code == 0
+    assert captured["resume"] is True
+
+
+def test_run_cancelled_report_exits_130(monkeypatch, tmp_path):
+    captured: dict[str, object] = {}
+    flow = _FakeFlow(captured, report=RunReport(workspace="repo", cancelled=True, summary="stop"))
+    _patch_cli(monkeypatch, flow)
+
+    result = CliRunner().invoke(
+        cli_mod.app,
+        ["run", "jira", "42", "--repo", str(tmp_path), "--no-update"],
+    )
+
+    assert result.exit_code == 130
+
+
 class _FakeFlow:
     scope = None
 
-    def __init__(self, captured: dict[str, object]) -> None:
+    def __init__(self, captured: dict[str, object], report: RunReport | None = None) -> None:
         self.captured = captured
+        self.report = report or RunReport(
+            workspace="repo", sprint_name="Sprint", sprint_id="42", summary="ok"
+        )
 
     def run(
         self,
@@ -80,14 +110,16 @@ class _FakeFlow:
         validate_only: bool = False,
         bootstrap_mapper: bool = True,
         retro: bool = True,
+        resume: bool = False,
         **read_kwargs: object,
     ) -> RunReport:
         self.captured["validate_plan"] = validate_plan
         self.captured["validate_only"] = validate_only
         self.captured["bootstrap_mapper"] = bootstrap_mapper
         self.captured["retro"] = retro
+        self.captured["resume"] = resume
         self.captured["read_kwargs"] = read_kwargs
-        return RunReport(workspace="repo", sprint_name="Sprint", sprint_id="42", summary="ok")
+        return self.report
 
 
 def _patch_cli(monkeypatch, flow: _FakeFlow) -> None:

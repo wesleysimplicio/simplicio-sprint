@@ -14,7 +14,10 @@ from __future__ import annotations
 
 import logging
 import re
+import signal
 from collections import deque
+from collections.abc import Generator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -29,6 +32,7 @@ from sendsprint.models import RunReport, ScopeConfig, Sprint, SprintItem, StepRe
 from sendsprint.operators.base import BaseOperator, TransportUnavailable
 from sendsprint.prompt import PromptFanout
 from sendsprint.scope import apply_scope
+from sendsprint.state import RunState, stop_requested
 from sendsprint.tech import TechFingerprint, detect_tech
 
 logger = logging.getLogger(__name__)
@@ -87,6 +91,8 @@ class SprintFlow:
         self.update_tickets = update_tickets
         self.write_specs = write_specs
         self.fanout = fanout
+        self._drain_requested = False
+        self._drain_reason: str | None = None
 
     def run(
         self,
@@ -95,6 +101,7 @@ class SprintFlow:
         validate_only: bool = False,
         bootstrap_mapper: bool = True,
         retro: bool = True,
+        resume: bool = False,
         **read_kwargs: object,
     ) -> RunReport:
         """Read the sprint, scope it, and deliver each item."""
@@ -140,15 +147,38 @@ class SprintFlow:
             sprint.transport,
         )
         ordered_items = _topological_order(sprint.items)
-        for index, item in enumerate(ordered_items, start=1):
-            outcome = self.deliver_item(item, sprint=sprint, index=index)
-            for step in outcome.steps:
-                logger.info(
-                    "step %s %s [%s] %s", step.step, step.name, step.status, step.message or ""
-                )
-            report.steps.extend(outcome.steps)
-            if outcome.pr is not None:
-                report.prs.append(outcome.pr)  # type: ignore[arg-type]
+        run_state = self._load_run_state(sprint, ordered_items, resume=resume, report=report)
+        if run_state is None:
+            report.summary = self._summarize(sprint, report)
+            return report
+        self._drain_requested = False
+        self._drain_reason = None
+        with self._handle_sigint():
+            for index, item in enumerate(ordered_items, start=1):
+                item_key = _state_key(item)
+                if not run_state.should_run(item_key):
+                    continue
+                if self._should_drain():
+                    self._mark_cancelled(report, run_state)
+                    break
+                outcome = self.deliver_item(item, sprint=sprint, index=index)
+                for step in outcome.steps:
+                    logger.info(
+                        "step %s %s [%s] %s", step.step, step.name, step.status, step.message or ""
+                    )
+                report.steps.extend(outcome.steps)
+                if outcome.pr is not None:
+                    report.prs.append(outcome.pr)  # type: ignore[arg-type]
+                    run_state.mark_completed(item_key, pr_number=_pr_number(outcome.pr))
+                else:
+                    run_state.mark_failed(item_key)
+                if not self._save_run_state(run_state, report):
+                    break
+                if self._should_drain():
+                    self._mark_cancelled(report, run_state)
+                    break
+        if self._should_drain():
+            self._mark_cancelled(report, run_state)
         report.failed = any(s.status == "failed" for s in report.steps)
         if retro and self.write_specs:
             retro_step = self._write_retrospective(sprint, report)
@@ -251,6 +281,11 @@ class SprintFlow:
             outcome.steps.append(self._update_ticket(item, pr_info))
 
         return outcome
+
+    def request_drain(self, reason: str = "requested") -> None:
+        """Ask the run loop to stop after the current item finishes."""
+        self._drain_requested = True
+        self._drain_reason = reason
 
     def revise_pr(self, pr_number: int, *, branch: str, item_key: str = "") -> list[StepReport]:
         """Review loop: pull reviewer feedback and have simplicio address it."""
@@ -367,6 +402,74 @@ class SprintFlow:
             status="ok",
             message=f"retrospective at {path.relative_to(self.target.path)}",
         )
+
+    def _load_run_state(
+        self,
+        sprint: Sprint,
+        ordered_items: list[SprintItem],
+        *,
+        resume: bool,
+        report: RunReport,
+    ) -> RunState | None:
+        sprint_slug = MapperAdapter(self.target.path).sprint_dir_name(sprint)
+        item_keys = [_state_key(item) for item in ordered_items]
+        try:
+            run_state = RunState.for_sprint(self.target.path, sprint_slug, item_keys, resume=resume)
+        except (OSError, ValueError) as exc:
+            report.steps.append(
+                StepReport(step=1, name="state:load", status="failed", message=str(exc))
+            )
+            report.failed = True
+            return None
+        if resume:
+            skipped = len(run_state.completed) + len(run_state.failed)
+            if skipped:
+                report.notes.append(f"resumed {sprint_slug}; skipped {skipped} settled item(s)")
+        return run_state
+
+    def _save_run_state(self, run_state: RunState, report: RunReport) -> bool:
+        try:
+            run_state.save()
+        except (OSError, ValueError) as exc:
+            report.steps.append(
+                StepReport(step=1, name="state:save", status="failed", message=str(exc))
+            )
+            report.failed = True
+            return False
+        return True
+
+    def _should_drain(self) -> bool:
+        if self._drain_requested:
+            return True
+        if stop_requested(self.target.path):
+            self.request_drain("stop_file")
+            return True
+        return False
+
+    def _mark_cancelled(self, report: RunReport, run_state: RunState) -> None:
+        if report.cancelled:
+            return
+        report.cancelled = True
+        reason = self._drain_reason or "requested"
+        pending = len(run_state.pending)
+        report.notes.append(f"run cancelled by {reason}; {pending} item(s) pending")
+
+    @contextmanager
+    def _handle_sigint(self) -> Generator[None]:
+        previous_handler = signal.getsignal(signal.SIGINT)
+
+        def _handler(signum: int, frame: object) -> None:
+            self.request_drain("sigint")
+
+        try:
+            signal.signal(signal.SIGINT, _handler)
+        except (AttributeError, ValueError):
+            yield
+            return
+        try:
+            yield
+        finally:
+            signal.signal(signal.SIGINT, previous_handler)
 
     def _fan_out(
         self, item: SprintItem, *, mapper_context: dict | None = None
@@ -534,8 +637,9 @@ class SprintFlow:
     def _summarize(self, sprint: Sprint, report: RunReport) -> str:
         ok = sum(1 for s in report.steps if s.status == "ok")
         failed = sum(1 for s in report.steps if s.status == "failed")
+        prefix = "cancelled, " if report.cancelled else ""
         return (
-            f"{sprint.name}: {len(sprint.items)} item(s), "
+            f"{sprint.name}: {prefix}{len(sprint.items)} item(s), "
             f"{len(report.prs)} PR(s), {ok} ok / {failed} failed step(s)"
         )
 
@@ -543,6 +647,15 @@ class SprintFlow:
 def _slug(text: str, *, max_len: int = 40) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
     return slug[:max_len].strip("-") or "task"
+
+
+def _state_key(item: SprintItem) -> str:
+    return item.key or item.id
+
+
+def _pr_number(pr_info: object | None) -> int | None:
+    number = getattr(pr_info, "number", None)
+    return number if isinstance(number, int) else None
 
 
 def _validate_sprint(sprint: Sprint) -> tuple[StepReport, list[str]]:
