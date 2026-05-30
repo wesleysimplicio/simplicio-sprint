@@ -7,7 +7,7 @@ from sendsprint import __version__
 def test_package_version_matches_release_metadata() -> None:
     project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]
 
-    assert project["version"] == "1.2.3"
+    assert project["version"] == "1.2.4"
     assert __version__ == project["version"]
 
 

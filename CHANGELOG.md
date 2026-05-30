@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.4
+
+Repository context release for LLM-assisted execution.
+
+- Commits `.simplicio/project-map.json` and
+  `.simplicio/precedent-index.json` so mapper-aware agents can load the
+  repository map directly.
+
 ## 1.2.3
 
 Dependency-alignment release for the Simplicio ecosystem.
