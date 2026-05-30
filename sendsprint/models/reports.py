@@ -85,5 +85,6 @@ class RunReport(BaseModel):
     finished_at: datetime | None = None
     steps: list[StepReport] = Field(default_factory=list)
     prs: list[PrInfo] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
     failed: bool = False
     summary: str | None = None

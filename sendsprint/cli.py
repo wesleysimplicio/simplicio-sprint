@@ -138,6 +138,17 @@ def run(
     fanout_subagents: int = typer.Option(600, help="Subagents per fan-out"),
     fanout_provider: str = typer.Option("deepseek", help="simplicio-prompt provider"),
     fanout_dry_run: bool = typer.Option(False, help="Run the fan-out offline (no key/network)"),
+    validate: bool = typer.Option(
+        True,
+        "--validate/--no-validate",
+        help="Run sprint plan validation before processing items",
+    ),
+    validate_only: bool = typer.Option(False, help="Validate the sprint plan and exit"),
+    bootstrap_mapper: bool = typer.Option(
+        True,
+        "--bootstrap-mapper/--no-bootstrap-mapper",
+        help="Create mapper context when .simplicio/project-map.json is absent",
+    ),
     no_update: bool = typer.Option(False, help="Skip the start-up tool update (profile-driven)"),
     output: Path | None = typer.Option(None, "-o", "--output", help="Write RunReport JSON"),
 ) -> None:
@@ -162,8 +173,15 @@ def run(
         fanout_provider=fanout_provider,
         fanout_dry_run=fanout_dry_run,
     )
-    report = flow.run(**_read_kwargs(source, sprint, flow.scope))
+    report = flow.run(
+        validate_plan=validate,
+        validate_only=validate_only,
+        bootstrap_mapper=bootstrap_mapper,
+        **_read_kwargs(source, sprint, flow.scope),
+    )
     console.print(f"[bold]{report.summary}[/bold]")
+    for note in report.notes:
+        console.print(f"  note: {note}")
     for pr in report.prs:
         console.print(f"  PR: {pr.url or pr.number} ({pr.state})")
     _archive_report(report)
