@@ -149,6 +149,11 @@ def run(
         "--bootstrap-mapper/--no-bootstrap-mapper",
         help="Create mapper context when .simplicio/project-map.json is absent",
     ),
+    retro: bool = typer.Option(
+        True,
+        "--retro/--no-retro",
+        help="Write .specs sprint RETROSPECTIVE.md after a run",
+    ),
     no_update: bool = typer.Option(False, help="Skip the start-up tool update (profile-driven)"),
     output: Path | None = typer.Option(None, "-o", "--output", help="Write RunReport JSON"),
 ) -> None:
@@ -177,6 +182,7 @@ def run(
         validate_plan=validate,
         validate_only=validate_only,
         bootstrap_mapper=bootstrap_mapper,
+        retro=retro,
         **_read_kwargs(source, sprint, flow.scope),
     )
     console.print(f"[bold]{report.summary}[/bold]")

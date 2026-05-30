@@ -36,6 +36,7 @@ $rows
 ## Snapshot
 
 - Sprint: `$sprint_slug`
+- Sprint ID: `$sprint_id`
 - Source: `$source`
 - Status: `$status`
 - Items: $item_count
@@ -53,6 +54,10 @@ $rows
 ## Tasks
 
 $task_rows
+
+## Notes
+
+$notes
 """,
 }
 

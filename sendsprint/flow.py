@@ -94,6 +94,7 @@ class SprintFlow:
         validate_plan: bool = True,
         validate_only: bool = False,
         bootstrap_mapper: bool = True,
+        retro: bool = True,
         **read_kwargs: object,
     ) -> RunReport:
         """Read the sprint, scope it, and deliver each item."""
@@ -149,6 +150,12 @@ class SprintFlow:
             if outcome.pr is not None:
                 report.prs.append(outcome.pr)  # type: ignore[arg-type]
         report.failed = any(s.status == "failed" for s in report.steps)
+        if retro and self.write_specs:
+            retro_step = self._write_retrospective(sprint, report)
+            report.steps.append(retro_step)
+            if retro_step.status != "ok":
+                report.notes.append(retro_step.message or "retrospective skipped")
+            report.failed = any(s.status == "failed" for s in report.steps)
         report.summary = self._summarize(sprint, report)
         logger.info("run done: %s", report.summary)
         return report
@@ -341,6 +348,25 @@ class SprintFlow:
             )
         executor = SimplicioExecutor(self.target.path, binary=self.simplicio_binary)
         return executor.index(self.target.path, repo=self.target.name)
+
+    def _write_retrospective(self, sprint: Sprint, report: RunReport) -> StepReport:
+        try:
+            path = MapperAdapter(self.target.path).write_retrospective(sprint, report)
+        except OSError as exc:
+            return StepReport(
+                step=8,
+                name="retro:write",
+                repo=self.target.name,
+                status="failed",
+                message=str(exc),
+            )
+        return StepReport(
+            step=8,
+            name="retro:write",
+            repo=self.target.name,
+            status="ok",
+            message=f"retrospective at {path.relative_to(self.target.path)}",
+        )
 
     def _fan_out(
         self, item: SprintItem, *, mapper_context: dict | None = None

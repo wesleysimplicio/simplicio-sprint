@@ -9,7 +9,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from sendsprint.models.reports import RunReport
 from sendsprint.models.sprint import Sprint, SprintItem
+from sendsprint.utils.templates import TemplateRenderer
 
 # Ticket statuses (any source/language) folded into the mapper's three states.
 _DONE = {
@@ -229,6 +231,14 @@ class MapperAdapter:
         path.write_text(self.render_task(sprint, item, index), encoding="utf-8")
         return path
 
+    def write_retrospective(self, sprint: Sprint, report: RunReport) -> Path:
+        """Write the sprint retrospective from the latest run report."""
+        sprint_dir = self.sprints_root() / self.sprint_dir_name(sprint)
+        sprint_dir.mkdir(parents=True, exist_ok=True)
+        path = sprint_dir / "RETROSPECTIVE.md"
+        path.write_text(self.render_retrospective(sprint, report), encoding="utf-8")
+        return path
+
     # -- renderers ----------------------------------------------------------
 
     def render_task(self, sprint: Sprint, item: SprintItem, index: int) -> str:
@@ -359,6 +369,41 @@ class MapperAdapter:
             rows.append(f"| {index} | {title} | {_map_status(item.status)} | {owner} |")
         return "\n".join(["# Backlog", "", *rows, ""])
 
+    def render_retrospective(self, sprint: Sprint, report: RunReport) -> str:
+        task_rows = [
+            "| Item | Source status | Final status | PR |",
+            "| --- | --- | --- | --- |",
+        ]
+        for item in sprint.items:
+            final_status = _final_item_status(item, report)
+            pr = _pr_for_item(item, report)
+            pr_cell = _pr_link(pr)
+            title = (item.title or item.key or item.id).replace("|", "\\|")
+            task_rows.append(
+                f"| `{item.key or item.id}` {title} | {_map_status(item.status)} | "
+                f"{final_status} | {pr_cell} |"
+            )
+
+        notes = "\n".join(f"- {note}" for note in report.notes) if report.notes else "- None"
+        return TemplateRenderer().render(
+            "retrospective",
+            {
+                "name": sprint.name or self.sprint_dir_name(sprint),
+                "sprint_slug": self.sprint_dir_name(sprint),
+                "sprint_id": sprint.id,
+                "source": sprint.source,
+                "status": _map_status(sprint.state),
+                "item_count": len(sprint.items),
+                "done_count": sum(1 for item in sprint.items if _map_status(item.status) == "done"),
+                "doing_count": sum(
+                    1 for item in sprint.items if _map_status(item.status) == "doing"
+                ),
+                "todo_count": sum(1 for item in sprint.items if _map_status(item.status) == "todo"),
+                "task_rows": "\n".join(task_rows),
+                "notes": notes,
+            },
+        )
+
 
 # -- helpers ----------------------------------------------------------------
 
@@ -411,6 +456,36 @@ def _render_links(sprint_name: str, item: SprintItem) -> str:
     if item.labels:
         links.append(f"- Labels: {', '.join(item.labels)}")
     return "\n".join(links)
+
+
+def _final_item_status(item: SprintItem, report: RunReport) -> str:
+    key = item.key or item.id
+    item_steps = [step for step in report.steps if step.name.endswith(f":{key}")]
+    if any(step.status == "failed" for step in item_steps):
+        return "failed"
+    if any(step.name.startswith("pr:") and step.status == "ok" for step in item_steps):
+        return "passed"
+    if any(step.status == "skipped" for step in item_steps):
+        return "blocked"
+    return "todo"
+
+
+def _pr_for_item(item: SprintItem, report: RunReport):
+    key = item.key or item.id
+    for step in report.steps:
+        if step.name == f"pr:{key}" and step.pr is not None:
+            return step.pr
+    title_prefix = f"{key}:"
+    return next((pr for pr in report.prs if pr.title.startswith(title_prefix)), None)
+
+
+def _pr_link(pr: object | None) -> str:
+    url = getattr(pr, "url", None)
+    if not url:
+        return "-"
+    number = getattr(pr, "number", None)
+    label = f"#{number}" if number else str(url)
+    return f"[{label}]({url})"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
